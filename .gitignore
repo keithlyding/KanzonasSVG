@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+/build/
+/dist/
+/AppDir/
+*.AppImage
+squashfs-root/
+# the built engine (python tools/build_engine.py)
+/kanzonassvg/lib/
+selftest*.log
+*.part

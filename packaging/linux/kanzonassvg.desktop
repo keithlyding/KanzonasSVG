@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=KanzonasSVG
+GenericName=Picture to SVG
+Comment=Turn pictures (logos, drawings, scans) into SVG files
+Exec=KanzonasSVG %f
+Icon=kanzonassvg
+Terminal=false
+Categories=Graphics;2DGraphics;VectorGraphics;
+MimeType=image/png;image/jpeg;image/bmp;image/gif;image/webp;image/tiff;
+Keywords=SVG;trace;vectorize;vector;logo;potrace;autotrace;
+StartupNotify=true
+StartupWMClass=KanzonasSVG
