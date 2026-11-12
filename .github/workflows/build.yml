@@ -86,6 +86,42 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path dist\KanzonasSVG -DestinationPath KanzonasSVG-windows.zip
 
+      - name: Build the installer (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          if (-not (Test-Path $iscc)) { throw "Inno Setup isn't available" }
+          & $iscc /DMyAppVersion=${{ steps.ver.outputs.version }} installer\KanzonasSVG.iss
+          if ($LASTEXITCODE -ne 0) { throw "Installer build failed" }
+
+      - name: Test the installer (install, self test of the installed program, update, uninstall)
+        timeout-minutes: 15
+        shell: pwsh
+        run: |
+          $setup = "dist-installer\KanzonasSVG-v${{ steps.ver.outputs.version }}-setup.exe"
+          $dir = "$env:RUNNER_TEMP\kzsvg"
+          $a = "/VERYSILENT","/SUPPRESSMSGBOXES","/CURRENTUSER","/NORESTART","/DIR=$dir"
+          foreach ($round in 1, 2) {     # the second time installs over the first (an update)
+            $p = Start-Process $setup -ArgumentList $a -PassThru -Wait
+            if ($p.ExitCode -ne 0) { throw "Install $round failed with code $($p.ExitCode)" }
+          }
+          if (-not (Test-Path "$dir\KanzonasSVG.exe")) { throw "KanzonasSVG.exe isn't installed" }
+          $p = Start-Process "$dir\KanzonasSVG.exe" -ArgumentList "--selftest","installed-selftest.log" -PassThru -Wait
+          Get-Content installed-selftest.log
+          if ($p.ExitCode -ne 0) { throw "The installed program's self test failed" }
+          $p = Start-Process "$dir\unins000.exe" -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "Uninstall failed with code $($p.ExitCode)" }
+          Start-Sleep -Seconds 3
+          if (Test-Path "$dir\KanzonasSVG.exe") { throw "Uninstalling left the program behind" }
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: KanzonasSVG-v${{ steps.ver.outputs.version }}-setup
+          path: dist-installer/KanzonasSVG-v${{ steps.ver.outputs.version }}-setup.exe
+          compression-level: 0
+          if-no-files-found: error
+
       - uses: actions/upload-artifact@v6
         with:
           name: KanzonasSVG-v${{ steps.ver.outputs.version }}-windows
@@ -270,6 +306,12 @@ jobs:
           name: KanzonasSVG-v${{ env.VERSION }}-linux
           path: release
 
+      - uses: actions/download-artifact@v6
+        if: steps.rel.outputs.new == 'true'
+        with:
+          name: KanzonasSVG-v${{ env.VERSION }}-setup
+          path: release
+
       - name: Release notes and checksums
         if: steps.rel.outputs.new == 'true'
         run: |
@@ -284,12 +326,13 @@ jobs:
           PY
           cd release
           chmod +x KanzonasSVG-x86_64.AppImage
-          sha256sum KanzonasSVG-windows.zip KanzonasSVG-x86_64.AppImage > ../SHA256SUMS.txt
+          sha256sum "KanzonasSVG-v$VERSION-setup.exe" KanzonasSVG-windows.zip KanzonasSVG-x86_64.AppImage > ../SHA256SUMS.txt
           cd ..
           {
             echo
-            echo "**Windows:** download \`KanzonasSVG-windows.zip\`, unzip it anywhere and run \`KanzonasSVG.exe\`"
-            echo "(\`kanzonassvg-cli.exe\` in the same folder is the command line)."
+            echo "**Windows:** download \`KanzonasSVG-v$VERSION-setup.exe\` and run it (no administrator rights"
+            echo "needed; installing a newer one over it updates it). Or, without installing: \`KanzonasSVG-windows.zip\`,"
+            echo "unzip it anywhere and run \`KanzonasSVG.exe\` (\`kanzonassvg-cli.exe\` in its folder is the command line)."
             echo "**Linux (64-bit; Ubuntu 22.04 or newer):** download \`KanzonasSVG-x86_64.AppImage\`, make it"
             echo "executable (\`chmod +x\`) and run it."
             echo
@@ -310,5 +353,6 @@ jobs:
           body_path: notes.md
           files: |
             SHA256SUMS.txt
+            release/KanzonasSVG-v${{ env.VERSION }}-setup.exe
             release/KanzonasSVG-windows.zip
             release/KanzonasSVG-x86_64.AppImage

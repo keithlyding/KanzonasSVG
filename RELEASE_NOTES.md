@@ -2,6 +2,15 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.0.1
+
+New:
+- A new icon, matching KanzonasPDF and KanzonasCAD: the cactus and sunflower with an orange
+  "SVG" tag.
+- A Windows installer: download the setup file and run it (no administrator rights needed). It
+  adds KanzonasSVG to the Start menu and to "Open with" for pictures, and installing a newer
+  version over it updates it. The zip is still there if you'd rather not install.
+
 ## 1.0
 
 New:

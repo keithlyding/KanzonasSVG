@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 /build/
 /dist/
+/dist-installer/
 /AppDir/
 *.AppImage
 squashfs-root/
