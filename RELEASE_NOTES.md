@@ -10,6 +10,8 @@ New:
 - Auto settings: each picture gets the settings that suit it (exactly a logo's colors,
   smoothing for JPEGs and scans, transparent backgrounds kept, black and white for scans of
   dark lines). Change anything after.
+- Remove a solid background, white or any color: around the picture only (that color inside
+  the logo stays), or everywhere.
 - Every mode of Inkscape's Trace Bitmap: colors, grays, brightness steps, black and white,
   edges, Autotrace colors and centerline.
 - Exact colors and sharp edges, holes that stay holes, and faster on big pictures than

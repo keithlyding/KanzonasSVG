@@ -37,8 +37,11 @@ def parser():
     p.add_argument("--smooth", action=argparse.BooleanOptionalAction, default=None,
                    help="smooth noise before reducing colors (--no-smooth: don't)")
     p.add_argument("--tile", action="store_true", help="tile the color layers instead of stacking them")
-    p.add_argument("--remove-background", action=argparse.BooleanOptionalAction, default=None,
-                   help="leave out the background layer (--no-remove-background: keep it)")
+    p.add_argument("--background", default=None, choices=["keep", "remove", "remove-all"],
+                   help="the picture's background (the color around its edge): keep it, remove it around "
+                   "the picture (that color inside shapes stays), or remove that color everywhere")
+    p.add_argument("--remove-background", action="store_const", const="remove", dest="background",
+                   help="the same as --background remove")
     p.add_argument("--threshold", type=float, default=None, metavar="0-1",
                    help="black and white: brightness cutoff (default 0.45); edges: edge threshold (default 0.65)")
     p.add_argument("--invert", action="store_true", help="black and white, edges: trace the light parts")
@@ -79,8 +82,9 @@ def options_from(args, picked=None):
         scans=args.colors if args.colors is not None else base.scans,
         smooth=args.smooth if args.smooth is not None else base.smooth,
         stack=not args.tile,
-        remove_background=args.remove_background if args.remove_background is not None
-        else base.remove_background and mode in (engine.COLORS, engine.GRAYS, engine.BRIGHTNESS_STEPS),
+        remove_background={"keep": engine.BG_KEEP, "remove": engine.BG_REMOVE,
+                           "remove-all": engine.BG_REMOVE_ALL}[args.background] if args.background
+        else base.remove_background if mode in (engine.COLORS, engine.GRAYS, engine.BRIGHTNESS_STEPS) else 0,
         threshold=threshold,
         invert=args.invert,
         speckles=args.speckles,

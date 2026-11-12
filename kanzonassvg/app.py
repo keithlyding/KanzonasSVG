@@ -51,7 +51,7 @@ is off: then press <i>Trace &gt; Update now</i>, F5).</li>
 settings for the picture: how many colors it needs (the fewest after which more colors no
 longer make it visibly closer: a logo gets exactly its colors, a photo or painting a number
 that keeps the file reasonable), <b>Smooth</b> when it has JPEG blotches or scan noise,
-<b>Remove background</b> when its background is transparent (so the SVG's is too), and
+<b>Background: Remove</b> when its background is transparent (so the SVG's is too), and
 <b>Black and white</b> with its <b>Threshold</b> for a scan of dark lines on a light page.
 The status bar says what it picked. Change anything after: Auto doesn't change it back.</p>
 <p><i>Trace &gt; Auto settings for new pictures</i> (on at first) does this for every picture you
@@ -75,7 +75,12 @@ instead of outlines.</li>
 while keeping edges sharp.</li>
 <li><b>Stack</b>: each color layer also covers the area of the layers above it, so no gaps
 show between colors. Off: the layers are tiled side by side.</li>
-<li><b>Remove background</b>: leaves out the bottom layer (usually the background).</li>
+<li><b>Background</b>: <i>Keep</i> traces the background like any color. <i>Remove</i> leaves
+out the picture's background (the color that most of its edge has, light or dark) around the
+picture: the SVG is see-through there, and that color inside shapes (the white inside a
+logo's letters) stays. <i>Remove, also inside</i> leaves that color out everywhere, so gaps
+inside shapes are see-through too. (Brightness steps: the bottom layer is left out. Autotrace
+always leaves out white, or with Remove, the background color, everywhere.)</li>
 <li><b>Invert</b>: traces the light parts instead of the dark ones.</li>
 <li><b>Speckles</b>: drops spots of up to this many pixels.</li>
 <li><b>Smooth corners</b>: 0 keeps every corner sharp; higher rounds them off.</li>
@@ -402,10 +407,17 @@ class Settings(QScrollArea):
         self.smooth.setToolTip("Even out noise and JPEG blotches first; edges stay sharp")
         self.stack = QCheckBox("Stack", checked=True)
         self.stack.setToolTip("Each layer also covers the layers above it, so no gaps show")
-        self.remove_bg = QCheckBox("Remove background")
-        self.remove_bg.setToolTip("Leave out the bottom layer")
-        for w in (self.smooth, self.stack, self.remove_bg):
+        for w in (self.smooth, self.stack):
             f.addRow(w)
+        self.remove_bg = QComboBox()
+        self.remove_bg.addItem("Keep", engine.BG_KEEP)
+        self.remove_bg.addItem("Remove", engine.BG_REMOVE)
+        self.remove_bg.addItem("Remove, also inside", engine.BG_REMOVE_ALL)
+        self.remove_bg.setToolTip("Leave out the picture's background (the color around its edge):\n"
+                                  "Remove: around the picture only (that color inside shapes stays)\n"
+                                  "Remove, also inside: that color everywhere")
+        self.bg_label = QLabel("Background")
+        f.addRow(self.bg_label, self.remove_bg)
         lay.addWidget(self.g_multi)
 
         self.g_single = QGroupBox("Scan")
@@ -466,13 +478,13 @@ class Settings(QScrollArea):
         self._edge = 0.65
         self._bw = 0.45
         self._last_mode = engine.COLORS
-        for w in (self.mode, self.enlarge):
+        for w in (self.mode, self.enlarge, self.remove_bg):
             w.currentIndexChanged.connect(self._changed)
         for w in (self.scans, self.speckles, self.filters):
             w.valueChanged.connect(self._changed)
         for w in (self.threshold, self.corners, self.tolerance, self.error):
             w.valueChanged.connect(self._changed)
-        for w in (self.smooth, self.stack, self.remove_bg, self.invert, self.optimize, self.width):
+        for w in (self.smooth, self.stack, self.invert, self.optimize, self.width):
             w.toggled.connect(self._changed)
         self.reset.clicked.connect(self.reset_all)
         self._update_visible()
@@ -502,7 +514,8 @@ class Settings(QScrollArea):
         self.g_multi.setVisible(mode in MULTI_MODES or mode == engine.AUTOTRACE)
         self.smooth.setVisible(mode in (engine.COLORS, engine.GRAYS))
         self.stack.setVisible(mode in MULTI_MODES)
-        self.remove_bg.setVisible(mode in MULTI_MODES)
+        self.remove_bg.setVisible(mode in MULTI_MODES or mode == engine.AUTOTRACE)
+        self.bg_label.setVisible(mode in MULTI_MODES or mode == engine.AUTOTRACE)
         self.scans_label.setText({engine.GRAYS: "Grays", engine.BRIGHTNESS_STEPS: "Steps"}.get(mode, "Colors"))
         self.g_single.setVisible(mode in (engine.BRIGHTNESS, engine.EDGES))
         self.g_potrace.setVisible(mode in POTRACE_MODES)
@@ -515,7 +528,7 @@ class Settings(QScrollArea):
             scans=self.scans.value(),
             smooth=self.smooth.isChecked(),
             stack=self.stack.isChecked(),
-            remove_background=self.remove_bg.isChecked(),
+            remove_background=self.remove_bg.currentData(),
             threshold=self.threshold.value(),
             invert=self.invert.isChecked(),
             speckles=self.speckles.value(),
@@ -589,7 +602,7 @@ class Settings(QScrollArea):
         self.scans.setValue(max(self.scans.minimum(), min(self.scans.maximum(), o.scans)))
         self.smooth.setChecked(o.smooth)
         self.stack.setChecked(o.stack)
-        self.remove_bg.setChecked(o.remove_background)
+        self.remove_bg.setCurrentIndex(max(0, self.remove_bg.findData(int(o.remove_background))))
         self.invert.setChecked(o.invert)
         if o.mode == engine.BRIGHTNESS:
             self.threshold.setValue(o.threshold)
@@ -609,7 +622,7 @@ class Settings(QScrollArea):
         self.scans.setValue(8)
         self.smooth.setChecked(True)
         self.stack.setChecked(True)
-        self.remove_bg.setChecked(False)
+        self.remove_bg.setCurrentIndex(0)
         self.threshold.setValue(0.45)
         self.invert.setChecked(False)
         self.speckles.setValue(2)

@@ -40,6 +40,10 @@ From [Releases](https://github.com/keithlyding/KanzonasSVG/releases):
 3. *File > Save SVG* (Ctrl+S), or *File > Copy SVG* (Ctrl+Shift+C) to paste it into Inkscape or
    another program.
 
+**Background**: *Remove* makes the picture's background (the color around its edge, light or
+dark) see-through and keeps that color inside shapes; *Remove, also inside* removes that color
+everywhere.
+
 Modes: **Colors** (best for logos: count the background as a color), Grays, Brightness steps,
 Black and white, Edges, Autotrace colors, and Autotrace centerline (lines along the middle of
 strokes). *Help > How to use KanzonasSVG* (F1) explains every setting.
@@ -53,6 +57,7 @@ folder; on Linux, the AppImage with options):
 kanzonassvg-cli logo.png                      logo.svg next to it, settings picked for it
 kanzonassvg-cli --colors 4 *.png -o svgs      every PNG into the svgs folder, 4 colors each
 kanzonassvg-cli --no-auto logo.png            the defaults (8 colors) instead of picked settings
+kanzonassvg-cli --background remove logo.jpg  a see-through background
 kanzonassvg-cli --mode bw scan.jpg -o scan.svg
 kanzonassvg-cli --help                        every option
 ```

@@ -205,6 +205,11 @@ struct Shape
 // Shapes from the bottom up.
 using Shapes = std::vector<Shape>;
 
+inline int channel_diff(RGB a, RGB b)
+{
+    return std::max({std::abs(a.r - b.r), std::abs(a.g - b.g), std::abs(a.b - b.b)});
+}
+
 std::string hex_color(RGB c)
 {
     static char const hexdigits[] = "0123456789abcdef";
@@ -393,6 +398,79 @@ IndexedMap quantized(RgbMap const &map, kz_options const &o)
     return imap;
 }
 
+/**
+ * The background: the color that most of the picture's edge has (at least a quarter of
+ * it), or -1 when no color does.
+ */
+int background_index(IndexedMap const &imap)
+{
+    std::vector<long> count(imap.nrColors, 0);
+    long total = 0;
+    auto add = [&](int x, int y) {
+        unsigned k = imap.pixels[(size_t)y * imap.width + x];
+        if ((int)k < imap.nrColors) {
+            count[k]++;
+        }
+        total++;
+    };
+    for (int x = 0; x < imap.width; x++) {
+        add(x, 0);
+        add(x, imap.height - 1);
+    }
+    for (int y = 1; y + 1 < imap.height; y++) {
+        add(0, y);
+        add(imap.width - 1, y);
+    }
+    if (!total || imap.nrColors == 0) {
+        return -1;
+    }
+    int best = (int)(std::max_element(count.begin(), count.end()) - count.begin());
+    return count[best] * 4 >= total ? best : -1;
+}
+
+/**
+ * The pixels to leave out: those of the background color <b> that reach the edge of the
+ * picture through others of that color (KZ_BG_REMOVE: white inside a logo stays), or all of
+ * that color (KZ_BG_REMOVE_ALL).
+ */
+std::vector<unsigned char> background_mask(IndexedMap const &imap, int b, int how)
+{
+    int const w = imap.width, h = imap.height;
+    std::vector<unsigned char> out((size_t)w * h, 0);
+    if (how == KZ_BG_REMOVE_ALL) {
+        for (size_t i = 0; i < out.size(); i++) {
+            out[i] = (int)imap.pixels[i] == b;
+        }
+        return out;
+    }
+    std::vector<size_t> todo;
+    auto seed = [&](int x, int y) {
+        size_t i = (size_t)y * w + x;
+        if (!out[i] && (int)imap.pixels[i] == b) {
+            out[i] = 1;
+            todo.push_back(i);
+        }
+    };
+    for (int x = 0; x < w; x++) {
+        seed(x, 0);
+        seed(x, h - 1);
+    }
+    for (int y = 0; y < h; y++) {
+        seed(0, y);
+        seed(w - 1, y);
+    }
+    while (!todo.empty()) {
+        size_t i = todo.back();
+        todo.pop_back();
+        int x = (int)(i % w), y = (int)(i / w);
+        if (x > 0) seed(x - 1, y);
+        if (x + 1 < w) seed(x + 1, y);
+        if (y > 0) seed(x, y - 1);
+        if (y + 1 < h) seed(x, y + 1);
+    }
+    return out;
+}
+
 Shapes trace_colors(RgbMap const &map, kz_options const &o, Progress &progress)
 {
     IndexedMap imap(1, 1);
@@ -403,17 +481,37 @@ Shapes trace_colors(RgbMap const &map, kz_options const &o, Progress &progress)
     }
     Progress::Part all(progress, 0.15, 0.85);
 
+    // The background left out: its pixels are in no layer, so it shows through.
+    int const bg = o.remove_background ? background_index(imap) : -1;
+    std::vector<unsigned char> gone;
+    if (bg >= 0) {
+        gone = background_mask(imap, bg, o.remove_background);
+    }
+
+    // Colors with no pixel left (the background color, all of it left out) get no layer:
+    // stacked, it would be drawn under the others for nothing.
+    std::vector<char> present(imap.nrColors, 0);
+    for (size_t i = 0; i < imap.pixels.size(); i++) {
+        if (imap.pixels[i] < (unsigned)imap.nrColors && (gone.empty() || !gone[i])) {
+            present[imap.pixels[i]] = 1;
+        }
+    }
+
     Shapes top_down;
     for (int k = 0; k < imap.nrColors; k++) {
         Progress::Part part(progress, (double)k / imap.nrColors, 1.0 / imap.nrColors);
+        if (!present[k]) {
+            continue;
+        }
         // The pixels of this color, and when stacking, those of every color before it.
         auto bitmap = new_bitmap(imap.width, imap.height);
         for (int y = 0; y < imap.height; y++) {
             auto line = bm_scanline(bitmap.get(), y);
             auto src = imap.row(y);
+            auto out = gone.empty() ? nullptr : gone.data() + (size_t)y * imap.width;
             for (int x = 0; x < imap.width; x++) {
                 int index = src[x];
-                if (o.stack ? index <= k : index == k) {
+                if ((o.stack ? index <= k : index == k) && !(out && out[x])) {
                     line[x / BM_WORDBITS] |= bm_mask(x);
                 }
             }
@@ -422,10 +520,6 @@ Shapes trace_colors(RgbMap const &map, kz_options const &o, Progress &progress)
         if (!path.empty()) {
             top_down.push_back({"fill:" + hex_color(imap.clut[k]), std::move(path)});
         }
-    }
-    // The last scan (holding every pixel when stacking) is the background.
-    if (top_down.size() > 1 && o.remove_background) {
-        top_down.pop_back();
     }
     return {std::make_move_iterator(top_down.rbegin()), std::make_move_iterator(top_down.rend())};
 }
@@ -490,7 +584,7 @@ int autotrace_colors(kz_options const &o)
  * the regions around them, and the regions under those show through, so a light color made
  * background turned white areas into holes.
  */
-RgbMap autotrace_input(RgbMap const &map, kz_options const &o)
+RgbMap autotrace_input(RgbMap const &map, kz_options const &o, RGB *background = nullptr)
 {
     auto smoothed = rgbMapGaussian(map);
     auto imap = rgbMapQuantize(smoothed, autotrace_colors(o));
@@ -498,11 +592,22 @@ RgbMap autotrace_input(RgbMap const &map, kz_options const &o)
     snapBlendedEdges(smoothed, imap);
     refinePalette(map, imap);
 
+    // The color Autotrace leaves out: white, or the picture's background when it is removed.
+    RGB bg = {255, 255, 255};
+    if (o.remove_background) {
+        int b = background_index(imap);
+        if (b >= 0) {
+            bg = imap.clut[b];
+        }
+    }
+    if (background) {
+        *background = bg;
+    }
     constexpr int NEAR_BACKGROUND = 10; // levels per channel
     for (int k = 0; k < imap.nrColors; k++) {
         auto &c = imap.clut[k];
-        if (c.r >= 255 - NEAR_BACKGROUND && c.g >= 255 - NEAR_BACKGROUND && c.b >= 255 - NEAR_BACKGROUND) {
-            c = {255, 255, 255};
+        if (channel_diff(c, bg) <= NEAR_BACKGROUND) {
+            c = bg;
         }
     }
 
@@ -561,14 +666,15 @@ Shapes trace_autotrace(RgbMap const &map, kz_options const &o, Progress &progres
     autotrace_init();
 
     RgbMap input(1, 1);
+    RGB background = {255, 255, 255};
     {
         Progress::Part part(progress, 0.0, 0.2);
-        input = autotrace_input(map, o);
+        input = autotrace_input(map, o, &background);
         progress.report(1.0);
     }
 
     auto opts = std::unique_ptr<at_fitting_opts_type, OptsDeleter>(at_fitting_opts_new());
-    at_color white = {255, 255, 255};
+    at_color white = {background.r, background.g, background.b};
     opts->background_color = &white;
     opts->color_count = 0; // already reduced
     opts->centerline = o.mode == KZ_CENTERLINE;
@@ -722,6 +828,7 @@ kz_options checked(kz_options const *in)
         o.size = sizeof(kz_options);
     }
     o.scans = std::clamp(o.scans, 2, 256);
+    o.remove_background = std::clamp(o.remove_background, 0, 2);
     o.threshold = std::clamp(o.threshold, 0.0, 1.0);
     o.speckles = std::clamp(o.speckles, 0, 100000);
     o.smooth_corners = std::clamp(o.smooth_corners, 0.0, 1.34);
@@ -777,11 +884,6 @@ RgbMap shrink(RgbMap const &map, long long max_pixels, int &factor)
         }
     }
     return out;
-}
-
-inline int channel_diff(RGB a, RGB b)
-{
-    return std::max({std::abs(a.r - b.r), std::abs(a.g - b.g), std::abs(a.b - b.b)});
 }
 
 struct AutoResult
@@ -924,7 +1026,7 @@ AutoResult choose_settings(unsigned char const *rgba, int width, int height, int
         }
     }
     // A transparent background stays transparent.
-    res.o.remove_background = res.info.transparent && res.o.mode == KZ_COLORS;
+    res.o.remove_background = res.info.transparent && res.o.mode == KZ_COLORS ? KZ_BG_REMOVE : KZ_BG_KEEP;
     return res;
 }
 

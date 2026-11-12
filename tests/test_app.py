@@ -90,7 +90,7 @@ class TestWindow(unittest.TestCase):
         self.w.open_path(self.png)
         self.assertTrue(self.traced())
         first = self.w.result
-        self.w.settings.remove_bg.setChecked(True)
+        self.w.settings.remove_bg.setCurrentIndex(2)  # Remove, also inside
         self.assertTrue(wait(lambda: self.w.result is not first and self.w.worker is None
                              and not self.w.timer.isActive()))
         self.assertEqual(self.w.result.shapes, 2)

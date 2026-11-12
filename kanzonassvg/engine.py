@@ -31,6 +31,11 @@ MODES_BY_NAME = {v: k for k, v in MODE_NAMES.items()}
 
 OK, CANCELLED, ERROR = 0, 1, 2
 
+# Background (enum kz_background): keep it, leave it out around the picture, or leave its
+# color out everywhere
+BG_KEEP, BG_REMOVE, BG_REMOVE_ALL = 0, 1, 2
+BG_NAMES = {BG_KEEP: "keep", BG_REMOVE: "remove", BG_REMOVE_ALL: "remove-all"}
+
 
 class TraceError(Exception):
     pass
@@ -68,7 +73,7 @@ class Options:
     scans: int = 8  # colors, grays or steps
     smooth: bool = True
     stack: bool = True
-    remove_background: bool = False
+    remove_background: int = BG_KEEP  # BG_KEEP, BG_REMOVE or BG_REMOVE_ALL
     threshold: float = 0.45  # black and white cutoff / edge threshold
     invert: bool = False
     speckles: int = 2

@@ -78,6 +78,16 @@ class TestCli(unittest.TestCase):
         self.assertEqual(rc, 0, err)
         self.assertNotIn("colors)", out)
 
+    def test_background_option(self):
+        dst = os.path.join(self.dir, "b.svg")
+        for value in ("keep", "remove", "remove-all"):
+            rc, _, err = run(self.png, "-o", dst, "-f", "--background", value)
+            self.assertEqual(rc, 0, err)
+        with open(dst, encoding="utf-8") as f:
+            self.assertNotIn("fill:#ffffff", f.read())
+        rc, _, err = run(self.png, "-o", dst, "-f", "--remove-background")
+        self.assertEqual(rc, 0, err)
+
     def test_window_or_command_line(self):
         self.assertFalse(main.wants_cli([]))
         self.assertFalse(main.wants_cli(["logo.png"]))

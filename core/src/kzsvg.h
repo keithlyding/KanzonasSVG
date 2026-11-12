@@ -30,6 +30,13 @@ enum kz_mode {
     KZ_CENTERLINE = 6        /* Autotrace, centerline (strokes along the middle of lines) */
 };
 
+/* Background (kz_options.remove_background) */
+enum kz_background {
+    KZ_BG_KEEP = 0,       /* traced like any color */
+    KZ_BG_REMOVE = 1,     /* left out around the picture; that color inside shapes stays */
+    KZ_BG_REMOVE_ALL = 2  /* that color left out everywhere (gaps inside shapes see through too) */
+};
+
 /* Version of this struct: set kz_options.size to sizeof(kz_options). */
 typedef struct kz_options {
     int size;               /* sizeof(kz_options) */
@@ -37,7 +44,8 @@ typedef struct kz_options {
     int scans;              /* colors / grays / steps (multiple scans and Autotrace), 2..256 */
     int smooth;             /* multiple scans: edge-preserving smoothing first (1/0) */
     int stack;              /* multiple scans: stack scans (1) or tile them (0) */
-    int remove_background;  /* multiple scans: leave out the bottom (background) layer */
+    int remove_background;  /* enum kz_background: leave out the picture's background (the color most
+                               of its edge has; brightness steps: the bottom layer) */
     double threshold;       /* brightness cutoff (0..1), edge detection threshold (0..1) */
     int invert;             /* single scan: trace the light parts instead */
     int speckles;           /* Potrace: drop shapes of up to this many pixels */

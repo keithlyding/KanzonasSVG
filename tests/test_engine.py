@@ -7,6 +7,8 @@ import unittest
 from tests import helpers  # noqa: F401 (sets up Qt first)
 from kanzonassvg import engine, image, tracing
 
+from PySide6.QtCore import Qt
+
 from tests.helpers import BLUE, RED, bad_pixels, canvas, close, color_at, logo, render
 
 WHITE = (255, 255, 255)
@@ -46,9 +48,14 @@ class TestColors(unittest.TestCase):
     def test_background_is_the_bottom_layer_and_can_go(self):
         svg, _ = trace(logo())
         self.assertEqual(fills(svg)[0], "#ffffff")
-        svg2, n2 = trace(logo(), remove_background=True)
-        self.assertNotIn("#ffffff", fills(svg2))
-        self.assertEqual(n2, 2)
+        # Remove: the white inside the ring stays (a layer under the logo)
+        svg2, n2 = trace(logo(), remove_background=engine.BG_REMOVE)
+        self.assertEqual(fills(svg2)[0], "#ffffff")
+        self.assertEqual(n2, 3)
+        # also inside: no white at all
+        svg3, n3 = trace(logo(), remove_background=engine.BG_REMOVE_ALL)
+        self.assertNotIn("#ffffff", fills(svg3))
+        self.assertEqual(n3, 2)
 
     def test_more_colors_than_the_picture_has(self):
         img = canvas(50, 40)
@@ -262,3 +269,69 @@ class TestAuto(unittest.TestCase):
     def test_bad_input(self):
         with self.assertRaises(engine.TraceError):
             engine.auto(b"", 0, 0)
+
+
+class TestBackground(unittest.TestCase):
+    """Background: Remove leaves out the color around the picture's edge (whatever it is),
+    and keeps that color inside shapes; Remove, also inside leaves it out everywhere."""
+
+    def picture(self, page):
+        # <page> all around; a red ring with the page's color inside it, and a white dot
+        from PySide6.QtCore import QPointF
+        from PySide6.QtGui import QPainter, QPen
+        img = canvas(200, 120, page)
+        p = QPainter(img)
+        p.setPen(QPen(RED, 14))
+        p.drawEllipse(QPointF(70, 60), 40, 40)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(Qt.GlobalColor.white)
+        p.drawEllipse(QPointF(160, 60), 15, 15)
+        p.end()
+        return image.to_rgba(img)
+
+    def render_clear(self, svg):
+        from PySide6.QtCore import QByteArray, QRectF
+        from PySide6.QtGui import QPainter
+        from PySide6.QtSvg import QSvgRenderer
+        out = canvas(200, 120, Qt.GlobalColor.transparent)
+        p = QPainter(out)
+        QSvgRenderer(QByteArray(svg.encode())).render(p, QRectF(0, 0, 200, 120))
+        p.end()
+        return out
+
+    def alpha(self, img, x, y):
+        return img.pixelColor(x, y).alpha()
+
+    def test_dark_background_removed_white_kept(self):
+        img = self.picture(BLUE)
+        svg, _ = trace(img, remove_background=engine.BG_REMOVE)
+        self.assertNotIn("#1d3f8f", fills(svg)[-1:])  # not the top layer either
+        out = self.render_clear(svg)
+        self.assertEqual(self.alpha(out, 5, 5), 0)  # the blue page is gone
+        self.assertEqual(out.pixelColor(160, 60).name(), "#ffffff")  # the white dot stays
+        self.assertEqual(out.pixelColor(70, 60).name(), "#1d3f8f")  # blue inside the ring stays
+        self.assertEqual(out.pixelColor(70, 20).name(), "#b2002d")
+        # also inside: the blue inside the ring goes too
+        out = self.render_clear(trace(img, remove_background=engine.BG_REMOVE_ALL)[0])
+        self.assertEqual(self.alpha(out, 70, 60), 0)
+        self.assertEqual(out.pixelColor(160, 60).name(), "#ffffff")
+
+    def test_white_background(self):
+        img = self.picture(Qt.GlobalColor.white)
+        out = self.render_clear(trace(img, remove_background=engine.BG_REMOVE)[0])
+        self.assertEqual(self.alpha(out, 5, 5), 0)
+        self.assertEqual(out.pixelColor(70, 60).name(), "#ffffff")  # inside the ring stays white
+        out = self.render_clear(trace(img, remove_background=engine.BG_REMOVE_ALL)[0])
+        self.assertEqual(self.alpha(out, 70, 60), 0)
+        self.assertEqual(self.alpha(out, 160, 60), 0)  # white everywhere goes
+        self.assertEqual(out.pixelColor(70, 20).name(), "#b2002d")
+
+    def test_keep(self):
+        out = self.render_clear(trace(self.picture(BLUE))[0])
+        self.assertEqual(out.pixelColor(5, 5).name(), "#1d3f8f")
+        self.assertEqual(self.alpha(out, 5, 5), 255)
+
+    def test_autotrace_removes_the_background_color(self):
+        out = self.render_clear(trace(self.picture(BLUE), mode=engine.AUTOTRACE, remove_background=engine.BG_REMOVE)[0])
+        self.assertEqual(self.alpha(out, 5, 5), 0)
+        self.assertTrue(close(color_at(out, 70, 20), (0xB2, 0x00, 0x2D)), color_at(out, 70, 20))
