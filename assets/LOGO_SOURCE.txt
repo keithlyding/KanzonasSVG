@@ -2,6 +2,6 @@
 # logo (brand/make_logos.py). Don't edit the logo files by hand: change it there and copy
 # the new files here, with this record (tests/test_logo_source.py checks it).
 repo: https://github.com/keithlyding/Kanzonas-Site
-commit: ca3751789c85f980184f28d5fba6811b9e44b6f1
-assets/kanzonassvg-logo.png: brand/out/kanzonassvg-logo.png sha256 bed497af8664316956423068f1a4ed78c3cb473abc8f03464319755a6f2e7052
-kanzonassvg/logo.png: brand/out/web/kanzonassvg-logo@2x.png sha256 277ae8a9d94cd3592ac52e4854e9ede0ad648a84f616cf3bdcf6672ab5c60dd8
+commit: f92703173e0582bedbfffb8bbd204c212d5346b8
+assets/kanzonassvg-logo.png: brand/out/kanzonassvg-logo.png sha256 c90f0ce5ce71799ff7fba341a1d9f1e9ff0070b46c68b5e918d653c732eb1aca
+kanzonassvg/logo.png: brand/out/web/kanzonassvg-logo@2x.png sha256 6eada8445b57d0abdf0ad55a390b6e764f2aea838ad8b79c0fe9a5944ec4a846
