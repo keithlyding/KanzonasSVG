@@ -7,7 +7,7 @@ A picture-to-SVG program: a tracing engine in C/C++ (`core/`: Inkscape's Trace B
 with Potrace and Autotrace, fixed and freed from GTK, GLib and 2geom) behind a plain C
 interface (`core/src/kzsvg.h`), and a PySide6 window and command line in Python
 (`kanzonassvg/`) that call it through ctypes. `.github/workflows/build.yml` builds a Windows
-zip (job `windows`) and a Linux AppImage (job `linux`), each running the tests and a
+zip and an installer (job `windows`, `installer/KanzonasSVG.iss`) and a Linux AppImage (job `linux`), each running the tests and a
 `--selftest` inside the finished program; job `publish` releases both from `main`.
 
 ## Branches and releases
@@ -43,6 +43,13 @@ zip (job `windows`) and a Linux AppImage (job `linux`), each running the tests a
   newer glibc or C++ runtime.
 - American spelling in all user-visible text.
 - Logos: no Kanzonas logo is made or edited here; logos come from the Kanzonas-Site
-  repository's `brand/` folder. The app icon (`tools/make_icon.py`) is a placeholder.
+  repository's `brand/` folder (`brand/make_logos.py`). KanzonasSVG's are copied in unchanged
+  (`assets/kanzonassvg-logo.png` for the README, `kanzonassvg/logo.png` for Help > About) and
+  `assets/LOGO_SOURCE.txt` records the Kanzonas-Site commit and each file's SHA-256
+  (tests/test_logo_source.py fails if a file doesn't match it): to change the logo, change it
+  there, copy the new files and update the record. The icons are drawn by `tools/make_icon.py` from the owner's
+  cactus and sunflower (`assets/kanzonas-mark-source.png`, from KanzonasPDF, unchanged), as
+  KanzonasPDF's are: orange tile and orange "SVG" tag (KanzonasPDF is red, KanzonasCAD
+  purple); the installer's icon has the same orange letters on a blue tile.
 - Third-party code in `core/third_party/` says where it came from and what was changed in its
   README.md; keep that true.

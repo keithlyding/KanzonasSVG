@@ -1,5 +1,7 @@
 # KanzonasSVG
 
+![KanzonasSVG](assets/kanzonassvg-logo.png)
+
 Turn pictures (logos, drawings, scans) into SVG files, on Windows and Linux.
 
 ![A picture and its SVG side by side](docs/screenshot.png)
@@ -25,7 +27,10 @@ fixed:
 
 From [Releases](https://github.com/keithlyding/KanzonasSVG/releases):
 
-- **Windows:** `KanzonasSVG-windows.zip`. Unzip it anywhere and run `KanzonasSVG.exe`.
+- **Windows:** `KanzonasSVG-v<version>-setup.exe`. Run it (no administrator rights needed); it
+  adds KanzonasSVG to the Start menu and to "Open with" for pictures, and a newer one installed
+  over it updates it. Or, without installing: `KanzonasSVG-windows.zip`; unzip it anywhere and
+  run `KanzonasSVG.exe`.
 - **Linux (64-bit; Ubuntu 22.04, Debian 12, Fedora 36 or newer):** `KanzonasSVG-x86_64.AppImage`.
   Make it executable (`chmod +x KanzonasSVG-x86_64.AppImage`) and run it.
 

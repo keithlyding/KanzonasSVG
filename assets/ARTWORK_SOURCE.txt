@@ -1,0 +1,6 @@
+kanzonas-mark-source.png: the owner's cactus and sunflower artwork, copied unchanged from
+KanzonasPDF (https://github.com/keithlyding/KanzonasPDF, assets/kanzonas-mark-source.png,
+commit 4160c68297d71065074c6d1073cd525f185d62d2).
+sha256: de594dcae64b74c7807776747beb248b8f7f36b13b936129a70e73c015a9f5cd
+tools/make_icon.py draws the icons from it (kanzonassvg.png/.ico, kanzonassvg-setup.ico,
+wizard-*.bmp, kanzonassvg/icon.png).

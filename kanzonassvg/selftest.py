@@ -74,6 +74,13 @@ def run(argv):
         assert out.pixelColor(50, 80).name() == "#b2002d", out.pixelColor(50, 80).name()
         return "%d shapes" % res.shapes
 
+    def logo_and_icon():
+        here = os.path.dirname(os.path.abspath(engine.__file__))
+        for name, width in (("logo.png", 1872), ("icon.png", 256)):
+            q = QImage(os.path.join(here, name))
+            assert not q.isNull() and q.width() == width, "%s missing or wrong (%d px)" % (name, q.width())
+        return "logo and icon in the program"
+
     def auto_settings():
         o, info = engine.auto(*image.pixels(img))
         assert (o.mode, o.scans) == (engine.COLORS, 3), (o.mode, o.scans)
@@ -132,7 +139,7 @@ def run(argv):
         return "ok"
 
     for name, fn in [("engine loads", engine_loads), ("exact colors and holes", colors_exact),
-                     ("auto settings", auto_settings), ("every mode", every_mode), ("reads pictures", reads_pictures),
+                     ("logo and icon", logo_and_icon), ("auto settings", auto_settings), ("every mode", every_mode), ("reads pictures", reads_pictures),
                      ("big picture speed", big_picture), ("window opens and traces", window_opens),
                      ("command line", command_line)]:
         check(name, fn)

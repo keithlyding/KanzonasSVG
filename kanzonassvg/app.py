@@ -4,7 +4,7 @@ import os
 import sys
 from dataclasses import replace
 
-from PySide6.QtCore import QByteArray, QMimeData, QObject, QRectF, QSettings, QSize, Qt, QThread, \
+from PySide6.QtCore import QUrl, QByteArray, QMimeData, QObject, QRectF, QSettings, QSize, Qt, QThread, \
     QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QGuiApplication, QIcon, QImage, QKeySequence, QPainter, QPalette
 from PySide6.QtSvg import QSvgRenderer
@@ -1005,9 +1005,12 @@ class MainWindow(QMainWindow):
             ev = engine.version()
         except engine.TraceError:
             ev = "not found"
+        logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.png")
+        head = ("<p><img src='%s' width='468'></p>" % QUrl.fromLocalFile(logo).toString()
+                if os.path.exists(logo) else "")
         QMessageBox.about(
             self, "About KanzonasSVG",
-            "<h3>KanzonasSVG %s</h3>"
+            head + "<h3>KanzonasSVG %s</h3>"
             "<p>Turns pictures into SVG files.</p>"
             "<p>Tracing engine %s: Inkscape's Trace Bitmap, with Potrace 1.16 (Peter Selinger) and "
             "Autotrace 0.40 (Martin Weber and others), with quality and speed fixes. Window: Qt for "
