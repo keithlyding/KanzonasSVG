@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata for the AppImage. make_appimage.py fills in @VERSION@ and @DATE@ and
+     checks it with appstreamcli. -->
+<component type="desktop-application">
+  <id>io.github.keithlyding.kanzonassvg</id>
+  <name>KanzonasSVG</name>
+  <summary>Turn pictures into SVG files</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+  <developer id="io.github.keithlyding">
+    <name>KanzonasSVG</name>
+  </developer>
+  <description>
+    <p>
+      Traces pictures (logos, drawings, scans, photos) into SVG files: flat colors, grays,
+      black and white, edges or centerlines, with Potrace and Autotrace. Colors come out
+      exact and edges sharp, and the result shows beside the picture as the settings change.
+      Many pictures at once from the command line.
+    </p>
+    <p>No account and no telemetry.</p>
+  </description>
+  <launchable type="desktop-id">kanzonassvg.desktop</launchable>
+  <icon type="stock">kanzonassvg</icon>
+  <url type="homepage">https://github.com/keithlyding/KanzonasSVG</url>
+  <url type="bugtracker">https://github.com/keithlyding/KanzonasSVG/issues</url>
+  <categories>
+    <category>Graphics</category>
+    <category>VectorGraphics</category>
+  </categories>
+  <provides>
+    <binary>KanzonasSVG</binary>
+  </provides>
+  <screenshots>
+    <screenshot type="default">
+      <caption>A picture and its SVG side by side</caption>
+      <image>https://raw.githubusercontent.com/keithlyding/KanzonasSVG/main/docs/screenshot.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="@VERSION@" date="@DATE@"/>
+  </releases>
+</component>

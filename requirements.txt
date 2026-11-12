@@ -1,0 +1,2 @@
+# Only Qt's essential modules (widgets, pictures, SVG): not the full PySide6
+PySide6_Essentials>=6.7
