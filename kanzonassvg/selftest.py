@@ -74,6 +74,11 @@ def run(argv):
         assert out.pixelColor(50, 80).name() == "#b2002d", out.pixelColor(50, 80).name()
         return "%d shapes" % res.shapes
 
+    def auto_settings():
+        o, info = engine.auto(*image.pixels(img))
+        assert (o.mode, o.scans) == (engine.COLORS, 3), (o.mode, o.scans)
+        return "%d colors in the test picture" % o.scans
+
     def every_mode():
         done = []
         for mode, name in engine.MODE_NAMES.items():
@@ -127,7 +132,7 @@ def run(argv):
         return "ok"
 
     for name, fn in [("engine loads", engine_loads), ("exact colors and holes", colors_exact),
-                     ("every mode", every_mode), ("reads pictures", reads_pictures),
+                     ("auto settings", auto_settings), ("every mode", every_mode), ("reads pictures", reads_pictures),
                      ("big picture speed", big_picture), ("window opens and traces", window_opens),
                      ("command line", command_line)]:
         check(name, fn)

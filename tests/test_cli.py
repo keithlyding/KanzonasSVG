@@ -67,6 +67,17 @@ class TestCli(unittest.TestCase):
         self.assertIn("Can't read", err)
         self.assertIn("not found", err)
 
+    def test_auto_by_default_and_options_win(self):
+        dst = os.path.join(self.dir, "a.svg")
+        rc, out, err = run(self.png, "-o", dst)
+        self.assertEqual(rc, 0, err)
+        self.assertIn("3 colors", out)
+        rc, out, err = run(self.png, "-o", dst, "-f", "--colors", "5", "--no-smooth")
+        self.assertIn("5 colors", out)
+        rc, out, err = run(self.png, "-o", dst, "-f", "--no-auto")
+        self.assertEqual(rc, 0, err)
+        self.assertNotIn("colors)", out)
+
     def test_window_or_command_line(self):
         self.assertFalse(main.wants_cli([]))
         self.assertFalse(main.wants_cli(["logo.png"]))

@@ -75,6 +75,23 @@ KZ_API int kz_trace(const unsigned char *rgba, int width, int height, int stride
 KZ_API int kz_preview(const unsigned char *rgba, int width, int height, int stride, const kz_options *o,
                       unsigned char *rgb_out);
 
+/* What kz_auto found out about a picture (besides the settings it picked). */
+typedef struct kz_auto_info {
+    int size;               /* sizeof(kz_auto_info) */
+    int colors;             /* colors chosen (or 2 for black and white) */
+    int transparent;        /* the picture has transparent parts (1/0) */
+    int noisy;              /* JPEG blotches, scan noise or texture found (1/0) */
+    int photo;              /* too many colors to trace exactly: a photo or painting (1/0) */
+    double wrong;           /* fraction of the picture's flat areas still off at that many colors */
+} kz_auto_info;
+
+/*
+ * Recommended settings for a picture: fills <o> (mode, colors, smoothing, background,
+ * threshold; the rest stays at the defaults) and, if given, <info>. Returns KZ_OK or KZ_ERROR.
+ */
+KZ_API int kz_auto(const unsigned char *rgba, int width, int height, int stride, kz_options *o,
+                   kz_auto_info *info);
+
 KZ_API void kz_free(void *p);
 
 /* The engine's version, for example "1.0". */

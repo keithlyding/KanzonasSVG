@@ -2,6 +2,7 @@
 
 import os
 import sys
+from dataclasses import replace
 
 from PySide6.QtCore import QByteArray, QMimeData, QObject, QRectF, QSettings, QSize, Qt, QThread, \
     QTimer, Signal
@@ -38,12 +39,23 @@ or another vector editor.</p>
 <ol>
 <li><b>Open a picture</b>: <i>File &gt; Open picture...</i> (Ctrl+O), drag a file into the
 window, or copy a picture and use <i>File &gt; Paste picture</i> (Ctrl+V).</li>
-<li><b>Pick the settings</b> on the right. The SVG on the right side of the window updates
-as you change them (unless <i>Trace &gt; Update automatically</i> is off: then press
-<i>Trace &gt; Update now</i>, F5).</li>
+<li><b>Check the settings</b> on the right. When you open a picture, KanzonasSVG picks the
+settings that suit it (see <b>Auto settings</b> below) and traces it. Change any setting and
+the SVG on the right side of the window updates (unless <i>Trace &gt; Update automatically</i>
+is off: then press <i>Trace &gt; Update now</i>, F5).</li>
 <li><b>Save</b>: <i>File &gt; Save SVG...</i> (Ctrl+S), or <i>File &gt; Copy SVG</i>
 (Ctrl+Shift+C) to paste it straight into Inkscape or another program.</li>
 </ol>
+<h3>Auto settings</h3>
+<p>The <b>Auto settings</b> button (or <i>Trace &gt; Auto settings</i>, Ctrl+Shift+A) picks the
+settings for the picture: how many colors it needs (the fewest after which more colors no
+longer make it visibly closer: a logo gets exactly its colors, a photo or painting a number
+that keeps the file reasonable), <b>Smooth</b> when it has JPEG blotches or scan noise,
+<b>Remove background</b> when its background is transparent (so the SVG's is too), and
+<b>Black and white</b> with its <b>Threshold</b> for a scan of dark lines on a light page.
+The status bar says what it picked. Change anything after: Auto doesn't change it back.</p>
+<p><i>Trace &gt; Auto settings for new pictures</i> (on at first) does this for every picture you
+open or paste; turn it off to keep your own settings for each new picture.</p>
 <h3>Modes</h3>
 <ul>
 <li><b>Colors</b>: the picture in a few flat colors, one layer per color. Best for logos.
@@ -91,6 +103,7 @@ size</i> (Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> 
 <tr><td>Ctrl+Shift+S</td><td>Save SVG as</td></tr>
 <tr><td>Ctrl+Shift+C</td><td>Copy SVG</td></tr>
 <tr><td>F5</td><td>Update now</td></tr>
+<tr><td>Ctrl+Shift+A</td><td>Auto settings</td></tr>
 <tr><td>Ctrl+T</td><td>Show colors to trace</td></tr>
 <tr><td>Ctrl+0 / Ctrl+1</td><td>Zoom to fit / Actual size</td></tr>
 <tr><td>Ctrl++ / Ctrl+-</td><td>Zoom in / Zoom out</td></tr>
@@ -284,8 +297,10 @@ class Canvas(QWidget):
 
 
 class Job:
-    def __init__(self, number, img, options, enlarge, want_preview):
+    def __init__(self, number, img, options, enlarge, want_preview, auto=False):
         self.number = number
+        self.auto = auto  # pick the settings first (Auto settings)
+        self.auto_info = None
         self.img = img
         self.options = options
         self.enlarge = enlarge
@@ -297,6 +312,7 @@ class Worker(QThread):
     """Traces in the background (the engine doesn't hold Python's lock while it works)."""
 
     progress = Signal(int, float)
+    auto_done = Signal(int, object, object)  # job number, Options picked, engine.AutoInfo
     done = Signal(int, object, object)  # job number, Result, preview QImage or None
     failed = Signal(int, str)
 
@@ -315,6 +331,9 @@ class Worker(QThread):
                     self.progress.emit(job.number, f)
                 return job.cancelled
 
+            if job.auto:
+                job.options, job.auto_info = auto_options(job.img, job.options)
+                self.auto_done.emit(job.number, job.options, job.auto_info)
             preview = tracing.preview_image(job.img, job.options) if job.want_preview else None
             if job.cancelled:
                 raise engine.Cancelled()
@@ -324,6 +343,30 @@ class Worker(QThread):
             self.failed.emit(job.number, "")
         except Exception as e:  # shown in the window, never a crash
             self.failed.emit(job.number, str(e) or e.__class__.__name__)
+
+
+def auto_options(img, current):
+    """The settings Auto picks for <img>: mode, colors, smoothing, background, threshold
+    (the curve settings stay as they are). Returns (Options, engine.AutoInfo)."""
+    picked, info = engine.auto(*image.pixels(img))
+    return replace(current, mode=picked.mode, scans=picked.scans, smooth=picked.smooth,
+                   remove_background=picked.remove_background, threshold=picked.threshold,
+                   stack=True, invert=False), info
+
+
+def describe_auto(options, info):
+    """What Auto picked, in a few words for the status bar."""
+    if options.mode == engine.BRIGHTNESS:
+        parts = ["black and white"]
+    else:
+        parts = ["%d colors" % options.scans]
+        if info.photo:
+            parts[0] += " (a photo or painting: it has more)"
+    if options.smooth:
+        parts.append("smoothed")
+    if options.remove_background:
+        parts.append("transparent background kept")
+    return "Auto: " + ", ".join(parts)
 
 
 class Settings(QScrollArea):
@@ -337,6 +380,10 @@ class Settings(QScrollArea):
         self.setMinimumWidth(270)
         box = QWidget()
         lay = QVBoxLayout(box)
+
+        self.auto = QPushButton("Auto settings")
+        self.auto.setToolTip("Pick the settings that suit this picture (you can change them after)")
+        lay.addWidget(self.auto)
 
         self.mode = QComboBox()
         for label, mode in MODES:
@@ -532,6 +579,28 @@ class Settings(QScrollArea):
         self.tolerance.setEnabled(self.optimize.isChecked())
         self._update_visible()
 
+    def apply_auto(self, o):
+        """Show the settings Auto picked (without tracing again: they're being traced)."""
+        widgets = [w for _, w in self._widgets()]
+        for w in widgets:
+            w.blockSignals(True)
+        index = [m for _, m in MODES].index(o.mode)
+        self.mode.setCurrentIndex(index)
+        self.scans.setValue(max(self.scans.minimum(), min(self.scans.maximum(), o.scans)))
+        self.smooth.setChecked(o.smooth)
+        self.stack.setChecked(o.stack)
+        self.remove_bg.setChecked(o.remove_background)
+        self.invert.setChecked(o.invert)
+        if o.mode == engine.BRIGHTNESS:
+            self.threshold.setValue(o.threshold)
+            self._bw = o.threshold
+        elif o.mode == engine.EDGES:
+            self.threshold.setValue(self._edge)
+        for w in widgets:
+            w.blockSignals(False)
+        self._last_mode = o.mode
+        self._update_visible()
+
     def reset_all(self):
         widgets = [w for _, w in self._widgets()]
         for w in widgets:
@@ -572,6 +641,7 @@ class MainWindow(QMainWindow):
         self.job = None
         self.worker = None
         self.pending = False
+        self.pending_auto = False
         self.closing = False
 
         self.view = View()
@@ -600,6 +670,7 @@ class MainWindow(QMainWindow):
         self.timer = QTimer(self, singleShot=True, interval=250)
         self.timer.timeout.connect(self.start_trace)
         self.settings.changed.connect(self.settings_changed)
+        self.settings.auto.clicked.connect(self.auto_settings)
         self.settings.load(self.qs)
 
         self._make_menus()
@@ -648,7 +719,11 @@ class MainWindow(QMainWindow):
         m = mb.addMenu("&Trace")
         self.a_auto = self._action(m, "Update automatically", self.auto_changed, None, True)
         self.a_auto.setChecked(bool(int(self.qs.value("trace/auto", 1))))
-        self._action(m, "Update now", self.start_trace, "F5")
+        self._action(m, "Update now", lambda: self.start_trace(), "F5")
+        m.addSeparator()
+        self._action(m, "Auto settings", self.auto_settings, "Ctrl+Shift+A")
+        self.a_auto_new = self._action(m, "Auto settings for new pictures", self.auto_new_changed, None, True)
+        self.a_auto_new.setChecked(bool(int(self.qs.value("trace/auto_new", 1))))
         self._action(m, "Reset settings", self.settings.reset_all)
 
         m = mb.addMenu("&Help")
@@ -716,7 +791,7 @@ class MainWindow(QMainWindow):
         self.right.set_message("")
         self._update_title()
         self._update_actions()
-        self.start_trace()
+        self.start_trace(auto=self.a_auto_new.isChecked())
 
     def dragEnterEvent(self, e):
         if e.mimeData().hasUrls() or e.mimeData().hasImage():
@@ -745,27 +820,45 @@ class MainWindow(QMainWindow):
         if on:
             self.timer.start()
 
-    def start_trace(self):
+    def auto_settings(self):
+        self.start_trace(auto=True)
+
+    def auto_new_changed(self, on):
+        self.qs.setValue("trace/auto_new", int(on))
+
+    def start_trace(self, auto=False):
         if self.img is None or self.closing:
             return
+        self.timer.stop()
         if self.worker is not None:
             # stop the one running; this one starts when it has
             self.job.cancelled = True
             self.pending = True
+            self.pending_auto = self.pending_auto or auto
             return
+        auto = auto or self.pending_auto
         self.pending = False
+        self.pending_auto = False
         self.job_number += 1
         self.job = Job(self.job_number, self.img, self.settings.options(), self.settings.enlarge_setting(),
-                       self.a_colors.isChecked())
+                       self.a_colors.isChecked(), auto)
         self.worker = Worker(self.job)
         self.worker.progress.connect(self.on_progress)
+        self.worker.auto_done.connect(self.on_auto_done)
         self.worker.done.connect(self.on_done)
         self.worker.failed.connect(self.on_failed)
         self.worker.finished.connect(self.on_finished)
         self.bar.setValue(0)
         self.bar.show()
-        self.status.setText("Tracing...")
+        self.status.setText("Picking settings..." if auto else "Tracing...")
         self.worker.start()
+
+    def on_auto_done(self, number, options, info):
+        if number != self.job_number or self.job.cancelled:
+            return
+        self.settings.apply_auto(options)
+        self.settings.save(self.qs)
+        self.status.setText(describe_auto(options, info) + ". Tracing...")
 
     def on_progress(self, number, f):
         if number == self.job_number:
@@ -785,6 +878,8 @@ class MainWindow(QMainWindow):
         text = "%d shapes, %s, traced in %.2f s" % (result.shapes, _size_text(size), result.seconds)
         if result.factor != 1:
             text += " (at %d times the size)" % result.factor
+        if self.job.auto_info is not None:
+            text = describe_auto(self.job.options, self.job.auto_info) + ". " + text[0].upper() + text[1:]
         self.status.setText(text)
         self._update_actions()
 

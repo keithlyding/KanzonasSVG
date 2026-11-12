@@ -18,7 +18,7 @@ def parser():
         prog="kanzonassvg-cli" if sys.platform == "win32" else "kanzonassvg",
         description="Turn pictures (PNG, JPEG, BMP, GIF, WebP, TIFF...) into SVG files.",
         epilog="Examples:\n"
-        "  kanzonassvg logo.png                  -> logo.svg, 8 colors\n"
+        "  kanzonassvg logo.png                  -> logo.svg, settings picked for it\n"
         "  kanzonassvg --colors 4 *.png -o out   -> out/<name>.svg for each\n"
         "  kanzonassvg --mode bw scan.jpg -o scan.svg",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -27,12 +27,18 @@ def parser():
     p.add_argument("-o", "--output", metavar="PATH",
                    help="the SVG file (one picture), or a folder for them (default: next to each picture)")
     p.add_argument("-f", "--force", action="store_true", help="replace SVG files that are already there")
-    p.add_argument("--mode", default="colors", choices=sorted(engine.MODES_BY_NAME), help=MODE_HELP)
-    p.add_argument("--colors", "--scans", type=int, default=8, metavar="N",
-                   help="colors, grays or steps (2-256; default 8)")
-    p.add_argument("--no-smooth", action="store_true", help="don't smooth before reducing colors")
+    p.add_argument("--no-auto", action="store_true",
+                   help="don't pick settings for each picture: use the defaults (8 colors, smoothed) and "
+                   "the options given. Without it, each picture gets the settings that suit it (mode, "
+                   "colors, smoothing, background, threshold), and the options given replace them")
+    p.add_argument("--mode", default=None, choices=sorted(engine.MODES_BY_NAME), help=MODE_HELP)
+    p.add_argument("--colors", "--scans", type=int, default=None, metavar="N",
+                   help="colors, grays or steps (2-256)")
+    p.add_argument("--smooth", action=argparse.BooleanOptionalAction, default=None,
+                   help="smooth noise before reducing colors (--no-smooth: don't)")
     p.add_argument("--tile", action="store_true", help="tile the color layers instead of stacking them")
-    p.add_argument("--remove-background", action="store_true", help="leave out the background layer")
+    p.add_argument("--remove-background", action=argparse.BooleanOptionalAction, default=None,
+                   help="leave out the background layer (--no-remove-background: keep it)")
     p.add_argument("--threshold", type=float, default=None, metavar="0-1",
                    help="black and white: brightness cutoff (default 0.45); edges: edge threshold (default 0.65)")
     p.add_argument("--invert", action="store_true", help="black and white, edges: trace the light parts")
@@ -56,17 +62,25 @@ def parser():
     return p
 
 
-def options_from(args):
-    mode = engine.MODES_BY_NAME[args.mode]
+def options_from(args, picked=None):
+    """The options for one picture: <picked> (Auto's, or the defaults) with the ones given."""
+    base = picked or engine.Options()
+    mode = engine.MODES_BY_NAME[args.mode] if args.mode else base.mode
     threshold = args.threshold
     if threshold is None:
-        threshold = 0.65 if mode == engine.EDGES else 0.45
+        if mode == engine.EDGES:
+            threshold = 0.65
+        elif mode == base.mode:
+            threshold = base.threshold
+        else:
+            threshold = 0.45
     return engine.Options(
         mode=mode,
-        scans=args.colors,
-        smooth=not args.no_smooth,
+        scans=args.colors if args.colors is not None else base.scans,
+        smooth=args.smooth if args.smooth is not None else base.smooth,
         stack=not args.tile,
-        remove_background=args.remove_background,
+        remove_background=args.remove_background if args.remove_background is not None
+        else base.remove_background and mode in (engine.COLORS, engine.GRAYS, engine.BRIGHTNESS_STEPS),
         threshold=threshold,
         invert=args.invert,
         speckles=args.speckles,
@@ -117,7 +131,6 @@ def qt_app():
 def run(argv):
     args = parser().parse_args(argv)
     qt_app()
-    options = options_from(args)
     enlarge = tracing.AUTO if args.enlarge == "auto" else int(args.enlarge)
     files = expand(args.inputs)
     if not files:
@@ -135,14 +148,22 @@ def run(argv):
             if os.path.exists(dst) and not args.force:
                 raise image.ImageError("%s is already there (use -f to replace it)" % dst)
             img = image.load(src)
+            note = ""
+            if args.no_auto:
+                options = options_from(args)
+            else:
+                picked, _info = engine.auto(*image.pixels(img))
+                options = options_from(args, picked)
+                note = ", %s" % ("black and white" if options.mode == engine.BRIGHTNESS
+                                 else "%d %s" % (options.scans, engine.MODE_NAMES[options.mode]))
             res = tracing.trace_image(img, options, enlarge)
             tmp = dst + ".part"
             with open(tmp, "w", encoding="utf-8", newline="\n") as f:
                 f.write(res.svg)
             os.replace(tmp, dst)
             if not args.quiet:
-                print("%s -> %s (%d shapes, %.0f KB, %.2f s%s)" % (
-                    src, dst, res.shapes, len(res.svg.encode()) / 1024, res.seconds,
+                print("%s -> %s (%d shapes, %.0f KB, %.2f s%s%s)" % (
+                    src, dst, res.shapes, len(res.svg.encode()) / 1024, res.seconds, note,
                     ", traced at %dx" % res.factor if res.factor != 1 else ""))
         except (image.ImageError, engine.TraceError, OSError) as e:
             failed += 1

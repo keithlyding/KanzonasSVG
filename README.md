@@ -4,8 +4,9 @@ Turn pictures (logos, drawings, scans) into SVG files, on Windows and Linux.
 
 ![A picture and its SVG side by side](docs/screenshot.png)
 
-KanzonasSVG does one thing: it traces a picture into an SVG. Open a picture, pick how many
-colors, see the SVG beside it as you change the settings, save it. Edit the SVG afterwards in
+KanzonasSVG does one thing: it traces a picture into an SVG. Open a picture and it picks the
+settings that suit it (how many colors, smoothing, background) and shows the SVG beside it;
+change any setting if you like, then save it. Edit the SVG afterwards in
 Inkscape, Illustrator or any vector editor.
 
 The tracing is Inkscape's *Trace Bitmap* (Potrace and Autotrace), taken out of Inkscape and
@@ -32,7 +33,10 @@ From [Releases](https://github.com/keithlyding/KanzonasSVG/releases):
 
 1. Open a picture: *File > Open picture* (Ctrl+O), drag it into the window, or copy a picture
    and *File > Paste picture* (Ctrl+V).
-2. Pick a mode and settings on the right. The SVG updates as you change them.
+2. KanzonasSVG picks the settings for the picture (**Auto settings**: exactly a logo's colors,
+   smoothing for JPEGs and scans, a transparent background kept transparent, black and white
+   for a scan of dark lines) and the status bar says what it picked. Change any setting on the
+   right and the SVG updates.
 3. *File > Save SVG* (Ctrl+S), or *File > Copy SVG* (Ctrl+Shift+C) to paste it into Inkscape or
    another program.
 
@@ -46,8 +50,9 @@ The same tracing, for one picture or many (on Windows, `kanzonassvg-cli.exe` in 
 folder; on Linux, the AppImage with options):
 
 ```
-kanzonassvg-cli logo.png                      logo.svg next to it, 8 colors
-kanzonassvg-cli --colors 4 *.png -o svgs      every PNG into the svgs folder
+kanzonassvg-cli logo.png                      logo.svg next to it, settings picked for it
+kanzonassvg-cli --colors 4 *.png -o svgs      every PNG into the svgs folder, 4 colors each
+kanzonassvg-cli --no-auto logo.png            the defaults (8 colors) instead of picked settings
 kanzonassvg-cli --mode bw scan.jpg -o scan.svg
 kanzonassvg-cli --help                        every option
 ```

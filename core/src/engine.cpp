@@ -11,6 +11,8 @@
 #include "kzsvg.h"
 
 #include <algorithm>
+#include <array>
+#include <cstdio>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -743,6 +745,189 @@ bool valid_image(unsigned char const *rgba, int width, int height, int stride)
     return rgba && width > 0 && height > 0 && stride >= width * 4 && (long long)width * height <= 400000000LL;
 }
 
+/*
+ * Recommended settings
+ */
+
+// The picture made smaller (box average) to at most about <max_pixels>, for analysis.
+RgbMap shrink(RgbMap const &map, long long max_pixels, int &factor)
+{
+    factor = 1;
+    while ((long long)(map.width / factor) * (map.height / factor) > max_pixels) {
+        factor++;
+    }
+    if (factor == 1) {
+        return map;
+    }
+    RgbMap out(std::max(1, map.width / factor), std::max(1, map.height / factor));
+    int const n = factor * factor;
+    for (int y = 0; y < out.height; y++) {
+        for (int x = 0; x < out.width; x++) {
+            int r = 0, g = 0, b = 0;
+            for (int dy = 0; dy < factor; dy++) {
+                auto row = map.row(y * factor + dy) + x * factor;
+                for (int dx = 0; dx < factor; dx++) {
+                    r += row[dx].r;
+                    g += row[dx].g;
+                    b += row[dx].b;
+                }
+            }
+            out.pixels[(size_t)y * out.width + x] = {(unsigned char)(r / n), (unsigned char)(g / n),
+                                                    (unsigned char)(b / n)};
+        }
+    }
+    return out;
+}
+
+inline int channel_diff(RGB a, RGB b)
+{
+    return std::max({std::abs(a.r - b.r), std::abs(a.g - b.g), std::abs(a.b - b.b)});
+}
+
+struct AutoResult
+{
+    kz_options o;
+    kz_auto_info info;
+};
+
+/**
+ * Pick settings for a picture: how many colors it needs (the fewest after which more
+ * colors no longer make the flat areas visibly closer to the picture), smoothing if it's
+ * noisy (JPEG, scans), the background left out if it's transparent, and black and white
+ * for a picture of dark gray on light gray (a scan of text or a drawing).
+ */
+AutoResult choose_settings(unsigned char const *rgba, int width, int height, int stride)
+{
+    AutoResult res;
+    kz_default_options(&res.o);
+    std::memset(&res.info, 0, sizeof(res.info));
+    res.info.size = sizeof(kz_auto_info);
+
+    // Transparent parts?
+    long long clear = 0;
+    for (int y = 0; y < height; y++) {
+        auto p = rgba + (size_t)stride * y + 3;
+        for (int x = 0; x < width; x++, p += 4) {
+            clear += *p < 250;
+        }
+    }
+    res.info.transparent = clear * 100 > (long long)width * height; // over 1%
+
+    auto full = to_rgbmap(rgba, width, height, stride);
+    int factor = 1;
+    auto map = shrink(full, 400000, factor);
+    int const w = map.width, h = map.height;
+
+    // Flat pixels: none of the four neighbors differs by more than a little (edges, including
+    // soft anti-aliased ones, are left out: whichever side they go to is right).
+    constexpr int FLAT = 24;
+    std::vector<unsigned char> flat((size_t)w * h, 0);
+    long long nflat = 0, nnoisy = 0;
+    for (int y = 1; y + 1 < h; y++) {
+        for (int x = 1; x + 1 < w; x++) {
+            size_t i = (size_t)y * w + x;
+            auto c = map.pixels[i];
+            int d = std::max({channel_diff(c, map.pixels[i - 1]), channel_diff(c, map.pixels[i + 1]),
+                              channel_diff(c, map.pixels[i - w]), channel_diff(c, map.pixels[i + w])});
+            if (d <= FLAT) {
+                flat[i] = 1;
+                nflat++;
+            }
+        }
+    }
+    // Noise, on the full-size picture (shrinking averages it away): flat pixels that differ
+    // a little from a neighbor. A clean logo's flat areas are exactly one color.
+    long long sampled = 0;
+    int const step = std::max(1, factor);
+    for (int y = 1; y + 1 < full.height; y += step) {
+        for (int x = 1; x + 1 < full.width; x += step) {
+            size_t i = (size_t)y * full.width + x;
+            auto c = full.pixels[i];
+            int d = std::max({channel_diff(c, full.pixels[i - 1]), channel_diff(c, full.pixels[i + 1]),
+                              channel_diff(c, full.pixels[i - full.width]),
+                              channel_diff(c, full.pixels[i + full.width])});
+            if (d <= FLAT) {
+                sampled++;
+                nnoisy += d > 0;
+            }
+        }
+    }
+    res.info.noisy = sampled > 0 && nnoisy * 20 > sampled; // over 5% of flat pixels
+    res.o.smooth = res.info.noisy;
+
+    // How many colors: the wrong part of the flat areas at 2, 3, ... colors.
+    auto smoothed = res.o.smooth ? rgbMapGaussian(map) : map;
+    constexpr int MAX_COLORS = 16;
+    constexpr int WRONG = 32; // levels: visibly another color
+    std::vector<double> wrong(MAX_COLORS + 1, 1.0);
+    std::vector<std::array<RGB, 2>> two(1);
+    int chosen = 0;
+    int actual_at[MAX_COLORS + 1] = {0};
+    for (int n = 2; n <= MAX_COLORS; n++) {
+        auto imap = rgbMapQuantize(smoothed, n);
+        dropBlendColors(smoothed, imap);
+        snapBlendedEdges(smoothed, imap);
+        refinePalette(map, imap);
+        long long bad = 0;
+        for (size_t i = 0; i < flat.size(); i++) {
+            if (flat[i] && channel_diff(imap.clut[imap.pixels[i]], map.pixels[i]) > WRONG) {
+                bad++;
+            }
+        }
+        wrong[n] = nflat ? (double)bad / nflat : 0.0;
+        actual_at[n] = imap.nrColors;
+        if (n == 2) {
+            two[0] = {imap.clut[0], imap.clut[std::min(1, imap.nrColors - 1)]};
+        }
+        if (std::getenv("KZ_AUTO_DEBUG")) {
+            std::fprintf(stderr, "auto: %2d colors (%2d kept): %.4f wrong\n", n, imap.nrColors, wrong[n]);
+        }
+        if (imap.nrColors < n && wrong[n] <= 0.002) {
+            // the picture has no more colors to give
+            chosen = imap.nrColors;
+            break;
+        }
+        if (wrong[n] <= 0.002) {
+            chosen = n;
+            break;
+        }
+    }
+    if (!chosen) {
+        // Never exact (a photo, a painting, gradients): the fewest colors that get nine
+        // tenths of the way from 2 colors to 16 (more add file size for little to see).
+        res.info.photo = 1;
+        double target = wrong[MAX_COLORS] + 0.10 * (wrong[2] - wrong[MAX_COLORS]);
+        chosen = MAX_COLORS;
+        for (int n = 2; n <= MAX_COLORS; n++) {
+            if (wrong[n] <= target) {
+                chosen = n;
+                break;
+            }
+        }
+    }
+    chosen = std::max(2, chosen);
+    res.o.scans = chosen;
+    res.info.colors = chosen;
+    res.info.wrong = wrong[std::min(chosen, MAX_COLORS)];
+    if (actual_at[chosen] && actual_at[chosen] < chosen) {
+        res.info.wrong = 0.0;
+    }
+
+    // Dark gray on light gray: black and white (one shape, no background).
+    if (chosen == 2) {
+        auto sat = [](RGB c) { return std::max({c.r, c.g, c.b}) - std::min({c.r, c.g, c.b}); };
+        auto lum = [](RGB c) { return ((int)c.r + c.g + c.b) / 3; };
+        RGB dark = two[0][0], light = two[0][1];
+        if (sat(dark) <= 40 && sat(light) <= 40 && lum(dark) <= 110 && lum(light) >= 170) {
+            res.o.mode = KZ_BRIGHTNESS;
+            res.o.threshold = (lum(dark) + lum(light)) / 2.0 / 256.0;
+        }
+    }
+    // A transparent background stays transparent.
+    res.o.remove_background = res.info.transparent && res.o.mode == KZ_COLORS;
+    return res;
+}
+
 } // namespace
 
 extern "C" {
@@ -883,6 +1068,25 @@ int kz_preview(unsigned char const *rgba, int width, int height, int stride, kz_
             }
             default:
                 return KZ_ERROR;
+        }
+        return KZ_OK;
+    } catch (...) {
+        return KZ_ERROR;
+    }
+}
+
+int kz_auto(unsigned char const *rgba, int width, int height, int stride, kz_options *o, kz_auto_info *info)
+{
+    if (!o || !valid_image(rgba, width, height, stride)) {
+        return KZ_ERROR;
+    }
+    try {
+        auto res = choose_settings(rgba, width, height, stride);
+        *o = res.o;
+        if (info) {
+            int n = std::clamp(info->size, 0, (int)sizeof(kz_auto_info));
+            res.info.size = n;
+            std::memcpy(info, &res.info, n);
         }
         return KZ_OK;
     } catch (...) {

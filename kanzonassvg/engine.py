@@ -88,6 +88,28 @@ class Options:
         return s
 
 
+class _AutoInfo(ctypes.Structure):
+    _fields_ = [
+        ("size", ctypes.c_int),
+        ("colors", ctypes.c_int),
+        ("transparent", ctypes.c_int),
+        ("noisy", ctypes.c_int),
+        ("photo", ctypes.c_int),
+        ("wrong", ctypes.c_double),
+    ]
+
+
+@dataclass
+class AutoInfo:
+    """What auto() found out about a picture."""
+
+    colors: int
+    transparent: bool
+    noisy: bool
+    photo: bool
+    wrong: float  # fraction of the flat areas still off
+
+
 _PROGRESS = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_double, ctypes.c_void_p)
 
 
@@ -147,6 +169,11 @@ def library():
         ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(_Options), ctypes.c_void_p,
     ]
     lib.kz_preview.restype = ctypes.c_int
+    lib.kz_auto.argtypes = [
+        ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(_Options),
+        ctypes.POINTER(_AutoInfo),
+    ]
+    lib.kz_auto.restype = ctypes.c_int
     lib.kz_free.argtypes = [ctypes.c_void_p]
     lib.kz_free.restype = None
     lib.kz_version.argtypes = []
@@ -217,3 +244,22 @@ def preview(rgba, width, height, stride=None, options=None):
     if lib.kz_preview(ctypes.addressof(buf), width, height, stride, ctypes.byref(opts), out) != OK:
         raise TraceError("The preview failed.")
     return out.raw
+
+
+def auto(rgba, width, height, stride=None):
+    """Recommended settings for a picture: (Options, AutoInfo)."""
+    lib = library()
+    stride = stride or width * 4
+    _check_image(rgba, width, height, stride)
+    buf = (ctypes.c_char * len(rgba)).from_buffer_copy(rgba) if isinstance(rgba, bytes) else \
+        (ctypes.c_char * len(rgba)).from_buffer(rgba)
+    opts = _Options()
+    info = _AutoInfo()
+    info.size = ctypes.sizeof(_AutoInfo)
+    if lib.kz_auto(ctypes.addressof(buf), width, height, stride, ctypes.byref(opts), ctypes.byref(info)) != OK:
+        raise TraceError("Couldn't work out settings for this picture.")
+    o = Options()
+    for f in fields(o):
+        v = getattr(opts, f.name)
+        setattr(o, f.name, bool(v) if isinstance(getattr(o, f.name), bool) else v)
+    return o, AutoInfo(info.colors, bool(info.transparent), bool(info.noisy), bool(info.photo), info.wrong)

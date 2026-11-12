@@ -198,3 +198,67 @@ class TestEnlarge(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAuto(unittest.TestCase):
+    def auto(self, img):
+        return engine.auto(*image.pixels(img))
+
+    def test_logo_gets_exactly_its_colors(self):
+        o, info = self.auto(logo())
+        self.assertEqual((o.mode, o.scans), (engine.COLORS, 3))
+        self.assertFalse(o.remove_background)
+        self.assertFalse(info.photo)
+        self.assertFalse(o.smooth)  # a clean picture: nothing to smooth
+
+    def test_transparent_background_stays_transparent(self):
+        from PySide6.QtCore import Qt
+        img = canvas(120, 80, Qt.GlobalColor.transparent)
+        for y in range(20, 60):
+            for x in range(20, 100):
+                img.setPixelColor(x, y, RED)
+        o, info = self.auto(img)
+        self.assertTrue(info.transparent)
+        self.assertTrue(o.remove_background)
+        svg, n = engine.trace(*image.pixels(img), options=o)
+        self.assertEqual(fills(svg), ["#b2002d"])
+
+    def test_noisy_picture_is_smoothed(self):
+        import random
+        rnd = random.Random(1)
+        img = logo()
+        for _ in range(4000):
+            x, y = rnd.randrange(240), rnd.randrange(160)
+            c = img.pixelColor(x, y)
+            d = rnd.randint(-12, 12)
+            c.setRgb(max(0, min(255, c.red() + d)), max(0, min(255, c.green() + d)), max(0, min(255, c.blue() + d)))
+            img.setPixelColor(x, y, c)
+        o, info = self.auto(img)
+        self.assertTrue(info.noisy)
+        self.assertTrue(o.smooth)
+        self.assertEqual(o.scans, 3)
+
+    def test_scan_of_dark_lines_is_black_and_white(self):
+        from PySide6.QtGui import QColor, QPainter, QPen
+        img = canvas(300, 200, QColor(0xF2, 0xF0, 0xEC))
+        p = QPainter(img)
+        p.setPen(QPen(QColor(0x2A, 0x2A, 0x2A), 7))
+        p.drawLine(20, 20, 280, 180)
+        p.drawEllipse(100, 40, 80, 80)
+        p.end()
+        o, _ = self.auto(image.to_rgba(img))
+        self.assertEqual(o.mode, engine.BRIGHTNESS)
+        self.assertTrue(0.3 < o.threshold < 0.8, o.threshold)
+
+    def test_gradient_is_a_photo_with_some_colors(self):
+        img = canvas(256, 64)
+        for x in range(256):
+            for y in range(64):
+                img.setPixelColor(x, y, RED.lighter(100 + (x * 150) // 256) if y < 32 else BLUE.darker(100 + x // 2))
+        o, info = self.auto(image.to_rgba(img))
+        self.assertTrue(4 <= o.scans <= 16, o.scans)
+        self.assertEqual(o.mode, engine.COLORS)
+
+    def test_bad_input(self):
+        with self.assertRaises(engine.TraceError):
+            engine.auto(b"", 0, 0)

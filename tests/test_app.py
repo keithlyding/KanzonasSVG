@@ -57,6 +57,35 @@ class TestWindow(unittest.TestCase):
             self.assertIn("#1d3f8f", f.read())
         self.assertEqual(self.w.default_name(), os.path.splitext(self.png)[0] + ".svg")
 
+    def test_auto_on_open_and_by_button(self):
+        self.w.settings.scans.setValue(12)
+        self.w.settings.smooth.setChecked(True)
+        QApplication.processEvents()
+        self.w.timer.stop()
+        self.w.open_path(self.png)
+        self.assertTrue(self.traced())
+        self.assertEqual(self.w.settings.scans.value(), 3)
+        self.assertFalse(self.w.settings.smooth.isChecked())
+        self.assertIn("Auto: 3 colors", self.w.status.text())
+        # the user's change stays; Auto again puts it back
+        self.w.settings.scans.setValue(6)
+        self.assertTrue(wait(lambda: self.w.worker is None and not self.w.timer.isActive()
+                             and self.w.job.options.scans == 6))
+        self.assertEqual(self.w.settings.scans.value(), 6)
+        self.w.settings.auto.click()
+        self.assertTrue(wait(lambda: self.w.worker is None and self.w.job.auto and self.w.result is not None))
+        self.assertEqual(self.w.settings.scans.value(), 3)
+
+    def test_auto_off_for_new_pictures(self):
+        self.w.a_auto_new.setChecked(False)
+        self.w.settings.scans.setValue(5)
+        QApplication.processEvents()
+        self.w.timer.stop()
+        self.w.open_path(self.png)
+        self.assertTrue(self.traced())
+        self.assertEqual(self.w.settings.scans.value(), 5)
+        self.assertNotIn("Auto", self.w.status.text())
+
     def test_settings_retrace(self):
         self.w.open_path(self.png)
         self.assertTrue(self.traced())
