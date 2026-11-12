@@ -43,7 +43,11 @@ zip and an installer (job `windows`, `installer/KanzonasSVG.iss`) and a Linux Ap
   newer glibc or C++ runtime.
 - American spelling in all user-visible text.
 - Logos: no Kanzonas logo is made or edited here; logos come from the Kanzonas-Site
-  repository's `brand/` folder. The icons are drawn by `tools/make_icon.py` from the owner's
+  repository's `brand/` folder (`brand/make_logos.py`). KanzonasSVG's are copied in unchanged
+  (`assets/kanzonassvg-logo.png` for the README, `kanzonassvg/logo.png` for Help > About) and
+  `assets/LOGO_SOURCE.txt` records the Kanzonas-Site commit and each file's SHA-256
+  (tests/test_logo_source.py fails if a file doesn't match it): to change the logo, change it
+  there, copy the new files and update the record. The icons are drawn by `tools/make_icon.py` from the owner's
   cactus and sunflower (`assets/kanzonas-mark-source.png`, from KanzonasPDF, unchanged), as
   KanzonasPDF's are: orange tile and orange "SVG" tag (KanzonasPDF is red, KanzonasCAD
   purple); the installer's icon has the same orange letters on a blue tile.

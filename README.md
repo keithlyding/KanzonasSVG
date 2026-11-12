@@ -1,5 +1,7 @@
 # KanzonasSVG
 
+![KanzonasSVG](assets/kanzonassvg-logo.png)
+
 Turn pictures (logos, drawings, scans) into SVG files, on Windows and Linux.
 
 ![A picture and its SVG side by side](docs/screenshot.png)
