@@ -18,6 +18,7 @@
 #include <array>
 #include <cstdio>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -830,6 +831,69 @@ std::vector<Paths> run_layers(int n, Progress &progress, Layer layer)
     return out;
 }
 
+/**
+ * The color edits (kz_options.edits) on a palette: each color takes the edit whose original
+ * color is nearest (within KZ_EDIT_MATCH levels in each channel; the first of equals), and is
+ * recolored or left out; colors that end up the same are one (the first of them, so stacking
+ * keeps its order). Returns which pixels are left out (empty if none).
+ */
+std::vector<unsigned char> apply_edits(IndexedMap &imap, kz_options const &o)
+{
+    std::vector<unsigned char> gone;
+    if (!o.nedits || imap.nrColors <= 0) {
+        return gone;
+    }
+    int const n = imap.nrColors;
+    std::vector<char> left_out(n, 0);
+    for (int k = 0; k < n; k++) {
+        int best = -1, best_d = KZ_EDIT_MATCH + 1;
+        RGB const c = imap.clut[k];
+        for (int e = 0; e < o.nedits; e++) {
+            auto const &ed = o.edits[e];
+            int d = std::max({std::abs(c.r - ed.from[0]), std::abs(c.g - ed.from[1]), std::abs(c.b - ed.from[2])});
+            if (d < best_d) {
+                best_d = d;
+                best = e;
+            }
+        }
+        if (best >= 0) {
+            auto const &ed = o.edits[best];
+            if (ed.leave_out) {
+                left_out[k] = 1;
+            } else {
+                imap.clut[k] = RGB{ed.to[0], ed.to[1], ed.to[2]};
+            }
+        }
+    }
+    // the same color twice: one layer (the first)
+    std::vector<unsigned> same(n);
+    for (int k = 0; k < n; k++) {
+        same[k] = k;
+        for (int j = 0; j < k; j++) {
+            if (!left_out[j] && !left_out[k] && imap.clut[j].r == imap.clut[k].r && imap.clut[j].g == imap.clut[k].g &&
+                imap.clut[j].b == imap.clut[k].b) {
+                same[k] = j;
+                break;
+            }
+        }
+    }
+    bool const any_out = std::find(left_out.begin(), left_out.end(), 1) != left_out.end();
+    if (any_out) {
+        gone.assign(imap.pixels.size(), 0);
+    }
+    for (size_t i = 0; i < imap.pixels.size(); i++) {
+        unsigned k = imap.pixels[i];
+        if ((int)k >= n) {
+            continue;
+        }
+        if (left_out[k]) {
+            gone[i] = 1;
+        }
+        imap.pixels[i] = same[k];
+    }
+    return gone;
+}
+
 Shapes trace_colors(RgbMap const &map, kz_options const &o, Progress &progress)
 {
     IndexedMap imap(1, 1);
@@ -839,12 +903,22 @@ Shapes trace_colors(RgbMap const &map, kz_options const &o, Progress &progress)
         progress.report(1.0);
     }
     Progress::Part all(progress, 0.15, 0.85);
+    auto removed = apply_edits(imap, o);
 
     // The background left out: its pixels are in no layer, so it shows through.
     int const bg = o.remove_background ? background_index(imap) : -1;
     std::vector<unsigned char> gone;
     if (bg >= 0) {
         gone = background_mask(imap, bg, o.remove_background);
+    }
+    if (!removed.empty()) {             // (and the colors left out by an edit)
+        if (gone.empty()) {
+            gone = std::move(removed);
+        } else {
+            for (size_t i = 0; i < gone.size(); i++) {
+                gone[i] |= removed[i];
+            }
+        }
     }
 
     // Colors with no pixel left (the background color, all of it left out) get no layer:
@@ -947,6 +1021,7 @@ RgbMap autotrace_input(RgbMap const &map, kz_options const &o, RGB *background =
 {
     auto prep = prepared(map, fingerprint(map), true);
     auto imap = palette(map, prep->smoothed, autotrace_colors(o), &prep->histogram);
+    auto removed = apply_edits(imap, o);   // (colors left out by an edit go with the background)
 
     // The color Autotrace leaves out: white, or the picture's background when it is removed.
     RGB bg = {255, 255, 255};
@@ -969,7 +1044,7 @@ RgbMap autotrace_input(RgbMap const &map, kz_options const &o, RGB *background =
 
     RgbMap out(map.width, map.height);
     for (size_t i = 0; i < out.pixels.size(); i++) {
-        out.pixels[i] = imap.clut[imap.pixels[i] % imap.clut.size()];
+        out.pixels[i] = !removed.empty() && removed[i] ? bg : imap.clut[imap.pixels[i] % imap.clut.size()];
     }
     return out;
 }
@@ -1186,6 +1261,11 @@ kz_options checked(kz_options const *in)
         int n = std::clamp(in->size, 0, (int)sizeof(kz_options));
         std::memcpy(&o, in, n);
         o.size = sizeof(kz_options);
+        // the edits only from a struct that holds them whole (part of a pointer is no pointer)
+        if (n < (int)(offsetof(kz_options, edits) + sizeof(o.edits))) {
+            o.nedits = 0;
+            o.edits = nullptr;
+        }
     }
     // Not-a-number or infinite settings (a caller's mistake, or "nan" typed on the command
     // line) take the default: clamping passes NaN through, and it then broke the scans.
@@ -1199,6 +1279,10 @@ kz_options checked(kz_options const *in)
         }
     }
     o.scans = std::clamp(o.scans, 2, 256);
+    o.nedits = o.edits ? std::clamp(o.nedits, 0, 4096) : 0;
+    if (!o.nedits) {
+        o.edits = nullptr;
+    }
     o.remove_background = std::clamp(o.remove_background, 0, 2);
     o.threshold = std::clamp(o.threshold, 0.0, 1.0);
     o.speckles = std::clamp(o.speckles, 0, 100000);
@@ -1687,8 +1771,11 @@ int kz_preview(unsigned char const *rgba, int width, int height, int stride, kz_
             case KZ_COLORS:
             case KZ_GRAYS: {
                 auto imap = quantized(map, o);
+                auto removed = apply_edits(imap, o);
                 for (size_t i = 0; i < imap.pixels.size(); i++) {
-                    put(i, imap.clut[imap.pixels[i] % imap.clut.size()]);
+                    // (a color left out shows as white, as transparent parts are traced)
+                    put(i, !removed.empty() && removed[i] ? RGB{255, 255, 255}
+                                                          : imap.clut[imap.pixels[i] % imap.clut.size()]);
                 }
                 break;
             }
@@ -1734,6 +1821,47 @@ int kz_auto(unsigned char const *rgba, int width, int height, int stride, kz_opt
             res.info.size = n;
             std::memcpy(info, &res.info, n);
         }
+        return KZ_OK;
+    } catch (...) {
+        return KZ_ERROR;
+    }
+}
+
+int kz_palette(unsigned char const *rgba, int width, int height, int stride, kz_options const *options,
+               unsigned char *rgb_out, long long *counts, int max, int *n)
+{
+    if (!n || !rgb_out || max < 0 || !valid_image(rgba, width, height, stride)) {
+        return KZ_ERROR;
+    }
+    *n = 0;
+    try {
+        auto o = checked(options);
+        IndexedMap imap(1, 1);
+        auto map = to_rgbmap(rgba, width, height, stride);
+        if (o.mode == KZ_COLORS || o.mode == KZ_GRAYS) {
+            imap = quantized(map, o);
+        } else if (o.mode == KZ_AUTOTRACE) {
+            auto prep = prepared(map, fingerprint(map), true);
+            imap = palette(map, prep->smoothed, autotrace_colors(o), &prep->histogram);
+        } else {
+            return KZ_OK;
+        }
+        std::vector<long long> count(imap.nrColors, 0);
+        for (auto k : imap.pixels) {
+            if ((int)k < imap.nrColors) {
+                count[k]++;
+            }
+        }
+        int const m = std::min(max, imap.nrColors);
+        for (int k = 0; k < m; k++) {
+            rgb_out[3 * k] = imap.clut[k].r;
+            rgb_out[3 * k + 1] = imap.clut[k].g;
+            rgb_out[3 * k + 2] = imap.clut[k].b;
+            if (counts) {
+                counts[k] = count[k];
+            }
+        }
+        *n = m;
         return KZ_OK;
     } catch (...) {
         return KZ_ERROR;

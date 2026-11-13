@@ -5,6 +5,7 @@ window captured at 1400 x 820. Run it again when the window changes:
     QT_QPA_PLATFORM=offscreen python tools/make_screenshots.py
 
 - docs/screenshot.png: the owner's sunflower and cactus (assets/kanzonas-mark-source.png).
+- docs/screenshot-colors.png: the same, with its colors edited in the Colors box.
 - docs/screenshot-landscape.png: a flat illustration drawn here (tools/make_screenshots.py's
   own landscape(), so no one else's picture), in many colors.
 """
@@ -100,11 +101,7 @@ def landscape(path, w=900, h=640):
     img.save(path)
 
 
-def shoot(picture, out):
-    w = app.MainWindow()
-    w.resize(W, H)
-    w.show()
-    w.open_path(picture)
+def settle(w):
     end = time.time() + 120
     while time.time() < end:
         APP.processEvents()
@@ -115,6 +112,37 @@ def shoot(picture, out):
     for _ in range(30):
         APP.processEvents()
         time.sleep(0.01)
+
+
+def evening(w):
+    """For the colors screenshot: the sky traced blue, the two darker greens merged, the roof
+    slate, and the sun's swatch selected."""
+    c = w.settings.colors
+
+    def group(rgb):
+        return next(g for g in c.groups if g.color == rgb)
+    c.selected = set(group((0xFF, 0xC4, 0x6B)).members)
+    c.change_color((0x6F, 0xA8, 0xDC))
+    settle(w)
+    c.selected = set(group((0x1F, 0x6B, 0x3A)).members) | set(group((0x4F, 0x8A, 0x5B)).members)
+    c.merge()
+    settle(w)
+    c.selected = set(group((0xD6, 0x3C, 0x3C)).members)
+    c.change_color((0x5A, 0x63, 0x70))
+    settle(w)
+    c.selected = set(group((0xFF, 0xE0, 0x66)).members)
+    c._rebuild()
+
+
+def shoot(picture, out, then=None):
+    w = app.MainWindow()
+    w.resize(W, H)
+    w.show()
+    w.open_path(picture)
+    settle(w)
+    if then is not None:
+        then(w)
+        settle(w)
     shot = w.grab()
     assert shot.width() == W and shot.height() == H, (shot.width(), shot.height())
     shot.save(out)
@@ -128,6 +156,7 @@ def main():
     pic = os.path.join(SETTINGS, "landscape.png")
     landscape(pic)
     shoot(pic, os.path.join(docs, "screenshot-landscape.png"))
+    shoot(pic, os.path.join(docs, "screenshot-colors.png"), evening)
     return 0
 
 

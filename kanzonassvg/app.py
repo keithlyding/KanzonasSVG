@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDial
     QProgressDialog, QPushButton, QScrollArea, QSpinBox, QSplitter, QTextBrowser, QVBoxLayout, QWidget
 
 from kanzonassvg import APP_NAME, __version__, engine, image, tracing
+from kanzonassvg.colors_panel import ColorsPanel
 
 # (label, engine mode)
 MODES = [
@@ -109,6 +110,28 @@ nothing from it); the status bar says how much it was.</li>
 <p>A big picture (over 3 megapixels) first shows a quick preview, traced from a smaller copy,
 while the whole picture is traced; the status bar says so, and <i>Save SVG</i> and <i>Copy SVG</i>
 wait for the whole picture's SVG.</p>
+<h3>Editing colors</h3>
+<p>In <b>Colors</b>, <b>Grays</b> and <b>Autotrace: colors</b>, the <b>Colors</b> box shows the
+colors the SVG is traced with, one swatch each. Click swatches to select them (click again to
+unselect; clicking the picture on the left selects the color traced there), then:</p>
+<ul>
+<li><b>Change color...</b> traces them as another color you pick: the shapes stay, only their
+color changes.</li>
+<li><b>Merge</b> traces them as one color (that of the biggest of them), in one layer: for a
+picture with too many shades of the same color, merge the shades you don't need apart. Merged
+colors show as one swatch.</li>
+<li><b>Leave out</b> leaves them out: the SVG is see-through there (a crossed-out swatch;
+select it and click <b>Put back</b> to trace it again).</li>
+<li><b>Reset colors</b> undoes the edits of the selected colors, or of all when none is
+selected.</li>
+</ul>
+<p>The picture itself never changes, and the edits are for the picture shown: a new picture
+starts without them, and <i>Reset settings</i> clears them. They still apply when the colors
+are picked again (another number of colors, Smooth, a crop, Auto settings): each edit goes to
+the color nearest the one it was made on (within 24 levels). An edit no color matches any more
+is kept, and the box says so; it applies again if that color comes back. The status bar says
+how many colors are edited. On the command line: <code>--list-colors</code>,
+<code>--recolor FROM=TO</code> and <code>--leave-out COLOR</code>.</p>
 <h3>Cropping</h3>
 <p>To trace only part of a picture (the drawing in a screenshot, without the program's
 toolbars around it; one logo of several), use <i>Trace &gt; Crop picture</i> (Ctrl+R) and
@@ -351,6 +374,7 @@ class Canvas(QWidget):
 
     _ids = itertools.count(1)
     cropped = Signal(QRectF)  # (Crop picture) the rectangle dragged, in picture pixels
+    clicked = Signal(QPointF)  # a click (no drag) on the picture, in picture pixels
 
     def __init__(self, view, title):
         super().__init__()
@@ -487,6 +511,7 @@ class Canvas(QWidget):
             return
         if e.button() in (Qt.MouseButton.LeftButton, Qt.MouseButton.MiddleButton):
             self.drag = e.position()
+            self.press = e.position() if e.button() == Qt.MouseButton.LeftButton else None
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
 
     def mouseMoveEvent(self, e):
@@ -499,7 +524,11 @@ class Canvas(QWidget):
             self.drag = e.position()
             self.view.move(d.x(), d.y())
 
-    def mouseReleaseEvent(self, _e):
+    def mouseReleaseEvent(self, e):
+        press, self.press = getattr(self, "press", None), None
+        if press is not None and self.band is None and (e.position() - press).manhattanLength() < 4 \
+                and self.has_content():
+            self.clicked.emit(self.to_picture(e.position()))
         if self.band is not None:
             a, b = self.to_picture(self.band[0]), self.to_picture(self.band[1])
             self.band = None
@@ -601,7 +630,8 @@ def auto_options(img, current):
     # the threshold only when Auto picks Black and white (the panel shows it only then; otherwise
     # the trace was made with another threshold than the one the panel keeps)
     threshold = picked.threshold if picked.mode == engine.BRIGHTNESS else current.threshold
-    return replace(picked, threshold=threshold, stack=True, invert=False), info
+    # (the color edits stay: they're the user's, for this picture)
+    return replace(picked, threshold=threshold, stack=True, invert=False, edits=current.edits), info
 
 
 def describe_auto(options, info):
@@ -666,6 +696,10 @@ class Settings(QScrollArea):
         self.bg_label = QLabel("Background")
         f.addRow(self.bg_label, self.remove_bg)
         lay.addWidget(self.g_multi)
+
+        self.colors = ColorsPanel()
+        self.colors.changed.connect(self.changed)
+        lay.addWidget(self.colors)
 
         self.g_single = QGroupBox("Scan")
         f = QFormLayout(self.g_single)
@@ -768,6 +802,7 @@ class Settings(QScrollArea):
         self.g_potrace.setVisible(mode in POTRACE_MODES)
         self.g_auto.setVisible(mode in AUTOTRACE_MODES)
         self.width.setVisible(mode == engine.CENTERLINE)
+        self.colors.setVisible(mode in tracing.COLOR_MODES)
 
     def options(self):
         return engine.Options(
@@ -785,6 +820,7 @@ class Settings(QScrollArea):
             error_threshold=self.error.value(),
             filter_iterations=self.filters.value(),
             preserve_width=self.width.isChecked(),
+            edits=self.colors.edits_tuple(),
         )
 
     def enlarge_setting(self):
@@ -895,6 +931,7 @@ class Settings(QScrollArea):
         self._edge, self._bw, self._last_mode = 0.65, 0.45, engine.COLORS
         self.tolerance.setEnabled(True)
         self._update_visible()
+        self.colors.clear()
         self.changed.emit()
 
 
@@ -923,6 +960,7 @@ class MainWindow(QMainWindow):
         self.view = View()
         self.left = Canvas(self.view, "Picture")
         self.left.cropped.connect(self.on_cropped)
+        self.left.clicked.connect(self.on_picture_clicked)
         self.right = Canvas(self.view, "SVG")
         self.left.set_message("Open a picture (Ctrl+O), drag one here, or paste one (Ctrl+V).")
         split = QSplitter()
@@ -1094,6 +1132,7 @@ class MainWindow(QMainWindow):
         """A new picture: opened, pasted or dropped."""
         self.full_img = img
         self.crop = None
+        self.settings.colors.clear()    # (color edits are for the picture they were made on)
         self.source_path = path
         self.save_path = None
         self.cancel_crop()
@@ -1113,6 +1152,23 @@ class MainWindow(QMainWindow):
         self._update_title()
         self._update_actions()
         self.start_trace(auto=self.a_auto_new.isChecked())
+
+    def on_picture_clicked(self, point):
+        """A click on the picture: select the color traced there in the Colors panel."""
+        colors = self.settings.colors
+        if self.img is None or not colors.isVisible() or not colors.palette:
+            return
+        x, y = int(point.x()), int(point.y())
+        if not (0 <= x < self.img.width() and 0 <= y < self.img.height()):
+            return
+        c = self.img.pixelColor(x, y)
+        if c.alpha() < 128:
+            c = QColor(255, 255, 255)   # (transparent parts are traced as white)
+        g = colors.select_only((c.red(), c.green(), c.blue()))
+        if g is not None:
+            self.status.setText("Selected %s in Colors (%s)." % (
+                "#%02x%02x%02x" % g.color, "left out" if g.left_out else "%d%% of the picture" % round(
+                    100.0 * g.count / max(1, sum(n for _, n in colors.palette)))))
 
     # cropping
 
@@ -1253,6 +1309,7 @@ class MainWindow(QMainWindow):
         self.result = result
         if preview is not None:
             self.preview = preview
+        self.settings.colors.set_palette(result.palette)
         self.right.set_message("")
         self.right.set_svg(result.svg)
         if self.a_colors.isChecked() and self.preview is not None:
@@ -1263,6 +1320,9 @@ class MainWindow(QMainWindow):
             text += " (at %d times the size)" % result.factor
         if self.crop is not None:
             text += "; cropped to %d x %d pixels" % (self.crop.width(), self.crop.height())
+        edited = self.settings.colors.edited_count()
+        if edited:
+            text += "; %d color%s edited" % (edited, "" if edited == 1 else "s")
         if self.job.auto_info is not None:
             text = describe_auto(self.job.options, self.job.auto_info) + ". " + text[0].upper() + text[1:]
         self.status.setText(text)

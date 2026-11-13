@@ -31,12 +31,16 @@ def enlarge_factor(setting, width, height):
     return factor
 
 
+COLOR_MODES = (engine.COLORS, engine.GRAYS, engine.AUTOTRACE)  # the modes whose colors can be edited
+
+
 @dataclass
 class Result:
     svg: str
     shapes: int
     seconds: float
     factor: int
+    palette: list = None  # [((r, g, b), pixels)]: the colors traced, before color edits (engine.palette)
 
 
 _SIZE = re.compile(r'<svg ([^>]*?)width="\d+" height="\d+"')
@@ -56,7 +60,9 @@ def trace_image(img, options, enlarge=AUTO, progress=None):
     svg, n = engine.trace(data, w, h, stride, options, progress)
     if factor != 1:
         svg = set_size(svg, img.width(), img.height())
-    return Result(svg, n, time.perf_counter() - t, factor)
+    # (the engine kept the colors it just traced with: quick)
+    colors = engine.palette(data, w, h, stride, options) if options.mode in COLOR_MODES else None
+    return Result(svg, n, time.perf_counter() - t, factor, colors)
 
 
 # A big picture is first traced as a small copy (about a megapixel, a tenth of a second) and

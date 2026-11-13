@@ -53,6 +53,14 @@ def parser():
     p.add_argument("--no-optimize", action="store_true", help="don't join curve segments (bigger files)")
     p.add_argument("--tolerance", type=float, default=0.2, metavar="0-5",
                    help="how far joining segments may move the curve (default 0.2)")
+    p.add_argument("--list-colors", action="store_true",
+                   help="print the colors each picture would be traced with (and how much of it each covers), "
+                   "to use with --recolor and --leave-out; writes no SVG")
+    p.add_argument("--recolor", action="append", default=[], metavar="FROM=TO", type=recolor_pair,
+                   help="trace the color nearest FROM (within %d levels) as TO, both #rrggbb; give it again for "
+                   "more colors (colors recolored the same are merged into one)" % engine.EDIT_MATCH)
+    p.add_argument("--leave-out", action="append", default=[], metavar="COLOR", type=rgb_color,
+                   help="leave out the color nearest COLOR (#rrggbb): the SVG is see-through there")
     p.add_argument("--crop", default=None, metavar="X,Y,W,H", type=crop_box,
                    help="trace only this part of the picture: W x H pixels from X across and Y down "
                    "(the SVG is that size)")
@@ -98,6 +106,7 @@ def options_from(args, picked=None):
         error_threshold=args.error_threshold,
         filter_iterations=args.filter_iterations,
         preserve_width=not args.no_preserve_width,
+        edits=tuple(args.recolor) + tuple((c, None) for c in args.leave_out),
     )
 
 
@@ -136,6 +145,22 @@ def qt_app():
     return QGuiApplication.instance()
 
 
+def rgb_color(text):
+    """'#b2002d' (or 'b2002d') -> (178, 0, 45)."""
+    t = text.strip().lstrip("#")
+    if len(t) != 6 or any(c not in "0123456789abcdefABCDEF" for c in t):
+        raise argparse.ArgumentTypeError("%r isn't a color: use #rrggbb, like #b2002d" % text)
+    return tuple(int(t[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def recolor_pair(text):
+    """'#b2002d=#00a000' -> ((178, 0, 45), (0, 160, 0))."""
+    if "=" not in text:
+        raise argparse.ArgumentTypeError("--recolor takes FROM=TO, like #b2002d=#00a000")
+    a, b = text.split("=", 1)
+    return rgb_color(a), rgb_color(b)
+
+
 def crop_box(text):
     """'X,Y,W,H' -> (x, y, w, h), whole pixels, W and H at least 1."""
     try:
@@ -155,6 +180,21 @@ def cropped(img, box):
     if r.isEmpty():
         raise image.ImageError("--crop %d,%d,%d,%d is outside the picture (%d x %d)" % (box + (img.width(), img.height())))
     return img.copy(r)
+
+
+def list_colors(src, img, options, enlarge):
+    """--list-colors: the colors a trace of img with options uses, biggest first."""
+    work = image.scaled(img, tracing.enlarge_factor(enlarge, img.width(), img.height()))
+    colors = engine.palette(*image.pixels(work), options=options)
+    if not colors:
+        print("%s: %s mode traces no colors to list" % (src, engine.MODE_NAMES[options.mode]))
+        return
+    total = sum(n for _, n in colors) or 1
+    print("%s: %d colors" % (src, len(colors)))
+    for c, n in sorted(colors, key=lambda x: -x[1]):
+        e = engine.edit_for(c, options.edits)
+        what = "" if e is None else ("  -> left out" if e[1] is None else "  -> #%02x%02x%02x" % tuple(e[1]))
+        print("  #%02x%02x%02x  %5.1f%%%s" % (c + (100.0 * n / total, what)))
 
 
 def run(argv):
@@ -190,6 +230,9 @@ def run(argv):
                     enlarge_this = info.enlarge     # (line art: enlarged 4 times)
                 note = ", %s" % ("black and white" if options.mode == engine.BRIGHTNESS
                                  else "%d %s" % (options.scans, engine.MODE_NAMES[options.mode]))
+            if args.list_colors:
+                list_colors(src, img, options, enlarge_this)
+                continue
             res = tracing.trace_image(img, options, enlarge_this)
             tmp = dst + ".part"
             with open(tmp, "w", encoding="utf-8", newline="\n") as f:
