@@ -17,7 +17,7 @@ class TestSlop(unittest.TestCase):
         self.assertEqual(slop_check.words_found(text, slop_check.BUZZWORDS), ["seamless", "robust", "leverage"])
         self.assertEqual(slop_check.words_found(text, slop_check.PLACEHOLDERS), ["lorem ipsum", "coming soon"])
         self.assertEqual(slop_check.words_found(text, slop_check.BRITISH), ["colour"])
-        self.assertTrue(slop_check.MARKERS.search("x = 1  # TODO later"))
+        self.assertTrue(slop_check.MARKERS.search("x = 1  # " + "TO" + "DO later"))
         self.assertTrue(slop_check.STRAY.search("kanzonassvg/app.py.orig"))
         self.assertTrue(slop_check.STRAY.search("tests/_quick.png"))
         # (whole words only: "robustness" in a word list isn't "robust"; "background" isn't "grey")
