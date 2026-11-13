@@ -365,7 +365,9 @@ int main(int argc, char **argv)
             if (cancel.after < 0) errs.push_back("cancelled without being asked");
             if (svg) errs.push_back("cancelled with an SVG");
         } else if (st == KZ_ERROR) {
-            bool nonsense_mode = o.size >= (int)(offsetof(kz_options, mode) + sizeof(int)) && (o.mode < 0 || o.mode > 6);
+            // (a size that reaches into the mode field, even partly, hands over a mode that may be none)
+            bool nonsense_mode = o.size > (int)offsetof(kz_options, mode) &&
+                                 (o.size < (int)(offsetof(kz_options, mode) + sizeof(int)) || o.mode < 0 || o.mode > 6);
             if (!nonsense_mode || !err) errs.push_back(std::string("error: ") + (err ? err : "(no message)"));
         } else {
             errs.push_back("unknown status " + std::to_string(st));

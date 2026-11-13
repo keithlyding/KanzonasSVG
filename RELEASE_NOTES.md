@@ -13,6 +13,8 @@ Faster:
   about three times faster.
 
 Fixed (found by a new battery of tests that tries to break it):
+- On Windows, detailed pictures (photos, paintings) were traced with worse colors than on Linux
+  (an overflow in the color reduction, from Inkscape's code). They now trace the same on both.
 - Quitting right after Copy SVG could crash the program.
 - An SVG of thousands of small shapes could show only in part in the window (and in some other
   programs). Very long paths are now split, and the window always shows the whole SVG.

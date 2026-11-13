@@ -15,7 +15,9 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
+#include <cstdint>
 #include <cstdlib>
+#include <tuple>
 #include <memory>
 #include <vector>
 
@@ -30,6 +32,8 @@ namespace {
 /**
  * an octree node datastructure
  */
+// (64-bit counts: Inkscape's unsigned long is 32 bits on Windows, where the impact values
+// overflowed on big pictures and the palette came out worse than on Linux.)
 struct Ocnode
 {
     Ocnode *parent;           // parent node
@@ -38,10 +42,10 @@ struct Ocnode
     int nchild;               // number of children
     int width;                // width level of this node
     RGB rgb;                  // rgb's prefix of that node
-    unsigned long weight;     // number of pixels this node accounts for
-    unsigned long rs, gs, bs; // sum of pixels colors this node accounts for
+    uint64_t weight;          // number of pixels this node accounts for
+    uint64_t rs, gs, bs;      // sum of pixels colors this node accounts for
     int nleaf;                // number of leaves under this node
-    unsigned long mi;         // minimum impact
+    uint64_t mi;              // minimum impact (weight << 2*width: up to 2^16 times the weight)
 };
 
 /*
@@ -339,7 +343,7 @@ void ocnodeMi(Ocnode *node)
  * <count> leaves are removed, and <count> is decreased on each removal.
  * all parameters including minimal impact values are regenerated.
  */
-void ocnodeStrip(Pool<Ocnode> &pool, Ocnode **ref, int &count, unsigned long lvl)
+void ocnodeStrip(Pool<Ocnode> &pool, Ocnode **ref, int &count, uint64_t lvl)
 {
     Ocnode *node = *ref;
     if (!node) return;
@@ -445,8 +449,8 @@ Ocnode *octreeBuild(Pool<Ocnode> &pool, RgbMap const &rgbmap, int ncolor)
 
     struct Bin
     {
-        unsigned long weight = 0;
-        unsigned long rs = 0, gs = 0, bs = 0;
+        uint64_t weight = 0;
+        uint64_t rs = 0, gs = 0, bs = 0;
     };
     std::vector<Bin> bins(1u << (3 * HIST_BITS));
 
@@ -494,7 +498,7 @@ Ocnode *octreeBuild(Pool<Ocnode> &pool, RgbMap const &rgbmap, int ncolor)
 /**
  * compute the color palette associated to an octree, with the weight of each color.
  */
-void octreeIndex(Ocnode *node, RGB *rgbpal, unsigned long *weights, int &index)
+void octreeIndex(Ocnode *node, RGB *rgbpal, uint64_t *weights, int &index)
 {
     if (!node) return;
     if (node->nchild == 0) {
@@ -519,7 +523,7 @@ void octreeIndex(Ocnode *node, RGB *rgbpal, unsigned long *weights, int &index)
  * for, the spare ones split a color into near-identical twins (JPEG noise in a flat
  * area), and the border between twins is noise: thousands of nodes for nothing.
  */
-int mergeCloseColors(RGB *rgbs, unsigned long *weights, int n)
+int mergeCloseColors(RGB *rgbs, uint64_t *weights, int n)
 {
     constexpr int CLOSE = 3 * 10 * 10; // about 10 levels per channel
     auto dist2 = [](RGB a, RGB b) {
@@ -540,7 +544,7 @@ int mergeCloseColors(RGB *rgbs, unsigned long *weights, int n)
         if (bi < 0) {
             break;
         }
-        unsigned long wi = weights[bi], wj = weights[bj], w = std::max(wi + wj, 1ul);
+        uint64_t wi = weights[bi], wj = weights[bj], w = std::max<uint64_t>(wi + wj, 1);
         rgbs[bi].r = (rgbs[bi].r * wi + rgbs[bj].r * wj + w / 2) / w;
         rgbs[bi].g = (rgbs[bi].g * wi + rgbs[bj].g * wj + w / 2) / w;
         rgbs[bi].b = (rgbs[bi].b * wi + rgbs[bj].b * wj + w / 2) / w;
@@ -590,7 +594,7 @@ IndexedMap rgbMapQuantize(RgbMap const &rgbmap, int ncolor)
     auto tree = octreeBuild(pool, rgbmap, ncolor);
 
     auto rgbs = std::make_unique<RGB[]>(ncolor);
-    auto counts = std::make_unique<unsigned long[]>(ncolor);
+    auto counts = std::make_unique<uint64_t[]>(ncolor);
     int index = 0;
     octreeIndex(tree, rgbs.get(), counts.get(), index);
 
@@ -605,8 +609,15 @@ IndexedMap rgbMapQuantize(RgbMap const &rgbmap, int ncolor)
     int const nused = index;
 
     // stacking with increasing contrasts
-    std::sort(rgbs.get(), rgbs.get() + nused,
-              [](auto &ra, auto &rb) { return (ra.r + ra.g + ra.b) < (rb.r + rb.g + rb.b); });
+    // (ties broken by the colors themselves: std::sort leaves equal ones in an order that differs
+    // between C++ libraries, and the order is the stacking order)
+    std::sort(rgbs.get(), rgbs.get() + nused, [](auto &ra, auto &rb) {
+        int a = ra.r + ra.g + ra.b, b = rb.r + rb.g + rb.b;
+        if (a != b) {
+            return a < b;
+        }
+        return std::tie(ra.r, ra.g, ra.b) < std::tie(rb.r, rb.g, rb.b);
+    });
 
     // make the new map
     // fill in the color lookup table
@@ -745,7 +756,7 @@ void refinePalette(RgbMap const &original, IndexedMap &imap)
 
     struct Sum
     {
-        unsigned long long r = 0, g = 0, b = 0, count = 0;
+        uint64_t r = 0, g = 0, b = 0, count = 0;
         void add(RGB c)
         {
             r += c.r;
@@ -791,7 +802,7 @@ void refinePalette(RgbMap const &original, IndexedMap &imap)
     }
 
     // Is the candidate really over half of them?
-    std::vector<unsigned long long> exact(n, 0);
+    std::vector<uint64_t> exact(n, 0);
     for (int y = 1; y + 1 < height; y++) {
         for (int x = 1; x + 1 < width; x++) {
             size_t i = (size_t)y * width + x;
