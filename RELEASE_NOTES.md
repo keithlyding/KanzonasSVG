@@ -2,6 +2,18 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.1.2
+
+New:
+- Crop: *Trace > Crop picture* (Ctrl+R), then drag across the part of the picture to trace,
+  for example the drawing in a screenshot without the program's toolbars around it. Auto
+  settings picks the settings for that part. *Trace > Remove crop* (Ctrl+Shift+R) brings the
+  whole picture back. On the command line: `--crop X,Y,W,H`.
+
+Fixed:
+- Background: Remove on a picture with transparent parts at its edge removes those parts, not
+  a shape that covers most of the edge.
+
 ## 1.1.1
 
 Fixed:

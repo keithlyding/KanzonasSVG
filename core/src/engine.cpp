@@ -67,6 +67,16 @@ struct TooBig : std::exception
 // Path data written by the trace this thread works for (layers run on several threads).
 thread_local std::atomic<size_t> *svg_budget = nullptr;
 
+// The picture being traced, as given (with its alpha): the background is the color of its
+// transparent pixels when its edge has some (see background_index). Set by kz_trace for the
+// calling thread.
+struct Input
+{
+    unsigned char const *rgba = nullptr;
+    int width = 0, height = 0, stride = 0;
+};
+thread_local Input traced_input;
+
 inline void count_bytes(size_t n)
 {
     if (svg_budget && (*svg_budget += n) > MAX_SVG_BYTES) {
@@ -652,6 +662,35 @@ IndexedMap quantized(RgbMap const &map, kz_options const &o)
  */
 int background_index(IndexedMap const &imap)
 {
+    // A picture with transparent pixels on its edge: they are its background (composited on
+    // white), whatever covers the rest of the edge (a cropped part of a transparent picture,
+    // mostly covered by a shape at its edge: the shape is not the background).
+    Input const in = traced_input;
+    if (in.rgba && in.width == imap.width && in.height == imap.height) {
+        std::vector<long> clear(imap.nrColors, 0);
+        long nclear = 0, edge = 0;
+        auto look = [&](int x, int y) {
+            edge++;
+            if (in.rgba[(size_t)y * in.stride + (size_t)x * 4 + 3] < 128) {
+                unsigned k = imap.pixels[(size_t)y * imap.width + x];
+                if ((int)k < imap.nrColors) {
+                    clear[k]++;
+                    nclear++;
+                }
+            }
+        };
+        for (int x = 0; x < imap.width; x++) {
+            look(x, 0);
+            look(x, imap.height - 1);
+        }
+        for (int y = 1; y + 1 < imap.height; y++) {
+            look(0, y);
+            look(imap.width - 1, y);
+        }
+        if (nclear * 50 >= edge) { // (2% of the edge: not a stray pixel)
+            return (int)(std::max_element(clear.begin(), clear.end()) - clear.begin());
+        }
+    }
     std::vector<long> count(imap.nrColors, 0);
     long total = 0;
     auto add = [&](int x, int y) {
@@ -1587,7 +1626,8 @@ int kz_trace(unsigned char const *rgba, int width, int height, int stride, kz_op
         auto map = to_rgbmap(rgba, width, height, stride);
         std::atomic<size_t> bytes{0};
         svg_budget = &bytes;
-        struct Reset { ~Reset() { svg_budget = nullptr; } } reset;
+        traced_input = Input{rgba, width, height, stride};
+        struct Reset { ~Reset() { svg_budget = nullptr; traced_input = Input{}; } } reset;
         Shapes shapes;
         switch (o.mode) {
             case KZ_GRAYS:

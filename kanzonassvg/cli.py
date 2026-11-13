@@ -53,6 +53,9 @@ def parser():
     p.add_argument("--no-optimize", action="store_true", help="don't join curve segments (bigger files)")
     p.add_argument("--tolerance", type=float, default=0.2, metavar="0-5",
                    help="how far joining segments may move the curve (default 0.2)")
+    p.add_argument("--crop", default=None, metavar="X,Y,W,H", type=crop_box,
+                   help="trace only this part of the picture: W x H pixels from X across and Y down "
+                   "(the SVG is that size)")
     p.add_argument("--enlarge", default="auto", choices=["auto", "1", "2", "4"],
                    help="trace at this many times the size (auto: 2 for pictures under %d pixels)"
                    % tracing.AUTO_BELOW)
@@ -133,6 +136,27 @@ def qt_app():
     return QGuiApplication.instance()
 
 
+def crop_box(text):
+    """'X,Y,W,H' -> (x, y, w, h), whole pixels, W and H at least 1."""
+    try:
+        x, y, w, h = (int(v) for v in text.split(","))
+    except ValueError:
+        raise argparse.ArgumentTypeError("--crop takes X,Y,W,H in whole pixels, like 10,20,300,200")
+    if x < 0 or y < 0 or w < 1 or h < 1:
+        raise argparse.ArgumentTypeError("--crop: X and Y can't be negative, W and H must be at least 1")
+    return x, y, w, h
+
+
+def cropped(img, box):
+    """The part of img box names (cut to the picture); ImageError if none of it is in it."""
+    from PySide6.QtCore import QRect
+
+    r = QRect(*box).intersected(QRect(0, 0, img.width(), img.height()))
+    if r.isEmpty():
+        raise image.ImageError("--crop %d,%d,%d,%d is outside the picture (%d x %d)" % (box + (img.width(), img.height())))
+    return img.copy(r)
+
+
 def run(argv):
     args = parser().parse_args(argv)
     qt_app()
@@ -153,6 +177,8 @@ def run(argv):
             if os.path.exists(dst) and not args.force:
                 raise image.ImageError("%s is already there (use -f to replace it)" % dst)
             img = image.load(src)
+            if args.crop:
+                img = cropped(img, args.crop)
             note = ""
             enlarge_this = enlarge
             if args.no_auto:
