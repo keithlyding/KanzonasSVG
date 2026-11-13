@@ -31,7 +31,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt -c constraints.txt pyinstaller numpy
+        run: python -m pip install -r requirements.txt -c constraints.txt pyinstaller numpy pyflakes
 
       - name: Build the tracing engine (C/C++, Visual Studio)
         run: python tools/build_engine.py
@@ -186,7 +186,7 @@ jobs:
             xvfb xauth appstream desktop-file-utils cmake
 
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt -c constraints.txt pyinstaller numpy
+        run: python -m pip install -r requirements.txt -c constraints.txt pyinstaller numpy pyflakes
 
       - name: Build the tracing engine (C/C++)
         run: python tools/build_engine.py

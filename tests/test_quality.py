@@ -2,7 +2,6 @@
 (tools/quality.py; its time limits are left to the full checks, as build machines vary)."""
 
 import json
-import os
 import unittest
 
 from tests import helpers  # noqa: F401 (Qt first)

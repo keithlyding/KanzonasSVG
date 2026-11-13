@@ -7,12 +7,12 @@ import time
 import unittest
 
 from tests import helpers  # noqa: F401 (Qt first)
-from PySide6.QtCore import QEvent, QPointF, QRect, QRectF, QSettings, Qt
+from PySide6.QtCore import QEvent, QPointF, QRect, QSettings, Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QApplication
 
 from kanzonassvg import app, cli
-from tests.helpers import BLUE, RED, logo
+from tests.helpers import logo
 
 
 def wait(cond, seconds=60):
