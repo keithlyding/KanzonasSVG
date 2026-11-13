@@ -91,7 +91,8 @@ the outline, and how much outlines are smoothed first.</li>
 <li><b>Keep line widths</b> (centerline): gives each line its width in the picture.</li>
 <li><b>Enlarge first</b>: traces the picture at 2 or 4 times its size, for smoother curves on
 small pictures. <i>Auto</i> does 2 times for pictures under 1000 pixels. The SVG keeps the
-picture's size either way.</li>
+picture's size either way. A picture is never enlarged past 40 megapixels (a big picture gains
+nothing from it); the status bar says how much it was.</li>
 </ul>
 <p>The settings are kept for next time. <i>Trace &gt; Reset settings</i> (or the
 <b>Reset settings</b> button) puts them all back to how they started.</p>
@@ -177,6 +178,49 @@ class View(QObject):
         return QRectF(x, y, self.width * self.scale, self.height * self.scale)
 
 
+OURS = "application/x-kanzonassvg"
+_clipboard_hooked = []
+
+
+def _release_clipboard():
+    """Before Qt shuts down, swap the SVG this app put on the clipboard for the same SVG as
+    plain text: Qt destroys the clipboard's data after Python has stopped, and data made from
+    Python (Copy SVG) then crashed the program on its way out (found by tests/battery_app.py;
+    KanzonasPDF does the same, kanzonas/clip.py)."""
+    try:
+        cb = QGuiApplication.clipboard()
+        md = cb.mimeData()
+        if md is not None and md.hasFormat(OURS):
+            cb.setText(md.text())
+    except Exception:
+        pass
+
+
+def _hook_clipboard_release():
+    if _clipboard_hooked:
+        return
+    import atexit
+
+    app = QApplication.instance()
+    if app is not None:
+        app.aboutToQuit.connect(_release_clipboard)
+    atexit.register(_release_clipboard)
+    _clipboard_hooked.append(True)
+
+
+def svg_renderer(svg):
+    """A renderer for an SVG that KanzonasSVG's engine just wrote. Qt stops reading a path at
+    about 32,000 points unless it's told the SVG is trusted (it is: it's ours), and a picture of
+    thousands of small shapes, or a shape with thousands of holes, showed only in part."""
+    r = QSvgRenderer()
+    if hasattr(r, "setOptions"):
+        from PySide6.QtSvg import QtSvg
+
+        r.setOptions(QtSvg.Option.AssumeTrustedSource)
+    r.load(QByteArray(svg.encode("utf-8")))
+    return r
+
+
 class Canvas(QWidget):
     """One side: the picture, or the SVG."""
 
@@ -202,7 +246,7 @@ class Canvas(QWidget):
 
     def set_svg(self, svg):
         self.picture = None
-        self.renderer = QSvgRenderer(QByteArray(svg.encode("utf-8"))) if svg else None
+        self.renderer = svg_renderer(svg) if svg else None
         self.cache = None
         self.update()
         self._render_svg()
@@ -354,8 +398,11 @@ def auto_options(img, current):
     """The settings Auto picks for <img>: mode, colors, smoothing, background, threshold
     (the curve settings stay as they are). Returns (Options, engine.AutoInfo)."""
     picked, info = engine.auto(*image.pixels(img))
+    # the threshold only when Auto picks Black and white (the panel shows it only then; otherwise
+    # the trace was made with another threshold than the one the panel keeps)
+    threshold = picked.threshold if picked.mode == engine.BRIGHTNESS else current.threshold
     return replace(current, mode=picked.mode, scans=picked.scans, smooth=picked.smooth,
-                   remove_background=picked.remove_background, threshold=picked.threshold,
+                   remove_background=picked.remove_background, threshold=threshold,
                    stack=True, invert=False), info
 
 
@@ -981,8 +1028,10 @@ class MainWindow(QMainWindow):
         md = QMimeData()
         data = QByteArray(self.result.svg.encode("utf-8"))
         md.setData("image/svg+xml", data)
+        md.setData(OURS, b"1")
         md.setText(self.result.svg)
         QGuiApplication.clipboard().setMimeData(md)
+        _hook_clipboard_release()
         self.status.setText("SVG copied: paste it into Inkscape, Illustrator or another program.")
 
     # help

@@ -29,7 +29,17 @@ zip and an installer (job `windows`, `installer/KanzonasSVG.iss`) and a Linux Ap
 ## Before pushing
 - `python tools/build_engine.py` (after any change in `core/`).
 - `QT_QPA_PLATFORM=offscreen python -m unittest discover -s tests -p "test_*.py" -t .`
+  (includes a short run of the app battery).
 - `QT_QPA_PLATFORM=offscreen python run.py --selftest selftest.log`
+- After a change in `core/`: `tests/engine_battery.sh 3000 SEED` with a few seeds (random
+  pictures and settings through the engine, built with AddressSanitizer, UBSan and leak
+  checks; it names the seed and step of each failure, `KZ_STEP=N` reruns one) and
+  `tests/fuzz_engine.sh SECONDS` (libFuzzer; needs clang). The Linux build runs 400 steps of the
+  engine battery with a new seed each time.
+- After a change in the window: `python tests/battery_app.py --steps 4000 --seed S` with a few
+  seeds (odd and broken picture files, then random actions in the window, checking that the
+  SVG shown is the trace of the picture and settings shown).
+- Never weaken a battery's check to get green: fix the cause.
 
 ## Conventions
 - Tracing quality is the point: a change to the engine is measured on real pictures

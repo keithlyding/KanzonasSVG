@@ -15,10 +15,20 @@ AUTO = 0
 AUTO_BELOW = 1000  # longest side, in pixels
 
 
+# Enlarging never makes a picture bigger than this: a big picture gains nothing from it, and
+# "4 times" on a 24-megapixel photo used to make a 384-megapixel picture (3 GB of memory)
+# before refusing it as too big.
+MAX_ENLARGED = 40_000_000  # pixels
+
+
 def enlarge_factor(setting, width, height):
     if setting == AUTO:
-        return 2 if max(width, height) < AUTO_BELOW else 1
-    return max(1, min(4, int(setting)))
+        factor = 2 if max(width, height) < AUTO_BELOW else 1
+    else:
+        factor = max(1, min(4, int(setting)))
+    while factor > 1 and width * height * factor * factor > MAX_ENLARGED:
+        factor -= 1
+    return factor
 
 
 @dataclass

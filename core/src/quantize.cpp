@@ -641,6 +641,88 @@ IndexedMap rgbMapQuantize(RgbMap const &rgbmap, int ncolor)
 }
 
 /**
+ * Merge palette colors that ended up nearly the same (about 10 levels per channel): each
+ * one's pixels go to the one with more pixels. Returns how many were merged.
+ *
+ * The palette is picked on the smoothed picture, where a hard edge between two colors that
+ * aren't far apart comes out softened: the pixels next to it, a few levels off, can get a
+ * palette color of their own, and once refinePalette() has set each color from the original
+ * picture, two of them can be the same color give or take a level or two (a clean picture of
+ * 3 colors traced with Smooth on gave 6 layers, two of them copies).
+ */
+int mergeDuplicateColors(IndexedMap &imap)
+{
+    int n = imap.nrColors;
+    if (n < 2) {
+        return 0;
+    }
+    constexpr int CLOSE = 3 * 10 * 10;
+    std::vector<size_t> count(n, 0);
+    for (auto k : imap.pixels) {
+        if ((int)k < n) {
+            count[k]++;
+        }
+    }
+    std::vector<int> target(n);
+    for (int k = 0; k < n; k++) {
+        target[k] = k;
+    }
+    auto dist2 = [](RGB a, RGB b) {
+        return (a.r - b.r) * (a.r - b.r) + (a.g - b.g) * (a.g - b.g) + (a.b - b.b) * (a.b - b.b);
+    };
+    int merged = 0;
+    while (true) {
+        int bi = -1, bj = -1, bd = CLOSE + 1;
+        for (int i = 0; i < n; i++) {
+            if (target[i] != i) {
+                continue;
+            }
+            for (int j = i + 1; j < n; j++) {
+                if (target[j] != j) {
+                    continue;
+                }
+                int d = dist2(imap.clut[i], imap.clut[j]);
+                if (d < bd) {
+                    bd = d;
+                    bi = i;
+                    bj = j;
+                }
+            }
+        }
+        if (bi < 0) {
+            break;
+        }
+        int keep = count[bi] >= count[bj] ? bi : bj, gone = keep == bi ? bj : bi;
+        for (int k = 0; k < n; k++) {
+            if (target[k] == gone) {
+                target[k] = keep;
+            }
+        }
+        count[keep] += count[gone];
+        merged++;
+    }
+    if (!merged) {
+        return 0;
+    }
+    // compact the palette, keeping its order (stacking goes by it)
+    std::vector<int> newIndex(n, -1);
+    int m = 0;
+    for (int k = 0; k < n; k++) {
+        if (target[k] == k) {
+            imap.clut[m] = imap.clut[k];
+            newIndex[k] = m++;
+        }
+    }
+    for (auto &k : imap.pixels) {
+        if ((int)k < n) {
+            k = newIndex[target[k]];
+        }
+    }
+    imap.nrColors = m;
+    return merged;
+}
+
+/**
  * Set each palette color to the color of <original> over the pixels of that color whose
  * eight neighbors have it too (over all its pixels if it has no such pixel): the color
  * that most of those pixels have exactly, when one does (a flat color), else their mean.

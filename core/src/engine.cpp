@@ -44,6 +44,30 @@ char const *const VERSION = "1.0";
 
 struct Cancelled : std::exception {};
 
+// The most path data one trace may write. Random noise or heavy film grain with many colors
+// made SVGs of gigabytes (a 0.2-megapixel picture of noise at 256 colors: 220 MB, a bigger one
+// filled the memory): past this, the trace stops with a message instead.
+constexpr size_t MAX_SVG_BYTES = 500u * 1000 * 1000;
+
+struct TooBig : std::exception
+{
+    const char *what() const noexcept override
+    {
+        return "the SVG would be over 500 MB (a very detailed or noisy picture): use fewer colors, "
+               "Smooth, or more Speckles";
+    }
+};
+
+thread_local size_t svg_bytes = 0; // path data written by the trace running on this thread
+
+inline void count_bytes(size_t n)
+{
+    svg_bytes += n;
+    if (svg_bytes > MAX_SVG_BYTES) {
+        throw TooBig();
+    }
+}
+
 /** Progress reporting: a fraction of the whole job, and a way to stop it. */
 class Progress
 {
@@ -163,24 +187,29 @@ struct PathData
 {
     std::string d;
     size_t nodes = 0;
+    size_t elements = 0; // points as Qt counts them (a curve is 3): see to_svg()
 
     void point(double x, double y)
     {
+        size_t before = d.size();
         put_number(d, x);
         d += ',';
         put_number(d, y);
+        count_bytes(d.size() - before + 1);
     }
     void move(double x, double y)
     {
         d += 'M';
         point(x, y);
         nodes++;
+        elements++;
     }
     void line(double x, double y)
     {
         d += 'L';
         point(x, y);
         nodes++;
+        elements++;
     }
     void curve(double x1, double y1, double x2, double y2, double x, double y)
     {
@@ -191,15 +220,24 @@ struct PathData
         d += ' ';
         point(x, y);
         nodes++;
+        elements += 3;
     }
-    void close() { d += 'Z'; }
+    void close()
+    {
+        d += 'Z';
+        elements++;
+    }
     bool empty() const { return d.empty(); }
 };
+
+// A shape's outlines in groups: each group an outline with the holes in it (a hole only cuts
+// out of an outline in the same <path> element), so a long path can be split between groups.
+using Paths = std::vector<PathData>;
 
 struct Shape
 {
     std::string style;
-    PathData path;
+    Paths paths;
 };
 
 // Shapes from the bottom up.
@@ -221,7 +259,13 @@ std::string hex_color(RGB c)
     return s;
 }
 
-std::string to_svg(Shapes const &shapes, int width, int height)
+// Points in one <path> element at most. Qt's SVG reader (KanzonasSVG's own view, and other
+// Qt programs) stops reading a path at about 32,000 points (QPainterPath elements; a curve
+// counts 3): a picture of a few thousand small shapes in one color used to show only part of
+// itself. Longer paths are split between groups (an outline and its holes stay together).
+constexpr size_t MAX_PATH_ELEMENTS = 20000;
+
+std::string to_svg(Shapes const &shapes, int width, int height, int *npaths)
 {
     std::string out = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                       "<!-- Created with KanzonasSVG " +
@@ -230,10 +274,25 @@ std::string to_svg(Shapes const &shapes, int width, int height)
                       "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"" +
                       std::to_string(width) + "\" height=\"" + std::to_string(height) + "\" viewBox=\"0 0 " +
                       std::to_string(width) + " " + std::to_string(height) + "\">\n";
+    int count = 0;
     for (auto const &s : shapes) {
-        out += "<path style=\"" + s.style + "\" d=\"" + s.path.d + "\"/>\n";
+        size_t k = 0;
+        while (k < s.paths.size()) {
+            out += "<path style=\"" + s.style + "\" d=\"";
+            size_t elements = 0;
+            do {
+                out += s.paths[k].d;
+                elements += s.paths[k].elements;
+                k++;
+            } while (k < s.paths.size() && elements + s.paths[k].elements <= MAX_PATH_ELEMENTS);
+            out += "\"/>\n";
+            count++;
+        }
     }
     out += "</svg>\n";
+    if (npaths) {
+        *npaths = count;
+    }
     return out;
 }
 
@@ -271,16 +330,19 @@ struct PointHash
 using PointSet = std::unordered_set<std::pair<double, double>, PointHash>;
 
 // Write Potrace's path tree; <points> leaves out paths already written (as Inkscape does).
-void write_paths(potrace_path_t *paths, PathData &out, PointSet &points)
+void write_paths(potrace_path_t *paths, PathData &out, PointSet &points);
+
+// One outline, then the outlines inside it (its holes, and the shapes in those).
+void write_path(potrace_path_t *path, PathData &out, PointSet &points)
 {
-    for (auto path = paths; path; path = path->sibling) {
+    {
         auto const &curve = path->curve;
         if (curve.n == 0) {
-            continue;
+            return;
         }
         auto const &last = curve.c[curve.n - 1][2];
         if (!points.emplace(last.x, last.y).second) {
-            continue;
+            return;
         }
         out.move(last.x, last.y);
         for (int i = 0; i < curve.n; i++) {
@@ -299,8 +361,15 @@ void write_paths(potrace_path_t *paths, PathData &out, PointSet &points)
     }
 }
 
+void write_paths(potrace_path_t *paths, PathData &out, PointSet &points)
+{
+    for (auto path = paths; path; path = path->sibling) {
+        write_path(path, out, points);
+    }
+}
+
 // Trace a Potrace bitmap (set bits are traced), freeing it.
-PathData trace_bitmap(BitmapPtr bitmap, kz_options const &o, Progress &progress)
+Paths trace_bitmap(BitmapPtr bitmap, kz_options const &o, Progress &progress)
 {
     PotraceParams params;
     params.p->turdsize = o.speckles;
@@ -325,12 +394,19 @@ PathData trace_bitmap(BitmapPtr bitmap, kz_options const &o, Progress &progress)
         throw Cancelled();
     }
 
-    PathData out;
+    Paths out;
     if (!state || state->status != POTRACE_STATUS_OK) {
         return out;
     }
+    // each outline at the top, with everything inside it, in a group of its own
     PointSet points;
-    write_paths(state->plist, out, points);
+    for (auto path = state->plist; path; path = path->sibling) {
+        PathData group;
+        write_path(path, group, points);
+        if (!group.empty()) {
+            out.push_back(std::move(group));
+        }
+    }
     return out;
 }
 
@@ -344,7 +420,7 @@ BitmapPtr new_bitmap(int w, int h)
     return b;
 }
 
-PathData trace_graymap(GrayMap const &gm, kz_options const &o, Progress &progress)
+Paths trace_graymap(GrayMap const &gm, kz_options const &o, Progress &progress)
 {
     auto bitmap = new_bitmap(gm.width, gm.height);
     for (int y = 0; y < gm.height; y++) {
@@ -378,17 +454,30 @@ GrayMap single_scan(RgbMap const &rgb, kz_options const &o, double floor, double
     return map;
 }
 
+// The palette after quantizing: edge shades dropped and snapped (judged on the image as
+// quantized: smoothing keeps edges sharp, and judging on the unsmoothed one brought back the
+// noise it removed), the exact colors from the insides of the shapes, and colors that came
+// out nearly the same merged (then the edges again, between the colors that are left).
+IndexedMap palette(RgbMap const &map, RgbMap const &smoothed, int ncolors)
+{
+    auto imap = rgbMapQuantize(smoothed, ncolors);
+    dropBlendColors(smoothed, imap);
+    snapBlendedEdges(smoothed, imap);
+    refinePalette(map, imap);
+    if (mergeDuplicateColors(imap)) {
+        dropBlendColors(smoothed, imap);
+        snapBlendedEdges(smoothed, imap);
+        refinePalette(map, imap);
+    }
+    return imap;
+}
+
 // The colors for multiple scans: edge-preserving smoothing, quantizing, edge shades
 // dropped and snapped, then the exact colors from the insides of the shapes.
 IndexedMap quantized(RgbMap const &map, kz_options const &o)
 {
     auto smoothed = o.smooth ? rgbMapGaussian(map) : map;
-    auto imap = rgbMapQuantize(smoothed, o.scans);
-    // Anti-aliased edges, judged on the image as quantized: smoothing keeps edges
-    // sharp, and judging on the unsmoothed one brought back the noise it removed.
-    dropBlendColors(smoothed, imap);
-    snapBlendedEdges(smoothed, imap);
-    refinePalette(map, imap);
+    auto imap = palette(map, smoothed, o.scans);
     if (o.mode == KZ_GRAYS) {
         for (auto &c : imap.clut) {
             unsigned char s = ((int)c.r + c.g + c.b) / 3;
@@ -587,10 +676,7 @@ int autotrace_colors(kz_options const &o)
 RgbMap autotrace_input(RgbMap const &map, kz_options const &o, RGB *background = nullptr)
 {
     auto smoothed = rgbMapGaussian(map);
-    auto imap = rgbMapQuantize(smoothed, autotrace_colors(o));
-    dropBlendColors(smoothed, imap);
-    snapBlendedEdges(smoothed, imap);
-    refinePalette(map, imap);
+    auto imap = palette(map, smoothed, autotrace_colors(o));
 
     // The color Autotrace leaves out: white, or the picture's background when it is removed.
     RGB bg = {255, 255, 255};
@@ -731,7 +817,7 @@ Shapes trace_autotrace(RgbMap const &map, kz_options const &o, Progress &progres
     {
         std::string style;
         Box box;
-        size_t item;
+        size_t item, group; // its outline group in that item: its holes go there too
     };
     std::deque<Item> items;
     std::vector<Outer> outers;
@@ -762,11 +848,13 @@ Shapes trace_autotrace(RgbMap const &map, kz_options const &o, Progress &progres
         }
 
         Item *item = nullptr;
+        PathData *group = nullptr;
         if (closed && list.clockwise) {
             // A hole: the latest region of the same style whose box holds it.
             for (auto it = outers.rbegin(); it != outers.rend(); ++it) {
                 if (it->style == style && it->box.contains(box)) {
                     item = &items[it->item];
+                    group = &item->shape.paths[it->group];
                     break;
                 }
             }
@@ -786,13 +874,15 @@ Shapes trace_autotrace(RgbMap const &map, kz_options const &o, Progress &progres
                 items.push_back({{style, {}}, {}});
             }
             item = &items[index];
+            item->shape.paths.emplace_back();
+            group = &item->shape.paths.back();
             if (closed && !list.clockwise) {
-                outers.push_back({style, box, index});
+                outers.push_back({style, box, index, item->shape.paths.size() - 1});
             }
         }
         item->box.add(box);
 
-        auto &d = item->shape.path;
+        auto &d = *group;
         auto const first = SPLINE_LIST_ELT(list, 0);
         d.move(px(START_POINT(first)), py(START_POINT(first)));
         for (int i = 0; i < SPLINE_LIST_LENGTH(list); i++) {
@@ -826,6 +916,17 @@ kz_options checked(kz_options const *in)
         int n = std::clamp(in->size, 0, (int)sizeof(kz_options));
         std::memcpy(&o, in, n);
         o.size = sizeof(kz_options);
+    }
+    // Not-a-number or infinite settings (a caller's mistake, or "nan" typed on the command
+    // line) take the default: clamping passes NaN through, and it then broke the scans.
+    kz_options d;
+    kz_default_options(&d);
+    for (auto [v, def] : {std::pair{&o.threshold, d.threshold}, std::pair{&o.smooth_corners, d.smooth_corners},
+                          std::pair{&o.optimize_tolerance, d.optimize_tolerance},
+                          std::pair{&o.error_threshold, d.error_threshold}}) {
+        if (!std::isfinite(*v)) {
+            *v = def;
+        }
     }
     o.scans = std::clamp(o.scans, 2, 256);
     o.remove_background = std::clamp(o.remove_background, 0, 2);
@@ -966,10 +1067,7 @@ AutoResult choose_settings(unsigned char const *rgba, int width, int height, int
     int chosen = 0;
     int actual_at[MAX_COLORS + 1] = {0};
     for (int n = 2; n <= MAX_COLORS; n++) {
-        auto imap = rgbMapQuantize(smoothed, n);
-        dropBlendColors(smoothed, imap);
-        snapBlendedEdges(smoothed, imap);
-        refinePalette(map, imap);
+        auto imap = palette(map, smoothed, n);
         long long bad = 0;
         for (size_t i = 0; i < flat.size(); i++) {
             if (flat[i] && channel_diff(imap.clut[imap.pixels[i]], map.pixels[i]) > WRONG) {
@@ -1085,6 +1183,7 @@ int kz_trace(unsigned char const *rgba, int width, int height, int stride, kz_op
         auto o = checked(options);
         Progress progress(progress_func, progress_data);
         auto map = to_rgbmap(rgba, width, height, stride);
+        svg_bytes = 0;
         Shapes shapes;
         switch (o.mode) {
             case KZ_GRAYS:
@@ -1108,12 +1207,13 @@ int kz_trace(unsigned char const *rgba, int width, int height, int stride, kz_op
         if (progress_func && progress_func(1.0, progress_data)) {
             return fail("cancelled", KZ_CANCELLED);
         }
-        *svg = dup_string(to_svg(shapes, width, height));
+        int npaths = 0;
+        *svg = dup_string(to_svg(shapes, width, height, &npaths));
         if (!*svg) {
             return fail("out of memory", KZ_ERROR);
         }
         if (nshapes) {
-            *nshapes = (int)shapes.size();
+            *nshapes = npaths;
         }
         return KZ_OK;
     } catch (Cancelled const &) {

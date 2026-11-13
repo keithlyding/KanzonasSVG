@@ -2,6 +2,20 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.0.2
+
+Fixed (found by a new battery of tests that tries to break it):
+- Quitting right after Copy SVG could crash the program.
+- An SVG of thousands of small shapes could show only in part in the window (and in some other
+  programs). Very long paths are now split, and the window always shows the whole SVG.
+- On a clean picture with Smooth on and many colors, near-copies of the picture's colors could
+  come out as extra layers.
+- Enlarge first on a big picture could use gigabytes of memory; pictures are now enlarged to at
+  most 40 megapixels.
+- A very noisy picture with very many colors could make an SVG of gigabytes; tracing now stops
+  past 500 MB and says to use fewer colors, Smooth or Speckles.
+- A threshold of "nan" on the command line, and Auto settings keeping the threshold shown.
+
 ## 1.0.1
 
 New:

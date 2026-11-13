@@ -183,6 +183,14 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: python -m unittest discover -s tests -p "test_*.py" -t .
 
+      - name: Engine battery (random pictures and settings, with AddressSanitizer and UBSan)
+        # a new seed every run, so each build tries pictures the earlier ones didn't (the seed
+        # and step of a failure are printed: tests/engine_battery.sh STEPS SEED reruns it)
+        env:
+          CC: gcc
+          CXX: g++
+        run: tests/engine_battery.sh 400 ${{ github.run_number }} 120
+
       - name: Build the program folder (PyInstaller)
         run: python -m PyInstaller --noconfirm packaging/kanzonassvg.spec
 

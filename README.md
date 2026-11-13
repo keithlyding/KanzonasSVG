@@ -99,8 +99,13 @@ python run.py                       # the window (or: python run.py --help)
 QT_QPA_PLATFORM=offscreen python -m unittest discover -s tests -p "test_*.py" -t .
 ```
 
-`.github/workflows/build.yml` builds the Windows zip and the Linux AppImage, and runs the tests
-and a self test inside each (`KanzonasSVG --selftest selftest.log`).
+`.github/workflows/build.yml` builds the Windows installer and zip and the Linux AppImage, and
+runs the tests and a self test inside each (`KanzonasSVG --selftest selftest.log`).
+
+Batteries that try to break it: `tests/engine_battery.sh` (random pictures and settings through
+the engine, with AddressSanitizer and UBSan), `tests/fuzz_engine.sh` (libFuzzer) and
+`tests/battery_app.py` (odd and broken picture files, and thousands of random actions in the
+window). Short runs of the first and last are in every build.
 
 ## License
 

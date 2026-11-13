@@ -8,6 +8,7 @@ from tests import helpers  # noqa: F401 (sets up Qt first)
 from kanzonassvg import engine, image, tracing
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 
 from tests.helpers import BLUE, RED, bad_pixels, canvas, close, color_at, logo, render
 
@@ -201,6 +202,10 @@ class TestEnlarge(unittest.TestCase):
         self.assertEqual(tracing.trace_image(img, engine.Options(), 1).factor, 1)
         self.assertEqual(tracing.enlarge_factor(tracing.AUTO, 1000, 400), 1)
         self.assertEqual(tracing.enlarge_factor(tracing.AUTO, 999, 400), 2)
+        # never past MAX_ENLARGED: 4 times on a 24-megapixel photo used to build 384 megapixels
+        self.assertEqual(tracing.enlarge_factor(4, 6000, 4000), 1)
+        self.assertEqual(tracing.enlarge_factor(4, 3000, 2000), 2)  # 6 MP: 4x is 24 MP, 3x would be 54
+        self.assertEqual(tracing.enlarge_factor(4, 1000, 1000), 4)
 
 
 if __name__ == "__main__":
@@ -335,3 +340,76 @@ class TestBackground(unittest.TestCase):
         out = self.render_clear(trace(self.picture(BLUE), mode=engine.AUTOTRACE, remove_background=engine.BG_REMOVE)[0])
         self.assertEqual(self.alpha(out, 5, 5), 0)
         self.assertTrue(close(color_at(out, 70, 20), (0xB2, 0x00, 0x2D)), color_at(out, 70, 20))
+
+
+class TestBattleFound(unittest.TestCase):
+    """Bugs the batteries (tests/engine_battery.sh, tests/battery_app.py) found, kept fixed."""
+
+    def test_not_a_number_settings(self):
+        # NaN or infinite settings used to be undefined behavior in the scans
+        for mode in engine.MODE_NAMES:
+            o = engine.Options(mode=mode, threshold=float("nan"), smooth_corners=float("inf"),
+                               optimize_tolerance=float("-inf"), error_threshold=float("nan"))
+            svg, n = trace(logo(), **o.__dict__)
+            self.assertTrue(svg.endswith("</svg>\n"))
+
+    def test_no_near_copies_of_colors_with_smooth(self):
+        # a clean picture of 3 colors, hard edges between two similar ones, Smooth on, many
+        # colors asked: used to give near-copies of its colors (#33e8a2 beside #31e8a1)
+        img = canvas(240, 90, QColor(0x31, 0xE8, 0xA1))
+        for y in range(90):
+            for x in range(240):
+                if (x // 30 + y // 30) % 2:
+                    img.setPixelColor(x, y, QColor(0x85, 0xF0, 0xDB))
+                if 100 <= x < 140 and 30 <= y < 60:
+                    img.setPixelColor(x, y, QColor(0x0A, 0x62, 0xF5))
+        svg, _ = trace(img, scans=29, smooth=True)
+        cols = [tuple(int(c[i:i + 2], 16) for i in (1, 3, 5)) for c in set(fills(svg))]
+        for a in cols:
+            for b in cols:
+                if a < b:
+                    self.assertGreater(max(abs(p - q) for p, q in zip(a, b)), 10, (a, b))
+
+    def test_long_paths_split_for_qt(self):
+        # thousands of small shapes of one color: one <path> with more points than Qt reads (it
+        # showed only part of it); now split, each <path> under the limit, and Qt reads them all
+        from PySide6.QtCore import QByteArray, qInstallMessageHandler
+        from PySide6.QtSvg import QSvgRenderer
+        img = canvas(600, 400)
+        for y in range(2, 400, 6):
+            for x in range(2, 600, 6):
+                for dy in range(3):
+                    for dx in range(3):
+                        img.setPixelColor(x + dx, y + dy, BLUE)
+        svg, n = trace(img, mode=engine.BRIGHTNESS)
+        self.assertGreater(n, 1)
+        for d in re.findall(r' d="([^"]*)"', svg):
+            points = d.count("M") + d.count("L") + 3 * d.count("C") + d.count("Z")
+            self.assertLessEqual(points, 20000)
+        said = []
+        old = qInstallMessageHandler(lambda kind, ctx, text: said.append(text))
+        try:
+            QSvgRenderer(QByteArray(svg.encode()))
+        finally:
+            qInstallMessageHandler(old)
+        self.assertEqual(said, [])
+
+    def test_the_viewer_reads_a_shape_with_thousands_of_holes(self):
+        # one outline with thousands of holes can't be split: the app's viewer reads it whole
+        from PySide6.QtCore import qInstallMessageHandler
+        from kanzonassvg.app import svg_renderer
+        img = canvas(600, 400, QColor(0, 0, 0))
+        for y in range(4, 396, 5):
+            for x in range(4, 596, 5):
+                for dy in range(2):
+                    for dx in range(2):
+                        img.setPixelColor(x + dx, y + dy, QColor(255, 255, 255))
+        svg, _ = trace(img, mode=engine.BRIGHTNESS)
+        said = []
+        old = qInstallMessageHandler(lambda kind, ctx, text: said.append(text))
+        try:
+            r = svg_renderer(svg)
+        finally:
+            qInstallMessageHandler(old)
+        self.assertTrue(r.isValid())
+        self.assertEqual(said, [])

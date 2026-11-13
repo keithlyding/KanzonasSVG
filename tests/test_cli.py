@@ -97,3 +97,12 @@ class TestCli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCliBattleFound(unittest.TestCase):
+    def test_threshold_nan(self):
+        with tempfile.TemporaryDirectory() as d:
+            src = os.path.join(d, "a.png")
+            logo().save(src)
+            rc, _, err = run("--mode", "bw", "--threshold", "nan", src, "-q")
+            self.assertEqual(rc, 0, err)
