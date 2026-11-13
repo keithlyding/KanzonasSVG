@@ -5,6 +5,11 @@ Short, plain-language notes for each version; the release text on GitHub is made
 ## 1.1.1
 
 Fixed:
+- Drawings, plans and screenshots of them trace much better with Auto settings: thin lines
+  are kept (gray outlines used to disappear), in their own colors, and the picture is enlarged
+  4 times first so lines a pixel wide trace cleanly.
+- Auto settings now sets every setting, including Speckles, Smooth corners, Optimize,
+  Tolerance and Enlarge first.
 - Auto settings gives flat pictures with more than 16 colors (illustrations, maps, charts)
   all their colors, up to 64. Before, it stopped at 16 and treated them like a photo, so
   some colors were lost or swapped. Photos and paintings are handled as before.

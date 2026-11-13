@@ -55,7 +55,13 @@ longer make it visibly closer: a logo or a flat illustration gets exactly its co
 a photo or painting a number up to 16 that keeps the file reasonable), <b>Smooth</b> when it has JPEG blotches or scan noise,
 <b>Background: Remove</b> when its background is transparent (so the SVG's is too), and
 <b>Black and white</b> with its <b>Threshold</b> for a scan of dark lines on a light page.
-The status bar says what it picked. Change anything after: Auto doesn't change it back.</p>
+For <b>line art</b> (a plan, a drawing or a screenshot of one: thin lines on a plain
+background) it keeps the lines' own colors, leaves <b>Smooth</b> off (it would wipe thin lines
+out) and sets <b>Enlarge first</b> to 4 times, so lines a pixel or two wide trace as solid
+shapes. It also puts the curve settings (<b>Speckles</b>, <b>Smooth corners</b>,
+<b>Optimize</b>, <b>Tolerance</b>) back to the values that suit the picture: Auto sets every
+setting. The status bar says what it picked. Change anything after: Auto doesn't change it
+back.</p>
 <p><i>Trace &gt; Auto settings for new pictures</i> (on at first) does this for every picture you
 open or paste; turn it off to keep your own settings for each new picture.</p>
 <h3>Modes</h3>
@@ -508,6 +514,7 @@ class Worker(QThread):
 
             if job.auto:
                 job.options, job.auto_info = auto_options(job.img, job.options)
+                job.enlarge = job.auto_info.enlarge or tracing.AUTO
                 self.auto_done.emit(job.number, job.options, job.auto_info)
             if job.quick and not job.cancelled:
                 svg = tracing.quick_trace(job.img, job.options)
@@ -525,15 +532,14 @@ class Worker(QThread):
 
 
 def auto_options(img, current):
-    """The settings Auto picks for <img>: mode, colors, smoothing, background, threshold
-    (the curve settings stay as they are). Returns (Options, engine.AutoInfo)."""
+    """The settings Auto picks for <img>: all of them (mode, colors, smoothing, background,
+    threshold, and the curve settings at the values that suit it). Returns (Options,
+    engine.AutoInfo); info.enlarge is Enlarge first (0: Auto)."""
     picked, info = engine.auto(*image.pixels(img))
     # the threshold only when Auto picks Black and white (the panel shows it only then; otherwise
     # the trace was made with another threshold than the one the panel keeps)
     threshold = picked.threshold if picked.mode == engine.BRIGHTNESS else current.threshold
-    return replace(current, mode=picked.mode, scans=picked.scans, smooth=picked.smooth,
-                   remove_background=picked.remove_background, threshold=threshold,
-                   stack=True, invert=False), info
+    return replace(picked, threshold=threshold, stack=True, invert=False), info
 
 
 def describe_auto(options, info):
@@ -548,6 +554,8 @@ def describe_auto(options, info):
         parts.append("smoothed")
     if options.remove_background:
         parts.append("transparent background kept")
+    if getattr(info, "line_art", False):
+        parts.append("thin lines: enlarged %d times first" % info.enlarge)
     return "Auto: " + ", ".join(parts)
 
 
@@ -769,8 +777,9 @@ class Settings(QScrollArea):
         self.tolerance.setEnabled(self.optimize.isChecked())
         self._update_visible()
 
-    def apply_auto(self, o):
-        """Show the settings Auto picked (without tracing again: they're being traced)."""
+    def apply_auto(self, o, enlarge=None):
+        """Show the settings Auto picked (without tracing again: they're being traced): all of
+        them, Enlarge first too (enlarge: its setting, tracing.AUTO by default)."""
         widgets = [w for _, w in self._widgets()]
         for w in widgets:
             w.blockSignals(True)
@@ -786,6 +795,15 @@ class Settings(QScrollArea):
             self._bw = o.threshold
         elif o.mode == engine.EDGES:
             self.threshold.setValue(self._edge)
+        self.speckles.setValue(o.speckles)
+        self.corners.setValue(o.smooth_corners)
+        self.optimize.setChecked(o.optimize)
+        self.tolerance.setValue(o.optimize_tolerance)
+        self.tolerance.setEnabled(bool(o.optimize))
+        self.error.setValue(o.error_threshold)
+        self.filters.setValue(o.filter_iterations)
+        self.width.setChecked(o.preserve_width)
+        self.enlarge.setCurrentIndex(max(0, self.enlarge.findData(tracing.AUTO if enlarge is None else enlarge)))
         for w in widgets:
             w.blockSignals(False)
         self._last_mode = o.mode
@@ -1098,7 +1116,7 @@ class MainWindow(QMainWindow):
     def on_auto_done(self, number, options, info):
         if number != self.job_number or self.job.cancelled:
             return
-        self.settings.apply_auto(options)
+        self.settings.apply_auto(options, self.job.enlarge)
         self.settings.save(self.qs)
         self.status.setText(describe_auto(options, info) + ". Tracing...")
 

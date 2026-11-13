@@ -1248,8 +1248,82 @@ AutoResult choose_settings(unsigned char const *rgba, int width, int height, int
     res.info.transparent = clear * 100 > (long long)width * height; // over 1%
 
     auto full = to_rgbmap(rgba, width, height, stride);
+
+    // Line art (a drawing, a plan, a screenshot of one): mostly one background color with thin
+    // lines on it (at least 30% of what is drawn in runs at most 4 pixels across or down). Its
+    // lines have no flat pixels to count
+    // colors by, smoothing wipes them out (their soft edges aren't noise), and lines a pixel or
+    // two wide only trace as solid shapes when enlarged.
+    bool line_art = false;
+    RGB bg{255, 255, 255};
+    {
+        std::unordered_map<uint32_t, long long> counts;
+        int const step = std::max(1, (int)std::sqrt((double)full.width * full.height / 250000.0));
+        long long sampled = 0;
+        for (int y = 0; y < full.height; y += step) {
+            for (int x = 0; x < full.width; x += step) {
+                auto c = full.pixels[(size_t)y * full.width + x];
+                counts[((uint32_t)c.r << 16) | ((uint32_t)c.g << 8) | c.b]++;
+                sampled++;
+            }
+        }
+        auto most = std::max_element(counts.begin(), counts.end(),
+                                     [](auto const &a, auto const &b) { return a.second < b.second; });
+        bg = RGB{(unsigned char)(most->first >> 16), (unsigned char)(most->first >> 8), (unsigned char)most->first};
+        long long near_bg = 0;
+        for (auto const &kv : counts) {
+            RGB c{(unsigned char)(kv.first >> 16), (unsigned char)(kv.first >> 8), (unsigned char)kv.first};
+            if (channel_diff(c, bg) <= 16) {
+                near_bg += kv.second;
+            }
+        }
+        // ink: clearly not the background; thin: in a run of ink at most 4 pixels long across
+        // or down (whole rows and columns of the full picture)
+        constexpr int INK = 48, THIN = 4;
+        int const fw = full.width, fh = full.height;
+        std::vector<unsigned char> ink((size_t)fw * fh), thin((size_t)fw * fh, 0);
+        for (size_t i = 0; i < ink.size(); i++) {
+            ink[i] = channel_diff(full.pixels[i], bg) > INK;
+        }
+        auto mark_runs = [&](int lines, int along, size_t line_step, size_t pixel_step) {
+            for (int l = 0; l < lines; l++) {
+                int run = 0;
+                for (int a = 0; a <= along; a++) {
+                    size_t i = l * line_step + (size_t)a * pixel_step;
+                    if (a < along && ink[i]) {
+                        run++;
+                        continue;
+                    }
+                    if (run > 0 && run <= THIN) {
+                        for (int b = a - run; b < a; b++) {
+                            thin[l * line_step + (size_t)b * pixel_step] = 1;
+                        }
+                    }
+                    run = 0;
+                }
+            }
+        };
+        mark_runs(fh, fw, fw, 1); // across
+        mark_runs(fw, fh, 1, fw); // down
+        long long nink = 0, nthin = 0;
+        for (size_t i = 0; i < ink.size(); i++) {
+            nink += ink[i];
+            nthin += ink[i] && thin[i];
+        }
+        long long const all = (long long)fw * fh;
+        line_art = near_bg * 2 >= sampled && nink > 0 && nink * 4 <= all && nthin * 10 >= nink * 3;
+        if (std::getenv("KZ_AUTO_DEBUG")) {
+            std::fprintf(stderr, "auto: background %02x%02x%02x %.1f%%, ink %.2f%%, thin %.1f%% of it: %s\n", bg.r,
+                         bg.g, bg.b, 100.0 * near_bg / sampled, 100.0 * nink / all, nink ? 100.0 * nthin / nink : 0.0,
+                         line_art ? "line art" : "not line art");
+        }
+    }
+    res.info.line_art = line_art;
+    res.info.enlarge = line_art ? 4 : 0;
+
     int factor = 1;
-    auto map = shrink(full, 400000, factor);
+    // (line art less shrunk: its thin lines fade when pixels are averaged)
+    auto map = shrink(full, line_art ? 1600000 : 400000, factor);
     int const w = map.width, h = map.height;
 
     // Flat pixels: none of the four neighbors differs by more than a little (edges, including
@@ -1287,7 +1361,30 @@ AutoResult choose_settings(unsigned char const *rgba, int width, int height, int
         }
     }
     res.info.noisy = sampled > 0 && nnoisy * 20 > sampled; // over 5% of flat pixels
-    res.o.smooth = res.info.noisy;
+    res.o.smooth = res.info.noisy && !line_art;
+
+    // Line art: the middle pixels of its lines (each the most unlike the background of its
+    // neighbors across the line), which have to keep a color of their own: a line's color.
+    std::vector<unsigned char> core;
+    long long ncore = 0;
+    if (line_art) {
+        core.assign((size_t)w * h, 0);
+        for (int y = 1; y + 1 < h; y++) {
+            for (int x = 1; x + 1 < w; x++) {
+                size_t i = (size_t)y * w + x;
+                int d = channel_diff(map.pixels[i], bg);
+                if (d <= 48 || flat[i]) {
+                    continue;
+                }
+                bool across = d >= channel_diff(map.pixels[i - 1], bg) && d >= channel_diff(map.pixels[i + 1], bg);
+                bool down = d >= channel_diff(map.pixels[i - w], bg) && d >= channel_diff(map.pixels[i + w], bg);
+                if (across || down) {
+                    core[i] = 1;
+                    ncore++;
+                }
+            }
+        }
+    }
 
     // How many colors: the wrong part of the flat areas at 2, 3, ... colors.
     auto smoothed = res.o.smooth ? rgbMapGaussian(map) : map;
@@ -1296,6 +1393,7 @@ AutoResult choose_settings(unsigned char const *rgba, int width, int height, int
     constexpr int MAX_FLAT_COLORS = 64; // (the window's Colors setting goes up to 64)
     constexpr int WRONG = 32;           // levels: visibly another color
     std::vector<double> wrong(MAX_FLAT_COLORS + 1, 1.0);
+    std::vector<double> core_wrong(MAX_FLAT_COLORS + 1, 0.0); // (line art: its lines' colors)
     std::vector<std::array<RGB, 2>> two(1);
     int chosen = 0;
     int actual_at[MAX_FLAT_COLORS + 1] = {0};
@@ -1319,6 +1417,16 @@ AutoResult choose_settings(unsigned char const *rgba, int width, int height, int
                     }
                 }
                 wrong[n] = nflat ? (double)bad / nflat : 0.0;
+                if (ncore) {
+                    long long off = 0;
+                    for (size_t i = 0; i < core.size(); i++) {
+                        // (looser than for flat areas: a thin line's pixels vary along it)
+                        if (core[i] && channel_diff(imap.clut[imap.pixels[i]], map.pixels[i]) > 48) {
+                            off++;
+                        }
+                    }
+                    core_wrong[n] = (double)off / ncore;
+                }
                 kept[n] = imap.nrColors;
                 two_of[n] = {imap.clut[0], imap.clut[std::min(1, imap.nrColors - 1)]};
             }
@@ -1329,14 +1437,16 @@ AutoResult choose_settings(unsigned char const *rgba, int width, int height, int
                 two[0] = two_of[2];
             }
             if (std::getenv("KZ_AUTO_DEBUG")) {
-                std::fprintf(stderr, "auto: %2d colors (%2d kept): %.4f wrong\n", n, kept[n], wrong[n]);
+                std::fprintf(stderr, "auto: %2d colors (%2d kept): %.4f wrong, lines %.4f\n", n, kept[n], wrong[n],
+                             core_wrong[n]);
             }
-            if (kept[n] < n && wrong[n] <= limit) {
+            bool const lines_ok = core_wrong[n] <= 0.05; // (always, but for line art)
+            if (kept[n] < n && wrong[n] <= limit && lines_ok) {
                 // the picture has no more colors to give
                 chosen = kept[n];
                 break;
             }
-            if (wrong[n] <= limit) {
+            if (wrong[n] <= limit && lines_ok) {
                 chosen = n;
                 break;
             }

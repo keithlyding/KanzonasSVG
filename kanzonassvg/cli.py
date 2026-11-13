@@ -30,7 +30,8 @@ def parser():
     p.add_argument("--no-auto", action="store_true",
                    help="don't pick settings for each picture: use the defaults (8 colors, smoothed) and "
                    "the options given. Without it, each picture gets the settings that suit it (mode, "
-                   "colors, smoothing, background, threshold), and the options given replace them")
+                   "colors, smoothing, background, threshold, and for a drawing of thin lines, enlarging "
+                   "4 times), and the options given replace them")
     p.add_argument("--mode", default=None, choices=sorted(engine.MODES_BY_NAME), help=MODE_HELP)
     p.add_argument("--colors", "--scans", type=int, default=None, metavar="N",
                    help="colors, grays or steps (2-256)")
@@ -153,14 +154,17 @@ def run(argv):
                 raise image.ImageError("%s is already there (use -f to replace it)" % dst)
             img = image.load(src)
             note = ""
+            enlarge_this = enlarge
             if args.no_auto:
                 options = options_from(args)
             else:
-                picked, _info = engine.auto(*image.pixels(img))
+                picked, info = engine.auto(*image.pixels(img))
                 options = options_from(args, picked)
+                if args.enlarge == "auto" and info.enlarge:
+                    enlarge_this = info.enlarge     # (line art: enlarged 4 times)
                 note = ", %s" % ("black and white" if options.mode == engine.BRIGHTNESS
                                  else "%d %s" % (options.scans, engine.MODE_NAMES[options.mode]))
-            res = tracing.trace_image(img, options, enlarge)
+            res = tracing.trace_image(img, options, enlarge_this)
             tmp = dst + ".part"
             with open(tmp, "w", encoding="utf-8", newline="\n") as f:
                 f.write(res.svg)

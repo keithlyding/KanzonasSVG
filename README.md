@@ -48,7 +48,8 @@ installed until you click it. (1.0.x doesn't have this: install 1.1 by hand once
    and *File > Paste picture* (Ctrl+V).
 2. KanzonasSVG picks the settings for the picture (**Auto settings**: exactly a logo's or a flat illustration's colors, up to 64,
    smoothing for JPEGs and scans, a transparent background kept transparent, black and white
-   for a scan of dark lines) and the status bar says what it picked. Change any setting on the
+   for a scan of dark lines, and for a drawing or plan of thin lines, its lines' colors and
+   enlarging 4 times; every setting, the curve settings too) and the status bar says what it picked. Change any setting on the
    right and the SVG updates.
 3. *File > Save SVG* (Ctrl+S), or *File > Copy SVG* (Ctrl+Shift+C) to paste it into Inkscape or
    another program.
