@@ -78,7 +78,7 @@ void append_pixel(curve_type curve, at_coord coord)
 void append_point(curve_type curve, at_real_coord coord)
 {
   CURVE_LENGTH(curve)++;
-  XREALLOC(curve->point_list, CURVE_LENGTH(curve) * sizeof(point_type));
+  XGROW(curve->point_list, CURVE_LENGTH(curve), sizeof(point_type));
   LAST_CURVE_POINT(curve) = coord;
   /* The t value does not need to be set.  */
 }
@@ -200,7 +200,7 @@ void free_curve_list(curve_list_type * curve_list)
 void append_curve(curve_list_type * curve_list, curve_type curve)
 {
   curve_list->length++;
-  XREALLOC(curve_list->data, curve_list->length * sizeof(curve_type));
+  XGROW(curve_list->data, curve_list->length, sizeof(curve_type));
   curve_list->data[curve_list->length - 1] = curve;
 }
 
@@ -237,7 +237,7 @@ void free_curve_list_array(curve_list_array_type * curve_list_array, at_progress
 void append_curve_list(curve_list_array_type * curve_list_array, curve_list_type curve_list)
 {
   CURVE_LIST_ARRAY_LENGTH(*curve_list_array)++;
-  XREALLOC(curve_list_array->data, CURVE_LIST_ARRAY_LENGTH(*curve_list_array) * sizeof(curve_list_type));
+  XGROW(curve_list_array->data, CURVE_LIST_ARRAY_LENGTH(*curve_list_array), sizeof(curve_list_type));
   LAST_CURVE_LIST_ARRAY_ELT(*curve_list_array) = curve_list;
 }
 

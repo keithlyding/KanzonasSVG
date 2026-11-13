@@ -13,6 +13,10 @@ New:
   turns the daily check off or on. Nothing is downloaded or installed until you click
   Update now.
 
+Faster:
+- Autotrace on very detailed pictures in many colors (a quarter faster on a noisy photo in
+  256 colors).
+
 This version is the first one that updates itself: from 1.0.x, install it by hand once.
 
 ## 1.0.4

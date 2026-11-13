@@ -1416,7 +1416,7 @@ static void free_index_list(index_list_type * index_list)
 static void append_index(index_list_type * list, unsigned new_index)
 {
   INDEX_LIST_LENGTH(*list)++;
-  XREALLOC(list->data, INDEX_LIST_LENGTH(*list) * sizeof(unsigned));
+  XGROW(list->data, INDEX_LIST_LENGTH(*list), sizeof(unsigned));
   list->data[INDEX_LIST_LENGTH(*list) - 1] = new_index;
 }
 
