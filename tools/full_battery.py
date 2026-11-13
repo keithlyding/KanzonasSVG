@@ -1,7 +1,9 @@
 """The full checks for a major release (a new middle number: 1.1, 1.2, 2.0): everything, long.
 Writes docs/test-reports/<version>.md with each check's result and the numbers.
 
-    python tools/full_battery.py [--quick]      (--quick: a few minutes, to try it)
+    python tools/full_battery.py [--quick] [--seed N ...]
+        --quick: a few minutes, to try it; --seed N: use seed N first (one that failed before,
+        to check it's fixed), then random ones
 
 Takes about two hours on a 4-core machine. Needs clang (with its sanitizer runtimes) for the
 fuzzer and ThreadSanitizer, gcc or clang for the engine battery, numpy, and a built engine
@@ -66,7 +68,8 @@ def main():
     quick = "--quick" in sys.argv
     import kanzonassvg
     version = kanzonassvg.__version__
-    seeds = [random.randrange(1, 10 ** 6) for _ in range(5)]
+    given = [int(sys.argv[i + 1]) for i, a in enumerate(sys.argv[:-1]) if a == "--seed"]
+    seeds = (given + [random.randrange(1, 10 ** 6) for _ in range(5)])[:5]
     n = (lambda full, short: short if quick else full)
     py = sys.executable
     big = os.path.join(ROOT, "build", "full-battery-12mp.png")

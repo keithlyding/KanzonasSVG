@@ -80,7 +80,7 @@ spline_list_type *new_spline_list_with_spline(spline_type spline)
   spline_list_type *answer;
 
   answer = new_spline_list();
-  XMALLOC(SPLINE_LIST_DATA(*answer), sizeof(spline_type));
+  XMALLOC(SPLINE_LIST_DATA(*answer), XCAPACITY(1) * sizeof(spline_type));
   SPLINE_LIST_ELT(*answer, 0) = spline;
   SPLINE_LIST_LENGTH(*answer) = 1;
 
@@ -103,7 +103,7 @@ void append_spline(spline_list_type * l, spline_type s)
   assert(l != NULL);
 
   SPLINE_LIST_LENGTH(*l)++;
-  XREALLOC(SPLINE_LIST_DATA(*l), SPLINE_LIST_LENGTH(*l) * sizeof(spline_type));
+  XGROW(SPLINE_LIST_DATA(*l), SPLINE_LIST_LENGTH(*l), sizeof(spline_type));
   LAST_SPLINE_LIST_ELT(*l) = s;
 }
 
@@ -119,7 +119,7 @@ void concat_spline_lists(spline_list_type * s1, spline_list_type s2)
 
   new_length = SPLINE_LIST_LENGTH(*s1) + SPLINE_LIST_LENGTH(s2);
 
-  XREALLOC(SPLINE_LIST_DATA(*s1), new_length * sizeof(spline_type));
+  XREALLOC(SPLINE_LIST_DATA(*s1), XCAPACITY(new_length) * sizeof(spline_type));
 
   for (this_spline = 0; this_spline < SPLINE_LIST_LENGTH(s2); this_spline++)
     SPLINE_LIST_ELT(*s1, SPLINE_LIST_LENGTH(*s1)++)
@@ -155,6 +155,6 @@ void free_spline_list_array(spline_list_array_type * spline_list_array)
 void append_spline_list(spline_list_array_type * l, spline_list_type s)
 {
   SPLINE_LIST_ARRAY_LENGTH(*l)++;
-  XREALLOC(SPLINE_LIST_ARRAY_DATA(*l), SPLINE_LIST_ARRAY_LENGTH(*l) * sizeof(spline_list_type));
+  XGROW(SPLINE_LIST_ARRAY_DATA(*l), SPLINE_LIST_ARRAY_LENGTH(*l), sizeof(spline_list_type));
   LAST_SPLINE_LIST_ARRAY_ELT(*l) = s;
 }

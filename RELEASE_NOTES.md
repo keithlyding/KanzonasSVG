@@ -2,7 +2,7 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
-## 1.1.2
+## 1.1.1
 
 New:
 - Crop: *Trace > Crop picture* (Ctrl+R), then drag across the part of the picture to trace,
@@ -13,10 +13,6 @@ New:
 Fixed:
 - Background: Remove on a picture with transparent parts at its edge removes those parts, not
   a shape that covers most of the edge.
-
-## 1.1.1
-
-Fixed:
 - Drawings, plans and screenshots of them trace much better with Auto settings: thin lines
   are kept (gray outlines used to disappear), in their own colors, and the picture is enlarged
   4 times first so lines a pixel wide trace cleanly.
@@ -36,6 +32,10 @@ New:
 - *Help > Check for updates...* checks at once; *Help > Check for updates automatically*
   turns the daily check off or on. Nothing is downloaded or installed until you click
   Update now.
+
+Faster:
+- Autotrace on very detailed pictures in many colors (a quarter faster on a noisy photo in
+  256 colors).
 
 This version is the first one that updates itself: from 1.0.x, install it by hand once.
 
