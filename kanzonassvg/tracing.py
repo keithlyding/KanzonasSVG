@@ -59,6 +59,27 @@ def trace_image(img, options, enlarge=AUTO, progress=None):
     return Result(svg, n, time.perf_counter() - t, factor)
 
 
+# A big picture is first traced as a small copy (about a megapixel, a tenth of a second) and
+# shown while the picture itself is traced: the window answers at once, even when the full
+# trace of a 12-megapixel photo takes a second.
+QUICK_ABOVE = 3_000_000  # pixels
+QUICK_SIZE = 1_000_000
+
+
+def quick_trace(img, options):
+    """The SVG of a small copy of a big picture, at the picture's size, or None if it's small."""
+    w, h = img.width(), img.height()
+    if w * h <= QUICK_ABOVE:
+        return None
+    f = (QUICK_SIZE / (w * h)) ** 0.5
+    from PySide6.QtCore import Qt
+
+    small = image.to_rgba(img.scaled(max(1, round(w * f)), max(1, round(h * f)), Qt.AspectRatioMode.IgnoreAspectRatio,
+                                     Qt.TransformationMode.SmoothTransformation))
+    svg, _n = engine.trace(*image.pixels(small), options=options)
+    return set_size(svg, w, h)
+
+
 def preview_image(img, options):
     """The picture as it will be traced (colors reduced), as a QImage."""
     from PySide6.QtGui import QImage

@@ -246,7 +246,9 @@ def check_window(steps, seed, fails):
         pics = []
         for k in range(6):
             path = os.path.join(folder, "p%d.png" % k)
-            picture(rng, rng.choice([20, 90, 300, 900]), rng.choice([15, 70, 240, 700])).save(path)
+            # (the last two big enough for the quick preview of big pictures)
+            size = [(20, 15), (90, 70), (300, 240), (900, 700), (2400, 1600), (2600, 1500)][k]
+            picture(rng, *size).save(path)
             pics.append(path)
         w = app.MainWindow()
         w.qs = QSettings(os.path.join(folder, "s.ini"), QSettings.Format.IniFormat)

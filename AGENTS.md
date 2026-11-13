@@ -75,7 +75,12 @@ Rules for all of it:
   on any number of threads: `KZ_THREADS=1` runs on one; check with ThreadSanitizer,
   `SAN="-fsanitize=thread ..." tests/engine_battery.sh`).
 - The reduced colors are cached by picture and settings: a setting that doesn't change them
-  must not reduce them again.
+  must not reduce them again. The smoothed picture and its color histogram are cached by
+  picture and Smooth (another number of colors starts from them). The caches hold two pictures
+  (a big picture's quick-preview copy and the picture).
+- A big picture (over 3 megapixels) shows a quick preview (a 1-megapixel copy traced) when its
+  colors have to be reduced again, then the full trace: the window shows something within a
+  few tenths of a second.
 - Budgets in `tests/test_speed.py` (several times today's numbers): never weaken one to get
   green. Profile with `KZ_PROFILE=1` (the engine's steps).
 

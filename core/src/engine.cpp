@@ -486,10 +486,10 @@ struct Timer
 // quantized: smoothing keeps edges sharp, and judging on the unsmoothed one brought back the
 // noise it removed), the exact colors from the insides of the shapes, and colors that came
 // out nearly the same merged (then the edges again, between the colors that are left).
-IndexedMap palette(RgbMap const &map, RgbMap const &smoothed, int ncolors)
+IndexedMap palette(RgbMap const &map, RgbMap const &smoothed, int ncolors, ColorHistogram const *hist = nullptr)
 {
     IndexedMap imap(1, 1);
-    { Timer t("quantize"); imap = rgbMapQuantize(smoothed, ncolors); }
+    { Timer t("quantize"); imap = rgbMapQuantize(smoothed, ncolors, hist); }
     { Timer t("drop blend colors"); dropBlendColors(smoothed, imap); }
     { Timer t("snap blended edges"); snapBlendedEdges(smoothed, imap); }
     { Timer t("refine palette"); refinePalette(map, imap); }
@@ -534,16 +534,72 @@ uint64_t fingerprint(RgbMap const &map)
     return x;
 }
 
+// The smoothed picture and its color histogram, kept for the last picture: they depend only
+// on the picture and Smooth, so another number of colors starts from them (smoothing a
+// 12-megapixel photo took 0.2-0.3 s of the 0.9 s).
+struct Prepared
+{
+    RgbMap smoothed{1, 1};
+    ColorHistogram histogram;
+};
+
+// The caches hold the last two pictures: the window traces a small copy of a big picture
+// first (a quick preview), then the picture itself, and neither should push the other out.
+constexpr size_t CACHED_PICTURES = 2;
+
+struct PreparedEntry
+{
+    uint64_t key;
+    int width, height, smooth;
+    std::shared_ptr<Prepared const> value;
+};
+
+struct PreparedCache
+{
+    std::mutex m;
+    std::deque<PreparedEntry> entries; // newest first
+} prepared_cache;
+
+std::shared_ptr<Prepared const> prepared(RgbMap const &map, uint64_t key, bool smooth)
+{
+    {
+        std::lock_guard<std::mutex> lock(prepared_cache.m);
+        auto &e = prepared_cache.entries;
+        for (size_t i = 0; i < e.size(); i++) {
+            if (e[i].key == key && e[i].width == map.width && e[i].height == map.height && e[i].smooth == (int)smooth) {
+                auto hit = e[i];
+                e.erase(e.begin() + i);
+                e.push_front(hit);
+                return hit.value;
+            }
+        }
+    }
+    auto p = std::make_shared<Prepared>();
+    { Timer t("smooth"); p->smoothed = smooth ? rgbMapGaussian(map) : map; }
+    { Timer t("histogram"); p->histogram = colorHistogram(p->smoothed); }
+    std::lock_guard<std::mutex> lock(prepared_cache.m);
+    auto &e = prepared_cache.entries;
+    e.push_front({key, map.width, map.height, (int)smooth, p});
+    while (e.size() > CACHED_PICTURES) {
+        e.pop_back();
+    }
+    return p;
+}
+
 // The last picture's reduced colors, kept: changing only a setting that doesn't change them
 // (speckles, smooth corners, optimize, tolerance, stack, background) traces again without
 // reducing the colors again (0.7 of the 1 s a 12-megapixel photo took).
+struct ColorEntry
+{
+    uint64_t key;
+    int width, height, scans, smooth;
+    std::shared_ptr<IndexedMap const> imap;
+};
+
 struct ColorCache
 {
     std::mutex m;
-    bool valid = false;
-    uint64_t key = 0;
-    int width = 0, height = 0, scans = 0, smooth = 0;
-    IndexedMap imap{1, 1};
+    std::deque<ColorEntry> entries; // newest first
 } color_cache;
 
 IndexedMap quantized(RgbMap const &map, kz_options const &o)
@@ -551,10 +607,16 @@ IndexedMap quantized(RgbMap const &map, kz_options const &o)
     uint64_t const key = fingerprint(map);
     {
         std::lock_guard<std::mutex> lock(color_cache.m);
-        auto &c = color_cache;
-        if (c.valid && c.key == key && c.width == map.width && c.height == map.height && c.scans == o.scans &&
-            c.smooth == (o.smooth != 0)) {
-            IndexedMap imap = c.imap;
+        auto &e = color_cache.entries;
+        auto it = std::find_if(e.begin(), e.end(), [&](ColorEntry const &c) {
+            return c.key == key && c.width == map.width && c.height == map.height && c.scans == o.scans &&
+                   c.smooth == (int)(o.smooth != 0);
+        });
+        if (it != e.end()) {
+            auto hit = *it;
+            e.erase(it);
+            e.push_front(hit);
+            IndexedMap imap = *hit.imap;
             if (o.mode == KZ_GRAYS) {
                 for (auto &col : imap.clut) {
                     unsigned char v = ((int)col.r + col.g + col.b) / 3;
@@ -564,19 +626,15 @@ IndexedMap quantized(RgbMap const &map, kz_options const &o)
             return imap;
         }
     }
-    RgbMap smoothed(1, 1);
-    { Timer t("smooth"); smoothed = o.smooth ? rgbMapGaussian(map) : map; }
-    auto imap = palette(map, smoothed, o.scans);
+    auto prep = prepared(map, key, o.smooth != 0);
+    auto imap = palette(map, prep->smoothed, o.scans, &prep->histogram);
     {
         std::lock_guard<std::mutex> lock(color_cache.m);
-        auto &c = color_cache;
-        c.valid = true;
-        c.key = key;
-        c.width = map.width;
-        c.height = map.height;
-        c.scans = o.scans;
-        c.smooth = o.smooth != 0;
-        c.imap = imap;
+        auto &e = color_cache.entries;
+        e.push_front({key, map.width, map.height, o.scans, (int)(o.smooth != 0), std::make_shared<IndexedMap const>(imap)});
+        while (e.size() > CACHED_PICTURES) {
+            e.pop_back();
+        }
     }
     if (o.mode == KZ_GRAYS) {
         for (auto &c : imap.clut) {
@@ -847,8 +905,8 @@ int autotrace_colors(kz_options const &o)
  */
 RgbMap autotrace_input(RgbMap const &map, kz_options const &o, RGB *background = nullptr)
 {
-    auto smoothed = rgbMapGaussian(map);
-    auto imap = palette(map, smoothed, autotrace_colors(o));
+    auto prep = prepared(map, fingerprint(map), true);
+    auto imap = palette(map, prep->smoothed, autotrace_colors(o), &prep->histogram);
 
     // The color Autotrace leaves out: white, or the picture's background when it is removed.
     RGB bg = {255, 255, 255};
@@ -1238,30 +1296,46 @@ AutoResult choose_settings(unsigned char const *rgba, int width, int height, int
     std::vector<std::array<RGB, 2>> two(1);
     int chosen = 0;
     int actual_at[MAX_COLORS + 1] = {0};
-    for (int n = 2; n <= MAX_COLORS; n++) {
-        auto imap = palette(map, smoothed, n);
-        long long bad = 0;
-        for (size_t i = 0; i < flat.size(); i++) {
-            if (flat[i] && channel_diff(imap.clut[imap.pixels[i]], map.pixels[i]) > WRONG) {
-                bad++;
+    // The counts are tried a few at a time on several cores (each try is independent), then
+    // judged in order, so the first count that does is the one picked, as when tried one by one.
+    auto hist = colorHistogram(smoothed);
+    int const batch = std::max(1, kz::threads());
+    for (int first = 2; first <= MAX_COLORS && !chosen; first += batch) {
+        int const last = std::min(MAX_COLORS, first + batch - 1);
+        std::vector<int> kept(MAX_COLORS + 1, 0);
+        std::vector<std::array<RGB, 2>> two_of(MAX_COLORS + 1);
+        kz::parallel_for(last - first + 1, [&](long b, long e) {
+            for (long k = b; k < e; k++) {
+                int n = first + (int)k;
+                auto imap = palette(map, smoothed, n, &hist);
+                long long bad = 0;
+                for (size_t i = 0; i < flat.size(); i++) {
+                    if (flat[i] && channel_diff(imap.clut[imap.pixels[i]], map.pixels[i]) > WRONG) {
+                        bad++;
+                    }
+                }
+                wrong[n] = nflat ? (double)bad / nflat : 0.0;
+                kept[n] = imap.nrColors;
+                two_of[n] = {imap.clut[0], imap.clut[std::min(1, imap.nrColors - 1)]};
             }
-        }
-        wrong[n] = nflat ? (double)bad / nflat : 0.0;
-        actual_at[n] = imap.nrColors;
-        if (n == 2) {
-            two[0] = {imap.clut[0], imap.clut[std::min(1, imap.nrColors - 1)]};
-        }
-        if (std::getenv("KZ_AUTO_DEBUG")) {
-            std::fprintf(stderr, "auto: %2d colors (%2d kept): %.4f wrong\n", n, imap.nrColors, wrong[n]);
-        }
-        if (imap.nrColors < n && wrong[n] <= 0.002) {
-            // the picture has no more colors to give
-            chosen = imap.nrColors;
-            break;
-        }
-        if (wrong[n] <= 0.002) {
-            chosen = n;
-            break;
+        }, 1);
+        for (int n = first; n <= last; n++) {
+            actual_at[n] = kept[n];
+            if (n == 2) {
+                two[0] = two_of[2];
+            }
+            if (std::getenv("KZ_AUTO_DEBUG")) {
+                std::fprintf(stderr, "auto: %2d colors (%2d kept): %.4f wrong\n", n, kept[n], wrong[n]);
+            }
+            if (kept[n] < n && wrong[n] <= 0.002) {
+                // the picture has no more colors to give
+                chosen = kept[n];
+                break;
+            }
+            if (wrong[n] <= 0.002) {
+                chosen = n;
+                break;
+            }
         }
     }
     if (!chosen) {

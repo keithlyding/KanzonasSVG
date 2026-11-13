@@ -12,15 +12,35 @@
 #ifndef INKSCAPE_TRACE_QUANTIZE_H
 #define INKSCAPE_TRACE_QUANTIZE_H
 
+#include <cstdint>
+#include <vector>
+
 #include "imagemap.h"
 
 namespace Inkscape {
 namespace Trace {
 
 /**
- * Quantize an RGB image to a reduced number of colors.
+ * How many pixels of each color an image has (6 bits a channel), with their sums: what the
+ * quantizer's octree is built from, the same for any number of colors (kept between traces).
  */
-IndexedMap rgbMapQuantize(RgbMap const &rgbmap, int nrColors);
+struct ColorHistogram
+{
+    static constexpr int BITS = 6;
+    struct Bin
+    {
+        uint64_t weight = 0;
+        uint64_t rs = 0, gs = 0, bs = 0;
+    };
+    std::vector<Bin> bins;
+};
+
+ColorHistogram colorHistogram(RgbMap const &rgbmap);
+
+/**
+ * Quantize an RGB image to a reduced number of colors (with its histogram, if already made).
+ */
+IndexedMap rgbMapQuantize(RgbMap const &rgbmap, int nrColors, ColorHistogram const *histogram = nullptr);
 
 /**
  * Set each palette color to the mean of <original> over the insides of its areas.
