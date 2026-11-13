@@ -2,6 +2,19 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.1
+
+New:
+- KanzonasSVG updates itself. Once a day it checks GitHub for a newer version and says so in the
+  status bar, with what's new since your version; **Update now** downloads it, checks it
+  against the checksum published with the release, installs it and starts KanzonasSVG again
+  (installed with the setup, unzipped, or the Linux AppImage). Your settings are kept.
+- *Help > Check for updates...* checks at once; *Help > Check for updates automatically*
+  turns the daily check off or on. Nothing is downloaded or installed until you click
+  Update now.
+
+This version is the first one that updates itself: from 1.0.x, install it by hand once.
+
 ## 1.0.4
 
 This release brings together 1.0.2 and 1.0.3 (1.0.2 wasn't published on its own).

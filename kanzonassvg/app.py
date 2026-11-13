@@ -8,11 +8,11 @@ from dataclasses import replace
 
 from PySide6.QtCore import QUrl, QByteArray, QMimeData, QObject, QRectF, QSettings, Qt, QThread, \
     QTimer, Signal
-from PySide6.QtGui import QAction, QColor, QGuiApplication, QIcon, QImage, QKeySequence, QPainter, QPalette
+from PySide6.QtGui import QAction, QColor, QDesktopServices, QGuiApplication, QIcon, QImage, QKeySequence, QPainter, QPalette
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, \
-    QFileDialog, QFormLayout, QGroupBox, QLabel, QMainWindow, QMessageBox, QProgressBar, \
-    QPushButton, QScrollArea, QSpinBox, QSplitter, QTextBrowser, QVBoxLayout, QWidget
+    QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QProgressBar, \
+    QProgressDialog, QPushButton, QScrollArea, QSpinBox, QSplitter, QTextBrowser, QVBoxLayout, QWidget
 
 from kanzonassvg import APP_NAME, __version__, engine, image, tracing
 
@@ -126,6 +126,21 @@ size</i> (Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> 
 <code>kanzonassvg-cli.exe</code> in the program's folder). Run it with <code>--help</code> to
 see every option, for example:<br>
 <code>kanzonassvg-cli --colors 4 *.png -o svgs</code></p>
+<h3>Updates</h3>
+<p>Once a day, a few seconds after it starts, KanzonasSVG asks GitHub whether a newer version is
+out (<i>Help &gt; Check for updates automatically</i>, on at first; it sends nothing about you
+or your pictures, and when you're offline it just tries again the next day). When there is one,
+a notice in the status bar says so: <b>What's new</b> shows what changed since your version,
+<b>Update now</b> updates it, <b>Download</b> opens the release page, <b>Skip this version</b>
+stops telling you about that version, and <b>Later</b> hides the notice.
+<i>Help &gt; Check for updates...</i> asks at once.</p>
+<p><b>Update now</b> downloads the new version, checks it against the checksum GitHub
+publishes with the release (nothing is installed if they differ), closes KanzonasSVG, puts
+the new version in place and starts it again. Installed with the setup, it runs the new setup
+over this one; unzipped from KanzonasSVG-windows.zip, it replaces the program files in that
+folder; the Linux AppImage replaces its file. Your settings are kept. (Run from its source code,
+KanzonasSVG only tells you.) Nothing is ever downloaded or installed until you click
+<b>Update now</b>.</p>
 <h3>About</h3>
 <p><i>Help &gt; About KanzonasSVG</i> shows the version, where the tracing comes from, and the
 license.</p>
@@ -907,6 +922,11 @@ class MainWindow(QMainWindow):
 
         m = mb.addMenu("&Help")
         self._action(m, "How to use KanzonasSVG", self.show_help, QKeySequence.StandardKey.HelpContents)
+        m.addSeparator()
+        self._action(m, "Check for updates...", self.check_updates)
+        self.a_auto_updates = self._action(m, "Check for updates automatically", self.auto_updates_changed, None, True)
+        self.a_auto_updates.setChecked(self.updater().enabled())
+        m.addSeparator()
         self._action(m, "About KanzonasSVG", self.about)
 
     def _update_actions(self):
@@ -1231,6 +1251,215 @@ class MainWindow(QMainWindow):
             "<a href='https://github.com/keithlyding/KanzonasSVG'>github.com/keithlyding/KanzonasSVG</a></p>"
             % (__version__, ev))
 
+    # updates (kanzonassvg/updates.py; the same as KanzonasPDF's)
+
+    def updater(self):
+        if getattr(self, "_upd", None) is None:
+            from kanzonassvg.updates import UpdateChecker
+            self._upd = UpdateChecker(self.qs, self)
+            self._upd.found.connect(self._update_found)
+            self._upd.result.connect(lambda t: QMessageBox.information(self, "Check for updates", t))
+        return self._upd
+
+    def auto_updates_changed(self, on):
+        self.updater().set_enabled(on)
+
+    def start_update_check(self):
+        """A few seconds after start-up: checks at most once a day, if on. While KanzonasSVG stays
+        open, it looks every hour whether a day has passed."""
+        if self.closing:
+            return
+        self.updater().check_if_due()
+        if getattr(self, "_update_timer", None) is None:
+            self._update_timer = QTimer(self)
+            self._update_timer.timeout.connect(lambda: self.updater().check_if_due())
+            self._update_timer.start(3600 * 1000)
+
+    def check_updates(self):
+        self.statusBar().showMessage("Checking for updates...", 3000)
+        self.updater().check(manual=True)
+
+    def _close_update_bar(self):
+        bar = getattr(self, "_update_bar", None)
+        if bar is not None:
+            self.statusBar().removeWidget(bar)
+            bar.deleteLater()
+            self._update_bar = None
+
+    def _update_found(self, version):
+        if self._upd.manual:
+            self.update_box(version)        # asked for: answer in a box
+            return
+        self._close_update_bar()
+        bar = QWidget()
+        h = QHBoxLayout(bar)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.addWidget(QLabel("<b>KanzonasSVG %s is available</b> (you have %s)." % (version, __version__)))
+        buttons = [("What's new", lambda: self.update_box(version))]
+        if self._update_url():
+            buttons.append(("Update now", lambda: (self._close_update_bar(), self.update_now())))
+        buttons += [("Download", lambda: (self._close_update_bar(), self._open_release_page())),
+                    ("Skip this version", lambda: (self.qs.setValue("updates/skip", version),
+                                                   self._close_update_bar())),
+                    ("Later", self._close_update_bar)]
+        for text, slot in buttons:
+            b = QPushButton(text)
+            b.clicked.connect(slot)
+            h.addWidget(b)
+        self._update_bar = bar
+        self.statusBar().clearMessage()
+        self.statusBar().addWidget(bar)
+        bar.show()
+
+    def _open_release_page(self):
+        from kanzonassvg import updates
+        QDesktopServices.openUrl(QUrl(updates.page(self._upd.release)))
+
+    def _update_url(self):
+        """Where the file that updates this copy in place comes from, or None (it can only tell)."""
+        from kanzonassvg import updates
+        upd = getattr(self, "_upd", None)
+        kind = updates.update_kind()
+        if upd is None or upd.release is None or kind is None:
+            return None
+        return updates.asset_url(upd.release, updates.update_file(kind, upd.release))
+
+    def _update_now_text(self):
+        from kanzonassvg import updates
+        kind = updates.update_kind()
+        if kind == "installer":
+            return ("Update now downloads the new setup, checks it, closes KanzonasSVG and installs the "
+                    "new version over this one; KanzonasSVG starts again when it's done.")
+        if kind == "portable":
+            return ("Update now downloads the new version, checks it, closes KanzonasSVG, puts the new "
+                    "program files in this folder and starts it again.")
+        if kind == "appimage":
+            return ("Update now downloads the new AppImage, checks it, puts it in place of %s, closes "
+                    "KanzonasSVG and starts it again." % os.path.basename(updates.running_appimage()))
+        return ""
+
+    def update_box(self, version):
+        """The short notes of every version newer than this one, then Update now / Download / Later."""
+        from kanzonassvg import updates
+        d = QDialog(self)
+        d.setWindowTitle("Check for updates")
+        lay = QVBoxLayout(d)
+        lay.addWidget(QLabel("KanzonasSVG %s is available (you have %s)." % (version, __version__)))
+        lay.addWidget(QLabel("<b>What's new since your version</b>"))
+        notes = QTextBrowser()
+        notes.setOpenExternalLinks(True)
+        parts = []
+        for v, text, url in updates.notes_since(self._upd.releases):
+            parts.append("### Version " + v)
+            parts.append(text or "[What's new in %s](%s)" % (v, url))
+        notes.setMarkdown("\n\n".join(parts))
+        lay.addWidget(notes)
+        can = self._update_url() is not None
+        info = QLabel(((self._update_now_text() + " Your settings are kept.\n\n") if can else "")
+                      + "Download opens the release page in your browser.")
+        info.setWordWrap(True)
+        lay.addWidget(info)
+        box = QDialogButtonBox()
+        upd = box.addButton("Update now", QDialogButtonBox.ButtonRole.AcceptRole) if can else None
+        get = box.addButton("Download", QDialogButtonBox.ButtonRole.AcceptRole)
+        box.addButton("Later", QDialogButtonBox.ButtonRole.RejectRole)
+        chosen = []
+        box.clicked.connect(lambda b: (chosen.append(b), d.accept()))
+        lay.addWidget(box)
+        d.resize(600, 520)
+        d.exec()
+        if chosen and chosen[0] in (upd, get):
+            self._close_update_bar()
+        if upd is not None and chosen and chosen[0] is upd:
+            self.update_now()
+        elif chosen and chosen[0] is get:
+            self._open_release_page()
+
+    def update_now(self):
+        from kanzonassvg import updates
+        if updates.downloading():
+            QMessageBox.information(self, "Update", "The new version is already downloading.")
+            return
+        url = self._update_url()
+        if not url:
+            return
+        kind = updates.update_kind()
+        release = self._upd.release
+        name = updates.update_file(kind, release)
+        digest = updates.asset_digest(release, name)
+        if kind == "appimage":
+            target = updates.running_appimage()
+            why = updates.appimage_unwritable(target)
+            if why:
+                QMessageBox.information(self, "Update", "KanzonasSVG can't replace %s: %s\n\nThe release page "
+                                        "opens so you can download the new %s yourself." % (target, why, name))
+                self._open_release_page()
+                return
+            dl = updates.AppImageUpdater(url, target, self, expected_sha256=digest)
+        elif kind == "installer":
+            dl = updates.InstallerUpdater(url, updates.release_version(release), self, expected_sha256=digest)
+        else:
+            dl = updates.PortableUpdater(url, updates.app_dir(), self, expected_sha256=digest)
+        prog = QProgressDialog("Downloading the new KanzonasSVG...", "Cancel", 0, 0, self)
+        prog.setWindowTitle("Update")
+        prog.setMinimumDuration(0)
+        prog.canceled.connect(dl.cancel)
+
+        def progress(got, total):
+            if total > 0:
+                prog.setMaximum(total)
+                prog.setValue(got)
+
+        def failed(message):
+            prog.close()
+            QMessageBox.warning(self, "Update", message + "\n\nYou can still download %s from the release "
+                                "page." % name)
+
+        dl.progress.connect(progress)
+        dl.failed.connect(failed)
+        dl.ready.connect(lambda path: (prog.close(), self._install_update(kind, path)))
+        self._download = dl
+        dl.start()
+
+    def _install_update(self, kind, path):
+        """The checked download is ready: close KanzonasSVG and put it in place."""
+        import subprocess
+        from kanzonassvg import updates
+        if kind == "appimage":
+            target = updates.running_appimage()
+            # in place first (the running program keeps its own copy open until it ends)
+            try:
+                updates.replace_appimage(path, target)
+            except OSError as e:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+                QMessageBox.warning(self, "Update", "The new version couldn't be put in place of %s (%s). "
+                                    "The release page opens so you can download it yourself." % (target, e))
+                self._open_release_page()
+                return
+            cwd = os.environ.get("OWD") or os.path.expanduser("~")
+            self.close()
+            subprocess.Popen(updates.restart_command(target), env=updates.restart_env(),
+                             cwd=cwd if os.path.isdir(cwd) else None, close_fds=True, start_new_session=True,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif kind == "installer":
+            self.close()
+            subprocess.Popen(updates.installer_command(path, updates.app_dir()), close_fds=True)
+        else:
+            import tempfile
+            folder = updates.app_dir()
+            # a new folder only this user can write to, not a fixed name another program could
+            # put its own script at first
+            script = os.path.join(tempfile.mkdtemp(prefix="kzsvgupdate"), "kanzonassvg-update.cmd")
+            with open(script, "w", encoding="mbcs" if os.name == "nt" else "utf-8") as f:
+                f.write(updates.swap_script(os.getpid(), path, folder))
+            self.close()
+            subprocess.Popen(["cmd", "/c", script], creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                             close_fds=True)
+        QApplication.quit()
+
     def closeEvent(self, e):
         self.closing = True
         self.timer.stop()
@@ -1270,6 +1499,7 @@ def run(argv):
         return 1
     w = MainWindow()
     w.show()
+    QTimer.singleShot(3000, w.start_update_check)
     for a in argv:
         if not a.startswith("-") and os.path.isfile(a):
             w.open_path(a)

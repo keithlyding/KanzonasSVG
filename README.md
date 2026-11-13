@@ -34,6 +34,14 @@ From [Releases](https://github.com/keithlyding/KanzonasSVG/releases):
 - **Linux (64-bit; Ubuntu 22.04, Debian 12, Fedora 36 or newer):** `KanzonasSVG-x86_64.AppImage`.
   Make it executable (`chmod +x KanzonasSVG-x86_64.AppImage`) and run it.
 
+**Updates** (from 1.1 on): once a day KanzonasSVG asks GitHub whether a newer version is out
+(*Help > Check for updates automatically*; nothing about you or your pictures is sent) and says so
+in the status bar, with what's new since your version. **Update now** downloads it, checks it
+against the checksum GitHub publishes with the release, and puts it in place: the setup runs
+over an installed copy, an unzipped copy gets the new files in its folder, and the AppImage
+replaces itself; then KanzonasSVG starts again, settings kept. Nothing is downloaded or
+installed until you click it. (1.0.x doesn't have this: install 1.1 by hand once.)
+
 ## Using it
 
 1. Open a picture: *File > Open picture* (Ctrl+O), drag it into the window, or copy a picture

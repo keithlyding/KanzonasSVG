@@ -150,10 +150,41 @@ def run(argv):
             assert rc == 0 and os.path.exists(os.path.join(d, "a.svg")), rc
         return "ok"
 
+    def update_check():
+        # the update check reaches GitHub over TLS (Qt's network backend in the program), and
+        # its pieces work in the finished program
+        from PySide6.QtNetwork import QSslSocket
+        from kanzonassvg import updates
+
+        assert QSslSocket.supportsSsl(), "no TLS support: the update check can't reach GitHub"
+        good = {"name": updates.PORTABLE_ZIP, "digest": "sha256:" + "ab" * 32,
+                "browser_download_url": "https://github.com/keithlyding/KanzonasSVG/releases/download/v99.1/x"}
+        rel = [{"tag_name": "v0.1"}, {"tag_name": "v99.1", "assets": [good],
+                                      "body": "x <!-- kanzonas-notes -->\nNew things\n<!-- /kanzonas-notes --> y"},
+               {"tag_name": "v99.2", "draft": True}]
+        r = updates.newest_release(rel)
+        assert r is rel[1], r
+        assert updates.asset_url(r, updates.PORTABLE_ZIP) == good["browser_download_url"]
+        assert updates.asset_url(dict(r, assets=[dict(good, browser_download_url="https://evil.example/x")]),
+                                 updates.PORTABLE_ZIP) is None
+        assert updates.notes_since(rel)[0][:2] == ("99.1", "New things")
+        with tempfile.TemporaryDirectory() as d:
+            import zipfile
+            z = os.path.join(d, "u.zip")
+            with zipfile.ZipFile(z, "w") as f:
+                f.writestr("KanzonasSVG/KanzonasSVG.exe", "x")
+                f.writestr("KanzonasSVG/_internal/a", "x")
+            new = updates.unpack(z, d)
+            assert os.path.isfile(os.path.join(new, "KanzonasSVG.exe"))
+            assert "robocopy" in updates.swap_script(4242, new, d)
+        kind = updates.update_kind()
+        return "TLS %s; this copy updates %s" % (QSslSocket.sslLibraryVersionString() or "built in",
+                                                 "by " + kind if kind else "by download only")
+
     for name, fn in [("engine loads", engine_loads), ("exact colors and holes", colors_exact),
                      ("logo and icon", logo_and_icon), ("auto settings", auto_settings), ("drawing SVGs", drawing), ("every mode", every_mode), ("reads pictures", reads_pictures),
                      ("big picture speed", big_picture), ("window opens and traces", window_opens),
-                     ("command line", command_line)]:
+                     ("command line", command_line), ("update check", update_check)]:
         check(name, fn)
 
     log("%s: %d failed" % ("FAILED" if failures else "ALL PASSED", failures))

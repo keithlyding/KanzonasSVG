@@ -86,6 +86,13 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path dist\KanzonasSVG -DestinationPath KanzonasSVG-windows.zip
 
+      - name: Test updating the unzipped program (Update now's unzip and file swap)
+        timeout-minutes: 10
+        shell: pwsh
+        run: |
+          python tools/test_windows_update.py portable KanzonasSVG-windows.zip "$env:RUNNER_TEMP\kzsvg-portable"
+          if ($LASTEXITCODE -ne 0) { throw "Updating the unzipped program failed" }
+
       - name: Build the installer (Inno Setup)
         shell: pwsh
         run: |
@@ -107,6 +114,12 @@ jobs:
             if ($p.ExitCode -ne 0) { throw "Install $round failed with code $($p.ExitCode)" }
           }
           if (-not (Test-Path "$dir\KanzonasSVG.exe")) { throw "KanzonasSVG.exe isn't installed" }
+          # Update now: the setup run exactly as the app runs it (no /DIR: it finds the installation
+          # itself), closing the running program and starting it again (/RELAUNCH)
+          python tools/test_windows_update.py installer $setup $dir
+          if ($LASTEXITCODE -ne 0) { throw "Updating the installed program the way Update now does failed" }
+          $un = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{5F2EE57A-F848-4461-9769-94D17A448495}_is1"
+          if ((Get-ItemProperty $un).InstallLocation.TrimEnd('\') -ne $dir) { throw "The update installed to another folder" }
           $p = Start-Process "$dir\KanzonasSVG.exe" -ArgumentList "--selftest","installed-selftest.log" -PassThru -Wait
           Get-Content installed-selftest.log
           if ($p.ExitCode -ne 0) { throw "The installed program's self test failed" }
@@ -330,7 +343,8 @@ jobs:
           m = re.search(r"^## +%s *$(.*?)(?=^## |\Z)" % re.escape(v), text, re.M | re.S)
           if not m or not m.group(1).strip():
               sys.exit("RELEASE_NOTES.md has no notes for %s" % v)
-          print(m.group(1).strip())
+          # (between marks: the app's update box shows the notes of every version since yours)
+          print("<!-- kanzonas-notes -->\n%s\n<!-- /kanzonas-notes -->" % m.group(1).strip())
           PY
           cd release
           chmod +x KanzonasSVG-x86_64.AppImage
