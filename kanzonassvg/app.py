@@ -1,10 +1,12 @@
 """The KanzonasSVG window: open a picture, pick settings, see the SVG beside it, save it."""
 
+import itertools
 import os
 import sys
+import threading
 from dataclasses import replace
 
-from PySide6.QtCore import QUrl, QByteArray, QMimeData, QObject, QRectF, QSettings, QSize, Qt, QThread, \
+from PySide6.QtCore import QUrl, QByteArray, QMimeData, QObject, QRectF, QSettings, Qt, QThread, \
     QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QGuiApplication, QIcon, QImage, QKeySequence, QPainter, QPalette
 from PySide6.QtSvg import QSvgRenderer
@@ -221,78 +223,181 @@ def svg_renderer(svg):
     return r
 
 
+class RenderThread(QThread):
+    """Draws one side of the window in the background: the window never waits for a drawing
+    (an SVG of a photo takes 0.3-0.4 s to draw, and the window used to freeze that long at every
+    zoom and every new result). Only the latest request is drawn; older ones are skipped."""
+
+    drawn = Signal(int, object, object)  # request number, QImage, the request's view key
+
+    def __init__(self):
+        super().__init__()
+        self._lock = threading.Lock()
+        self._wake = threading.Condition(self._lock)
+        self._request = None
+        self._quit = False
+        self._svg_id = None
+        self._renderer = None
+
+    def request(self, number, kind, content_id, content, key, target, size, dpr):
+        with self._lock:
+            self._request = (number, kind, content_id, content, key, target, size, dpr)
+            self._wake.notify()
+
+    def stop(self):
+        with self._lock:
+            self._quit = True
+            self._wake.notify()
+        self.wait()
+
+    def run(self):
+        while True:
+            with self._lock:
+                while self._request is None and not self._quit:
+                    self._wake.wait()
+                if self._quit:
+                    return
+                req, self._request = self._request, None
+            try:
+                self.drawn.emit(req[0], self._draw(*req[1:]), req[4])
+            except Exception:  # a drawing that fails leaves the old one shown, never a crash
+                pass
+
+    def _draw(self, kind, content_id, content, key, target, size, dpr):
+        w, h = max(1, int(size.width() * dpr)), max(1, int(size.height() * dpr))
+        img = QImage(w, h, QImage.Format.Format_ARGB32_Premultiplied)
+        img.setDevicePixelRatio(dpr)
+        img.fill(Qt.GlobalColor.transparent)
+        p = QPainter(img)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        if kind == "svg":
+            # drawn by the engine (through ctypes: Python's lock is let go, so the window keeps
+            # going; Qt's SVG renderer held it all along, 0.3 s for a photo's SVG)
+            p.end()
+            if self._svg_id != content_id:
+                if self._renderer is not None:
+                    self._renderer.close()
+                self._renderer = engine.Drawing(content)  # parsed once, used only in this thread
+                self._svg_id = content_id
+            self._renderer.render_image(img, target.left() * dpr, target.top() * dpr,
+                                        target.width() * dpr, target.height() * dpr)
+            return img
+        else:
+            # only the part of the picture that shows, scaled (zoomed in on a 12-megapixel
+            # picture, scaling all of it every time cost most of the drawing)
+            visible = target.intersected(QRectF(0, 0, size.width(), size.height()))
+            if not visible.isEmpty():
+                sx = content.width() / target.width()
+                sy = content.height() / target.height()
+                src = QRectF((visible.left() - target.left()) * sx, (visible.top() - target.top()) * sy,
+                             visible.width() * sx, visible.height() * sy)
+                p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, target.width() < content.width() * 2)
+                p.drawImage(visible, content, src)
+        p.end()
+        return img
+
+
+def _checker_brush():
+    tile = QImage(20, 20, QImage.Format.Format_RGB32)
+    tile.fill(QColor(255, 255, 255))
+    p = QPainter(tile)
+    p.fillRect(0, 0, 10, 10, QColor(232, 232, 232))
+    p.fillRect(10, 10, 10, 10, QColor(232, 232, 232))
+    p.end()
+    from PySide6.QtGui import QBrush
+    return QBrush(tile)
+
+
 class Canvas(QWidget):
-    """One side: the picture, or the SVG."""
+    """One side: the picture, or the SVG. Drawn by its RenderThread; until the drawing for the
+    current zoom and position is ready, the last one is shown moved and scaled to match."""
+
+    _ids = itertools.count(1)
 
     def __init__(self, view, title):
         super().__init__()
         self.view = view
         self.title = title
         self.picture = None  # QImage
-        self.renderer = None  # QSvgRenderer
+        self.svg = None  # SVG text
+        self.content_id = 0
         self.message = ""
-        self.cache = None  # (key, QImage) of the SVG drawn at the current view
+        self.cache = None  # (key, QImage, scale, cx, cy) of the last drawing
         self.drag = None
+        self.number = 0  # of the latest drawing asked for
+        self.checker = _checker_brush()
         self.setMinimumSize(200, 200)
-        self.setMouseTracking(False)
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent)
-        view.changed.connect(self.update)
-        self.redraw = QTimer(self, singleShot=True, interval=120)
-        self.redraw.timeout.connect(self._render_svg)
+        view.changed.connect(self.redraw)
+        self.thread = RenderThread()
+        self.thread.drawn.connect(self._drawn)
+        self.thread.start()
+
+    @property
+    def renderer(self):
+        """(For tests and old code: whether an SVG is shown.)"""
+        return self.svg
+
+    def stop(self):
+        self.thread.stop()
+
+    def has_content(self):
+        return (self.picture is not None and not self.picture.isNull()) or bool(self.svg)
 
     def set_picture(self, img):
-        self.picture, self.renderer, self.cache = img, None, None
-        self.update()
+        self.picture, self.svg = img, None
+        self.content_id = next(self._ids)
+        self.redraw()
 
     def set_svg(self, svg):
-        self.picture = None
-        self.renderer = svg_renderer(svg) if svg else None
-        self.cache = None
-        self.update()
-        self._render_svg()
+        self.picture, self.svg = None, svg or None
+        self.content_id = next(self._ids)
+        if not svg:
+            self.cache = None
+        self.redraw()
 
     def set_message(self, text):
         self.message = text
         self.update()
 
     def _key(self):
-        return (self.view.scale, self.view.cx, self.view.cy, self.width(), self.height(), self.devicePixelRatioF())
+        return (self.content_id, self.view.scale, self.view.cx, self.view.cy, self.width(), self.height(),
+                self.devicePixelRatioF())
 
-    def _render_svg(self):
-        if not self.renderer or not self.renderer.isValid():
+    def redraw(self):
+        self.update()
+        if not self.has_content() or not self.view.width:
             return
-        dpr = self.devicePixelRatioF()
-        img = QImage(QSize(max(1, int(self.width() * dpr)), max(1, int(self.height() * dpr))),
-                     QImage.Format.Format_ARGB32_Premultiplied)
-        img.setDevicePixelRatio(dpr)
-        img.fill(Qt.GlobalColor.transparent)
-        p = QPainter(img)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.renderer.render(p, self.view.target(self.size()))
-        p.end()
-        self.cache = (self._key(), img, self.view.scale, self.view.cx, self.view.cy)
+        self.number += 1
+        kind, content = ("svg", self.svg) if self.svg else ("picture", self.picture)
+        self.thread.request(self.number, kind, self.content_id, content, self._key(),
+                            self.view.target(self.size()), self.size(), self.devicePixelRatioF())
+
+    def _drawn(self, number, img, key):
+        if key[0] != self.content_id and self.cache is not None and self.cache[0][0] == self.content_id:
+            return  # an older content's drawing, and the current one is already shown
+        self.cache = (key, img, key[1], key[2], key[3])
         self.update()
 
     def paintEvent(self, _event):
         p = QPainter(self)
-        self._checkers(p)
-        if self.picture is not None and not self.picture.isNull():
-            p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, self.view.scale < 2)
-            p.drawImage(self.view.target(self.size()), self.picture)
-        elif self.renderer is not None and self.cache is not None:
+        p.fillRect(self.rect(), self.palette().color(QPalette.ColorRole.Window))
+        if self.has_content():
+            r = self.view.target(self.size()).intersected(QRectF(self.rect()))
+            if not r.isEmpty():
+                p.fillRect(r, self.checker)
+        if self.cache is not None and self.has_content():
             key, img, scale, cx, cy = self.cache
-            if key == self._key():
+            if key[1:] == self._key()[1:]:
                 p.drawImage(0, 0, img)
             else:
-                # moved or zoomed since it was drawn: show it shifted, draw it again shortly
+                # moved or zoomed since it was drawn: show it moved and scaled to match
                 f = self.view.scale / scale
                 w, h = self.width(), self.height()
                 left = w / 2 + (cx - self.view.cx) * self.view.scale - w / 2 * f
                 top = h / 2 + (cy - self.view.cy) * self.view.scale - h / 2 * f
                 p.drawImage(QRectF(left, top, w * f, h * f), img)
-                self.redraw.start()
-        elif self.renderer is not None:
-            self.redraw.start()
         if self.message:
             p.setPen(self.palette().color(QPalette.ColorRole.Text))
             p.drawText(self.rect().adjusted(20, 20, -20, -20), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap,
@@ -300,24 +405,6 @@ class Canvas(QWidget):
         p.setPen(QColor(90, 90, 90))
         p.drawText(8, 18, self.title)
         p.end()
-
-    def _checkers(self, p):
-        """The window color around the picture, a checkerboard (transparent) under it."""
-        p.fillRect(self.rect(), self.palette().color(QPalette.ColorRole.Window))
-        if self.picture is None and self.renderer is None:
-            return
-        r = self.view.target(self.size()).intersected(QRectF(self.rect()))
-        if r.isEmpty():
-            return
-        p.save()
-        p.setClipRect(r)
-        p.fillRect(r, QColor(255, 255, 255))
-        s = 10
-        c = QColor(232, 232, 232)
-        for y in range(int(r.top()) // s * s, int(r.bottom()) + s, s):
-            for x in range(int(r.left()) // (2 * s) * (2 * s) + ((y // s) % 2) * s, int(r.right()) + s, 2 * s):
-                p.fillRect(x, y, s, s, c)
-        p.restore()
 
     def wheelEvent(self, e):
         steps = e.angleDelta().y() / 120.0
@@ -343,6 +430,25 @@ class Canvas(QWidget):
         if self.view.fitted:
             self.view.fit(self.size())
         super().resizeEvent(e)
+        self.redraw()
+
+
+class Loader(QThread):
+    """Reads a picture file in the background (a 12-megapixel PNG takes 0.8 s to decode: the
+    window used to freeze that long)."""
+
+    loaded = Signal(int, object, str)  # number, QImage, path
+    failed = Signal(int, str)
+
+    def __init__(self, number, path):
+        super().__init__()
+        self.number, self.path = number, path
+
+    def run(self):
+        try:
+            self.loaded.emit(self.number, image.load(self.path), self.path)
+        except Exception as e:
+            self.failed.emit(self.number, str(e) or e.__class__.__name__)
 
 
 class Job:
@@ -703,6 +809,9 @@ class MainWindow(QMainWindow):
         self.pending = False
         self.pending_auto = False
         self.closing = False
+        self.loader = None  # reading a picture file
+        self.old_loaders = []  # replaced by a newer one, still finishing
+        self.load_number = 0
 
         self.view = View()
         self.left = Canvas(self.view, "Picture")
@@ -727,7 +836,7 @@ class MainWindow(QMainWindow):
         self.statusBar().addWidget(self.status, 1)
         self.statusBar().addPermanentWidget(self.bar)
 
-        self.timer = QTimer(self, singleShot=True, interval=250)
+        self.timer = QTimer(self, singleShot=True, interval=150)
         self.timer.timeout.connect(self.start_trace)
         self.settings.changed.connect(self.settings_changed)
         self.settings.auto.clicked.connect(self.auto_settings)
@@ -809,14 +918,40 @@ class MainWindow(QMainWindow):
             self.open_path(path)
 
     def open_path(self, path):
+        """Open a picture: the quick checks now (a message at once if it can't be read), the
+        reading itself in the background. Returns whether it's being opened."""
         try:
-            img = image.load(path)
+            image.check(path)
         except image.ImageError as e:
             QMessageBox.warning(self, APP_NAME, str(e))
             return False
         self.qs.setValue("paths/open", os.path.dirname(os.path.abspath(path)))
-        self.set_image(img, os.path.abspath(path))
+        self.load_number += 1
+        if self.loader is not None:
+            self.old_loaders.append(self.loader)
+        self.loader = Loader(self.load_number, os.path.abspath(path))
+        self.loader.loaded.connect(self.on_loaded)
+        self.loader.failed.connect(self.on_load_failed)
+        self.loader.finished.connect(self.on_loader_finished)
+        self.status.setText("Opening %s..." % os.path.basename(path))
+        self.loader.start()
         return True
+
+    def loading(self):
+        return self.loader is not None and self.loader.isRunning()
+
+    def on_loaded(self, number, img, path):
+        if number == self.load_number and not self.closing:
+            self.set_image(img, path)
+
+    def on_load_failed(self, number, message):
+        if number == self.load_number and not self.closing:
+            self.status.setText("")
+            QMessageBox.warning(self, APP_NAME, message)
+
+    def on_loader_finished(self):
+        for t in [t for t in self.old_loaders if t.isFinished()]:
+            self.old_loaders.remove(t)
 
     def paste(self):
         md = QGuiApplication.clipboard().mimeData()
@@ -973,6 +1108,7 @@ class MainWindow(QMainWindow):
             self.left.set_picture(self.img)
         self.left.title = "Colors to trace" if on else "Picture"
         self.left.update()
+        self.left.update()
 
     def actual_size(self):
         self.view.scale = 1.0
@@ -1077,6 +1213,10 @@ class MainWindow(QMainWindow):
         if self.worker is not None:
             self.job.cancelled = True
             self.worker.wait()
+        for t in self.old_loaders + ([self.loader] if self.loader is not None else []):
+            t.wait()
+        self.left.stop()
+        self.right.stop()
         super().closeEvent(e)
 
 

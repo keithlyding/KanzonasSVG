@@ -168,9 +168,12 @@ def check_files(rng, fails):
             # the window
             MESSAGES.clear()
             before = len(ERRORS)
+            shown = w.img
             opened = w.open_path(path)
             if opened:
                 settle(w)
+                # read in the background: it opened only if the window now shows it
+                opened = w.img is not shown and not MESSAGES
             if len(ERRORS) > before:
                 fails.append("files: %s: exception in the window" % name)
             if QT_WARNINGS:
@@ -212,9 +215,9 @@ def settle(w, seconds=60):
     end = time.time() + seconds
     while time.time() < end:
         QApplication.processEvents()
-        if w.worker is None and not w.timer.isActive() and not w.pending:
+        if not w.loading() and w.worker is None and not w.timer.isActive() and not w.pending:
             QApplication.processEvents()
-            if w.worker is None and not w.timer.isActive() and not w.pending:
+            if not w.loading() and w.worker is None and not w.timer.isActive() and not w.pending:
                 return True
         time.sleep(0.005)
     return False

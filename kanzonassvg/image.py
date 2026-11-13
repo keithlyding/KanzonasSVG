@@ -19,6 +19,20 @@ def supported_suffixes():
     return sorted({bytes(f).decode().lower() for f in QImageReader.supportedImageFormats()})
 
 
+def check(path):
+    """The quick checks before reading a picture (it exists, Qt can read its kind, its size is
+    within the limit), without decoding it: raises ImageError."""
+    if not os.path.isfile(path):
+        raise ImageError("File not found: %s" % path)
+    reader = QImageReader(path)
+    if not reader.canRead():
+        raise ImageError("Can't read %s: %s" % (os.path.basename(path), reader.errorString()))
+    size = reader.size()
+    if size.isValid() and size.width() * size.height() > MAX_PIXELS:
+        raise ImageError("The picture is too big (%d x %d pixels; the limit is %d megapixels)."
+                         % (size.width(), size.height(), MAX_PIXELS // 1_000_000))
+
+
 def load(path):
     """Read <path> as a QImage in RGBA8888 (not premultiplied)."""
     if not os.path.isfile(path):

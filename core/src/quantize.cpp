@@ -10,6 +10,7 @@
  * Released under GNU GPL v2+, read the file 'COPYING' for more information.
  */
 #include "quantize.h"
+#include "parallel.h"
 
 #include <algorithm>
 #include <cassert>
@@ -952,14 +953,18 @@ void snapBlendedEdges(RgbMap const &rgbmap, IndexedMap &imap)
     // about 16 levels per channel, above JPEG and scanner noise in flat areas.
     constexpr int SURE = 3 * 16 * 16;
     std::vector<unsigned char> sure(imap.pixels.size());
-    for (size_t i = 0; i < sure.size(); i++) {
-        auto c = rgbmap.pixels[i];
-        sure[i] = dist2(c.r, c.g, c.b, pal[imap.pixels[i]]) <= SURE;
-    }
+    kz::parallel_for((long)sure.size(), [&](long b, long e) {
+        for (long i = b; i < e; i++) {
+            auto c = rgbmap.pixels[i];
+            sure[i] = dist2(c.r, c.g, c.b, pal[imap.pixels[i]]) <= SURE;
+        }
+    }, 1 << 16);
 
     auto out = imap.pixels;
     constexpr int R = 2; // look this far around a pixel for the colors it may blend
-    for (int y = 0; y < height; y++) {
+    // (rows independent: each reads imap and sure, and writes only its own row of out)
+    kz::parallel_for(height, [&](long y0, long y1) {
+    for (int y = (int)y0; y < (int)y1; y++) {
         for (int x = 0; x < width; x++) {
             size_t i = (size_t)y * width + x;
             if (sure[i]) {
@@ -1032,6 +1037,7 @@ void snapBlendedEdges(RgbMap const &rgbmap, IndexedMap &imap)
             }
         }
     }
+    });
 
     imap.pixels = std::move(out);
 }

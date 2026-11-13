@@ -11,6 +11,7 @@
  * Released under GNU GPL v2+, read the file 'COPYING' for more information.
  */
 #include "filterset.h"
+#include "parallel.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -92,7 +93,8 @@ RgbMap rgbMapGaussian(RgbMap const &me)
     // as soft rings of other colors around every shape and letter.
     constexpr int edge = 120;
     static_assert(sizeof(RGB) == 3);
-    for (int y = 2; y < height - 2; y++) {
+    kz::parallel_for(height - 4, [&](long y0, long y1) {
+    for (int y = 2 + (int)y0; y < 2 + (int)y1; y++) {
         unsigned char const *rows[5];
         for (int i = 0; i < 5; i++) {
             rows[i] = reinterpret_cast<unsigned char const *>(me.row(y - 2 + i));
@@ -120,6 +122,7 @@ RgbMap rgbMapGaussian(RgbMap const &me)
             dst[3 * x + 2] = (sb + sw / 2) / sw;
         }
     }
+    });
 
     return newGm;
 }

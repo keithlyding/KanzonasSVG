@@ -41,6 +41,23 @@ zip and an installer (job `windows`, `installer/KanzonasSVG.iss`) and a Linux Ap
   SVG shown is the trace of the picture and settings shown).
 - Never weaken a battery's check to get green: fix the cause.
 
+## Speed (the owner's priority: fast, efficient, never clunky)
+- The window never waits: tracing, reading picture files and drawing (both sides) happen in
+  background threads, and the window only shows finished drawings (moved and scaled to the
+  current view until the new one is ready). Nothing that can take more than a few
+  milliseconds runs on the window's thread.
+- SVGs are drawn by the engine (`core/src/drawing.cpp`, `engine.Drawing`), not by Qt's SVG
+  renderer: Qt holds Python's lock while it draws, so the window froze whatever thread drew.
+  Calls through ctypes let go of the lock: heavy work belongs in the engine.
+- The engine uses all cores (`core/src/parallel.h`): independent rows and layers in parallel,
+  progress and cancelling only on the calling thread, results in a fixed order (the same SVG
+  on any number of threads: `KZ_THREADS=1` runs on one; check with ThreadSanitizer,
+  `SAN="-fsanitize=thread ..." tests/engine_battery.sh`).
+- The reduced colors are cached by picture and settings: a setting that doesn't change them
+  must not reduce them again.
+- Budgets in `tests/test_speed.py` (several times today's numbers): never weaken one to get
+  green. Profile with `KZ_PROFILE=1` (the engine's steps).
+
 ## Conventions
 - Tracing quality is the point: a change to the engine is measured on real pictures
   (public-domain ones, never a company's logo in the repo) before and after, with the

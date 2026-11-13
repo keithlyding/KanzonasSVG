@@ -42,7 +42,8 @@ class TestWindow(unittest.TestCase):
         self.tmp.cleanup()
 
     def traced(self):
-        return wait(lambda: self.w.worker is None and not self.w.timer.isActive() and self.w.result is not None)
+        return wait(lambda: not self.w.loading() and self.w.worker is None and not self.w.timer.isActive()
+                    and self.w.result is not None)
 
     def test_open_trace_save(self):
         self.assertFalse(self.w.a_save.isEnabled())

@@ -86,6 +86,18 @@ def run(argv):
         assert (o.mode, o.scans) == (engine.COLORS, 3), (o.mode, o.scans)
         return "%d colors in the test picture" % o.scans
 
+    def drawing():
+        # the engine's own SVG drawing (the window's): matches Qt's, and fast
+        res = tracing.trace_image(img, engine.Options(), 1)
+        out = QImage(240, 160, QImage.Format.Format_ARGB32_Premultiplied)
+        out.fill(Qt.GlobalColor.white)
+        engine.Drawing(res.svg).render_image(out, 0, 0, 240, 160)
+        qt = render(res.svg)
+        for x, y in ((50, 80), (165, 30), (165, 80), (5, 5)):
+            a, b = out.pixelColor(x, y), qt.pixelColor(x, y)
+            assert max(abs(a.red() - b.red()), abs(a.green() - b.green()), abs(a.blue() - b.blue())) < 8, (x, y)
+        return "matches Qt's"
+
     def every_mode():
         done = []
         for mode, name in engine.MODE_NAMES.items():
@@ -139,7 +151,7 @@ def run(argv):
         return "ok"
 
     for name, fn in [("engine loads", engine_loads), ("exact colors and holes", colors_exact),
-                     ("logo and icon", logo_and_icon), ("auto settings", auto_settings), ("every mode", every_mode), ("reads pictures", reads_pictures),
+                     ("logo and icon", logo_and_icon), ("auto settings", auto_settings), ("drawing SVGs", drawing), ("every mode", every_mode), ("reads pictures", reads_pictures),
                      ("big picture speed", big_picture), ("window opens and traces", window_opens),
                      ("command line", command_line)]:
         check(name, fn)

@@ -11,6 +11,10 @@
 #include "kzsvg.h"
 
 #include <algorithm>
+#include <thread>
+#include <mutex>
+#include <atomic>
+#include <chrono>
 #include <array>
 #include <cstdio>
 #include <cmath>
@@ -26,6 +30,7 @@
 #include <vector>
 
 #include "filterset.h"
+#include "parallel.h"
 #include "imagemap.h"
 #include "quantize.h"
 
@@ -58,12 +63,12 @@ struct TooBig : std::exception
     }
 };
 
-thread_local size_t svg_bytes = 0; // path data written by the trace running on this thread
+// Path data written by the trace this thread works for (layers run on several threads).
+thread_local std::atomic<size_t> *svg_budget = nullptr;
 
 inline void count_bytes(size_t n)
 {
-    svg_bytes += n;
-    if (svg_bytes > MAX_SVG_BYTES) {
+    if (svg_budget && (*svg_budget += n) > MAX_SVG_BYTES) {
         throw TooBig();
     }
 }
@@ -80,6 +85,10 @@ public:
     // Report <f> (0..1) of the part [from, from + span) of the job.
     void report(double f)
     {
+        if (cancel && *cancel) {
+            stopped = true;
+            throw Cancelled();
+        }
         double v = from + span * std::clamp(f, 0.0, 1.0);
         if (!func || v < last + 0.01) {
             if (stopped) {
@@ -115,6 +124,7 @@ public:
     };
 
     bool stopped = false;
+    std::atomic<bool> const *cancel = nullptr; // a layer's: stop when the whole trace stops
 
 private:
     kz_progress_func func;
@@ -454,16 +464,35 @@ GrayMap single_scan(RgbMap const &rgb, kz_options const &o, double floor, double
     return map;
 }
 
+// KZ_PROFILE=1 prints how long each step takes (to stderr).
+struct Timer
+{
+    const char *what;
+    std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+    explicit Timer(const char *w)
+        : what(w)
+    {}
+    ~Timer()
+    {
+        static const bool on = std::getenv("KZ_PROFILE") != nullptr;
+        if (on) {
+            std::fprintf(stderr, "kz: %-22s %7.3f s\n", what,
+                         std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count());
+        }
+    }
+};
+
 // The palette after quantizing: edge shades dropped and snapped (judged on the image as
 // quantized: smoothing keeps edges sharp, and judging on the unsmoothed one brought back the
 // noise it removed), the exact colors from the insides of the shapes, and colors that came
 // out nearly the same merged (then the edges again, between the colors that are left).
 IndexedMap palette(RgbMap const &map, RgbMap const &smoothed, int ncolors)
 {
-    auto imap = rgbMapQuantize(smoothed, ncolors);
-    dropBlendColors(smoothed, imap);
-    snapBlendedEdges(smoothed, imap);
-    refinePalette(map, imap);
+    IndexedMap imap(1, 1);
+    { Timer t("quantize"); imap = rgbMapQuantize(smoothed, ncolors); }
+    { Timer t("drop blend colors"); dropBlendColors(smoothed, imap); }
+    { Timer t("snap blended edges"); snapBlendedEdges(smoothed, imap); }
+    { Timer t("refine palette"); refinePalette(map, imap); }
     if (mergeDuplicateColors(imap)) {
         dropBlendColors(smoothed, imap);
         snapBlendedEdges(smoothed, imap);
@@ -474,10 +503,81 @@ IndexedMap palette(RgbMap const &map, RgbMap const &smoothed, int ncolors)
 
 // The colors for multiple scans: edge-preserving smoothing, quantizing, edge shades
 // dropped and snapped, then the exact colors from the insides of the shapes.
+// A fingerprint of a picture's pixels (FNV-1a over 64-bit words, on several cores): telling
+// whether the picture is the one the cached colors were made from.
+uint64_t fingerprint(RgbMap const &map)
+{
+    auto const *bytes = reinterpret_cast<unsigned char const *>(map.pixels.data());
+    size_t const n = map.pixels.size() * sizeof(RGB);
+    int const parts = 16;
+    uint64_t h[parts];
+    kz::parallel_for(parts, [&](long b, long e) {
+        for (long part = b; part < e; part++) {
+            size_t from = n * part / parts, to = n * (part + 1) / parts;
+            uint64_t x = 1469598103934665603ull ^ (uint64_t)part;
+            size_t i = from;
+            for (; i + 8 <= to; i += 8) {
+                uint64_t w;
+                std::memcpy(&w, bytes + i, 8);
+                x = (x ^ w) * 1099511628211ull;
+            }
+            for (; i < to; i++) {
+                x = (x ^ bytes[i]) * 1099511628211ull;
+            }
+            h[part] = x;
+        }
+    }, 1);
+    uint64_t x = 1469598103934665603ull ^ ((uint64_t)map.width << 32 | (uint64_t)map.height);
+    for (auto v : h) {
+        x = (x ^ v) * 1099511628211ull;
+    }
+    return x;
+}
+
+// The last picture's reduced colors, kept: changing only a setting that doesn't change them
+// (speckles, smooth corners, optimize, tolerance, stack, background) traces again without
+// reducing the colors again (0.7 of the 1 s a 12-megapixel photo took).
+struct ColorCache
+{
+    std::mutex m;
+    bool valid = false;
+    uint64_t key = 0;
+    int width = 0, height = 0, scans = 0, smooth = 0;
+    IndexedMap imap{1, 1};
+} color_cache;
+
 IndexedMap quantized(RgbMap const &map, kz_options const &o)
 {
-    auto smoothed = o.smooth ? rgbMapGaussian(map) : map;
+    uint64_t const key = fingerprint(map);
+    {
+        std::lock_guard<std::mutex> lock(color_cache.m);
+        auto &c = color_cache;
+        if (c.valid && c.key == key && c.width == map.width && c.height == map.height && c.scans == o.scans &&
+            c.smooth == (o.smooth != 0)) {
+            IndexedMap imap = c.imap;
+            if (o.mode == KZ_GRAYS) {
+                for (auto &col : imap.clut) {
+                    unsigned char v = ((int)col.r + col.g + col.b) / 3;
+                    col = {v, v, v};
+                }
+            }
+            return imap;
+        }
+    }
+    RgbMap smoothed(1, 1);
+    { Timer t("smooth"); smoothed = o.smooth ? rgbMapGaussian(map) : map; }
     auto imap = palette(map, smoothed, o.scans);
+    {
+        std::lock_guard<std::mutex> lock(color_cache.m);
+        auto &c = color_cache;
+        c.valid = true;
+        c.key = key;
+        c.width = map.width;
+        c.height = map.height;
+        c.scans = o.scans;
+        c.smooth = o.smooth != 0;
+        c.imap = imap;
+    }
     if (o.mode == KZ_GRAYS) {
         for (auto &c : imap.clut) {
             unsigned char s = ((int)c.r + c.g + c.b) / 3;
@@ -560,6 +660,78 @@ std::vector<unsigned char> background_mask(IndexedMap const &imap, int b, int ho
     return out;
 }
 
+/**
+ * Trace <n> independent layers on several cores: layer(k, quiet) gives layer k's paths, quiet
+ * being a Progress that reports nothing and stops when the trace is cancelled. This thread
+ * traces layers too, and between them reports progress (the caller's callback is only ever
+ * called from the thread that called kz_trace) and notices cancelling. The results are in
+ * layer order whatever order they finish in: the same SVG as on one core.
+ */
+template <class Layer>
+std::vector<Paths> run_layers(int n, Progress &progress, Layer layer)
+{
+    std::vector<Paths> out(n);
+    std::atomic<int> next{0}, done{0};
+    std::atomic<bool> stop{false};
+    std::exception_ptr error;
+    std::mutex m;
+    auto *budget = svg_budget;
+    auto work_one = [&](Progress &quiet) {
+        int k = next++;
+        if (k >= n) {
+            return false;
+        }
+        try {
+            out[k] = layer(k, quiet);
+        } catch (...) {
+            std::lock_guard<std::mutex> lock(m);
+            if (!error) {
+                error = std::current_exception();
+            }
+            stop = true;
+        }
+        done++;
+        return true;
+    };
+    std::vector<std::thread> pool;
+    struct Joiner
+    {
+        std::vector<std::thread> &pool;
+        std::atomic<bool> &stop;
+        ~Joiner()
+        {
+            stop = true;
+            for (auto &t : pool) {
+                t.join();
+            }
+        }
+    } joiner{pool, stop};
+    int const extra = std::min(kz::threads(), n) - 1;
+    for (int i = 0; i < extra; i++) {
+        pool.emplace_back([&, budget] {
+            svg_budget = budget;
+            Progress quiet(nullptr, nullptr);
+            quiet.cancel = &stop;
+            while (!stop && work_one(quiet)) {
+            }
+        });
+    }
+    Progress quiet(nullptr, nullptr);
+    quiet.cancel = &stop;
+    while (!stop && work_one(quiet)) {
+        progress.report((double)done / n); // throws Cancelled: the joiner stops the others
+    }
+    for (auto &t : pool) {
+        t.join();
+    }
+    pool.clear();
+    if (error) {
+        std::rethrow_exception(error);
+    }
+    progress.report(1.0);
+    return out;
+}
+
 Shapes trace_colors(RgbMap const &map, kz_options const &o, Progress &progress)
 {
     IndexedMap imap(1, 1);
@@ -586,11 +758,9 @@ Shapes trace_colors(RgbMap const &map, kz_options const &o, Progress &progress)
         }
     }
 
-    Shapes top_down;
-    for (int k = 0; k < imap.nrColors; k++) {
-        Progress::Part part(progress, (double)k / imap.nrColors, 1.0 / imap.nrColors);
+    auto layers = run_layers(imap.nrColors, progress, [&](int k, Progress &quiet) -> Paths {
         if (!present[k]) {
-            continue;
+            return {};
         }
         // The pixels of this color, and when stacking, those of every color before it.
         auto bitmap = new_bitmap(imap.width, imap.height);
@@ -605,9 +775,12 @@ Shapes trace_colors(RgbMap const &map, kz_options const &o, Progress &progress)
                 }
             }
         }
-        auto path = trace_bitmap(std::move(bitmap), o, progress);
-        if (!path.empty()) {
-            top_down.push_back({"fill:" + hex_color(imap.clut[k]), std::move(path)});
+        return trace_bitmap(std::move(bitmap), o, quiet);
+    });
+    Shapes top_down;
+    for (int k = 0; k < imap.nrColors; k++) {
+        if (!layers[k].empty()) {
+            top_down.push_back({"fill:" + hex_color(imap.clut[k]), std::move(layers[k])});
         }
     }
     return {std::make_move_iterator(top_down.rbegin()), std::make_move_iterator(top_down.rend())};
@@ -617,19 +790,18 @@ Shapes trace_brightness_steps(RgbMap const &map, kz_options const &o, Progress &
 {
     double constexpr low = 0.2, high = 0.9;
     double const delta = (high - low) / o.scans;
-    double floor = 0.0;
 
+    // step i: from <floor> (0, or when tiling, the step before's cutoff) to its cutoff
+    auto cutoff = [&](int i) { return low + delta * i; };
+    auto layers = run_layers(o.scans, progress, [&](int i, Progress &quiet) {
+        double floor = o.stack || i == 0 ? 0.0 : cutoff(i - 1);
+        return trace_graymap(single_scan(map, o, floor, cutoff(i)), o, quiet);
+    });
     Shapes top_down;
     for (int i = 0; i < o.scans; i++) {
-        Progress::Part part(progress, (double)i / o.scans, 1.0 / o.scans);
-        double cutoff = low + delta * i;
-        auto path = trace_graymap(single_scan(map, o, floor, cutoff), o, progress);
-        if (!path.empty()) {
-            unsigned char v = (unsigned char)std::min(255.0, 256.0 * cutoff);
-            top_down.push_back({"fill:" + hex_color({v, v, v}), std::move(path)});
-        }
-        if (!o.stack) {
-            floor = cutoff;
+        if (!layers[i].empty()) {
+            unsigned char v = (unsigned char)std::min(255.0, 256.0 * cutoff(i));
+            top_down.push_back({"fill:" + hex_color({v, v, v}), std::move(layers[i])});
         }
     }
     if (top_down.size() > 1 && o.remove_background) {
@@ -1183,7 +1355,9 @@ int kz_trace(unsigned char const *rgba, int width, int height, int stride, kz_op
         auto o = checked(options);
         Progress progress(progress_func, progress_data);
         auto map = to_rgbmap(rgba, width, height, stride);
-        svg_bytes = 0;
+        std::atomic<size_t> bytes{0};
+        svg_budget = &bytes;
+        struct Reset { ~Reset() { svg_budget = nullptr; } } reset;
         Shapes shapes;
         switch (o.mode) {
             case KZ_GRAYS:

@@ -20,7 +20,7 @@ if [ ! -x "$OUT/fuzz_engine" ]; then
         -I"$AT/src/autotrace" -c "$f" -o "$OUT/at_$(basename "$f").o"
   done
   clang++ $SAN -std=c++17 -I"$C/src" -I"$C/third_party/potrace" -I"$AT/shim" -I"$AT/include" \
-      "$ROOT/tests/fuzz_engine.cpp" "$C"/src/engine.cpp "$C"/src/filterset.cpp "$C"/src/imagemap.cpp \
+      "$ROOT/tests/fuzz_engine.cpp" "$C"/src/engine.cpp "$C"/src/drawing.cpp "$C"/src/filterset.cpp "$C"/src/imagemap.cpp \
       "$C"/src/quantize.cpp "$OUT"/*.o -o "$OUT/fuzz_engine"
 fi
 cd "$OUT"

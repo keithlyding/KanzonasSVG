@@ -7,7 +7,7 @@ OUT=${OUT:-$ROOT/build/battery}
 mkdir -p "$OUT"
 CXX=${CXX:-clang++}
 CC=${CC:-clang}
-SAN="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer -g -O1"
+SAN=${SAN:-"-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer -g -O1"}
 C="$ROOT/core"
 AT="$C/third_party/autotrace"
 for f in "$C"/third_party/potrace/curve.c "$C"/third_party/potrace/trace.c "$C"/third_party/potrace/decompose.c \
@@ -19,7 +19,7 @@ for f in "$AT"/src/autotrace/*.c; do
       -I"$AT/include/autotrace" -I"$AT/src/autotrace" -c "$f" -o "$OUT/at_$(basename "$f").o"
 done
 $CXX $SAN -std=c++17 -I"$C/src" -I"$C/third_party/potrace" -I"$AT/shim" -I"$AT/include" \
-    "$ROOT/tests/engine_battery.cpp" "$C"/src/engine.cpp "$C"/src/filterset.cpp "$C"/src/imagemap.cpp \
+    "$ROOT/tests/engine_battery.cpp" "$C"/src/engine.cpp "$C"/src/drawing.cpp "$C"/src/filterset.cpp "$C"/src/imagemap.cpp \
     "$C"/src/quantize.cpp "$OUT"/*.o -o "$OUT/engine_battery"
 ASAN_OPTIONS=${ASAN_OPTIONS:-detect_leaks=1:abort_on_error=1} \
 UBSAN_OPTIONS=${UBSAN_OPTIONS:-print_stacktrace=1:halt_on_error=1} \

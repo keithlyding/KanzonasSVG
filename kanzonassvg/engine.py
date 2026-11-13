@@ -179,6 +179,13 @@ def library():
         ctypes.POINTER(_AutoInfo),
     ]
     lib.kz_auto.restype = ctypes.c_int
+    lib.kz_drawing_open.argtypes = [ctypes.c_char_p]
+    lib.kz_drawing_open.restype = ctypes.c_void_p
+    lib.kz_drawing_render.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                      ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
+    lib.kz_drawing_render.restype = ctypes.c_int
+    lib.kz_drawing_close.argtypes = [ctypes.c_void_p]
+    lib.kz_drawing_close.restype = None
     lib.kz_free.argtypes = [ctypes.c_void_p]
     lib.kz_free.restype = None
     lib.kz_version.argtypes = []
@@ -268,3 +275,37 @@ def auto(rgba, width, height, stride=None):
         v = getattr(opts, f.name)
         setattr(o, f.name, bool(v) if isinstance(getattr(o, f.name), bool) else v)
     return o, AutoInfo(info.colors, bool(info.transparent), bool(info.noisy), bool(info.photo), info.wrong)
+
+
+class Drawing:
+    """An SVG this engine wrote, parsed once, to draw for the window (see kz_drawing_render)."""
+
+    def __init__(self, svg):
+        self._lib = library()
+        self._handle = self._lib.kz_drawing_open(svg.encode("utf-8"))
+        if not self._handle:
+            raise TraceError("Couldn't read the SVG to show it.")
+
+    def render(self, buffer_address, width, height, stride, left, top, target_width, target_height):
+        """Draw into a premultiplied ARGB32 buffer (a QImage's bits). Python's lock is let go."""
+        if self._lib.kz_drawing_render(self._handle, buffer_address, width, height, stride, left, top,
+                                       target_width, target_height) != OK:
+            raise TraceError("Couldn't draw the SVG.")
+
+    def render_image(self, img, left, top, target_width, target_height):
+        """Draw into a QImage (Format_ARGB32_Premultiplied)."""
+        bits = img.bits()  # writable memoryview of the image's pixels
+        buf = (ctypes.c_char * len(bits)).from_buffer(bits)
+        self.render(ctypes.addressof(buf), img.width(), img.height(), img.bytesPerLine(), left, top,
+                    target_width, target_height)
+
+    def close(self):
+        if self._handle:
+            self._lib.kz_drawing_close(self._handle)
+            self._handle = None
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
