@@ -2,6 +2,13 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.0.3
+
+Faster:
+- Big pictures show a quick preview of the SVG within moments, then the full one: a
+  12-megapixel photo shows its first SVG in about a second instead of three.
+- Changing the number of colors is about twice as fast, and Auto settings too.
+
 ## 1.0.2
 
 Faster:

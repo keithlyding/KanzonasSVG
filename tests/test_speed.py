@@ -57,6 +57,12 @@ class TestSpeed(unittest.TestCase):
         engine.trace(*px, options=o)
         again = time.perf_counter() - t
         self.assertLess(first, 6.0 * SLACK, "6-megapixel trace: %.2f s" % first)
+        # another number of colors starts from the kept smoothed picture and histogram
+        o.scans = 9
+        t = time.perf_counter()
+        engine.trace(*px, options=o)
+        colors = time.perf_counter() - t
+        self.assertLess(colors, first * 0.85, "another number of colors: %.2f s (first %.2f s)" % (colors, first))
         # a setting that doesn't change the colors reuses them
         self.assertLess(again, first * 0.75, "trace again with other speckles: %.2f s (first %.2f s)" % (again, first))
 
@@ -71,6 +77,34 @@ class TestSpeed(unittest.TestCase):
             d.render_image(img, 0, 0, 1600, 1066)
             best = min(best, time.perf_counter() - t)
         self.assertLess(best, 0.15 * SLACK, "drawing the SVG: %.3f s" % best)
+
+    def test_quick_preview_of_a_big_picture(self):
+        w = app.MainWindow()
+        w.show()
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_quick.png")
+        self.big.save(path)
+        try:
+            t = time.perf_counter()
+            w.open_path(path)
+            quick = full = None
+            end = time.time() + 120
+            while time.time() < end and full is None:
+                QApplication.processEvents()
+                if quick is None and w.right.svg and w.result is None:
+                    quick = time.perf_counter() - t
+                    self.assertFalse(w.a_save.isEnabled(), "Save on before the whole picture's SVG")
+                    self.assertIn("Quick preview", w.status.text())
+                if w.result is not None and w.worker is None:
+                    full = time.perf_counter() - t
+                time.sleep(0.002)
+            self.assertIsNotNone(quick, "no quick preview")
+            self.assertIsNotNone(full)
+            self.assertLess(quick, full, "the preview came no sooner than the SVG")
+            self.assertTrue(w.a_save.isEnabled())
+            self.assertNotIn("Quick preview", w.status.text())
+        finally:
+            w.close()
+            os.remove(path)
 
     def test_window_never_freezes(self):
         w = app.MainWindow()

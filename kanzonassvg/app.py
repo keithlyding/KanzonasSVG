@@ -98,6 +98,9 @@ nothing from it); the status bar says how much it was.</li>
 </ul>
 <p>The settings are kept for next time. <i>Trace &gt; Reset settings</i> (or the
 <b>Reset settings</b> button) puts them all back to how they started.</p>
+<p>A big picture (over 3 megapixels) first shows a quick preview, traced from a smaller copy,
+while the whole picture is traced; the status bar says so, and <i>Save SVG</i> and <i>Copy SVG</i>
+wait for the whole picture's SVG.</p>
 <h3>Looking at it</h3>
 <p>The left side shows the picture; <i>View &gt; Show colors to trace</i> (Ctrl+T) shows it
 with its colors reduced, as it will be traced. Both sides zoom and move together: turn the
@@ -455,6 +458,7 @@ class Job:
     def __init__(self, number, img, options, enlarge, want_preview, auto=False):
         self.number = number
         self.auto = auto  # pick the settings first (Auto settings)
+        self.quick = False  # show a quick preview first (a big picture, settings that take a while)
         self.auto_info = None
         self.img = img
         self.options = options
@@ -468,6 +472,7 @@ class Worker(QThread):
 
     progress = Signal(int, float)
     auto_done = Signal(int, object, object)  # job number, Options picked, engine.AutoInfo
+    quick_done = Signal(int, str)  # job number, the SVG of a small copy (a big picture's quick preview)
     done = Signal(int, object, object)  # job number, Result, preview QImage or None
     failed = Signal(int, str)
 
@@ -489,6 +494,10 @@ class Worker(QThread):
             if job.auto:
                 job.options, job.auto_info = auto_options(job.img, job.options)
                 self.auto_done.emit(job.number, job.options, job.auto_info)
+            if job.quick and not job.cancelled:
+                svg = tracing.quick_trace(job.img, job.options)
+                if svg is not None and not job.cancelled:
+                    self.quick_done.emit(job.number, svg)
             preview = tracing.preview_image(job.img, job.options) if job.want_preview else None
             if job.cancelled:
                 raise engine.Cancelled()
@@ -808,6 +817,7 @@ class MainWindow(QMainWindow):
         self.worker = None
         self.pending = False
         self.pending_auto = False
+        self.colors_key = None  # the picture and color settings of the last trace
         self.closing = False
         self.loader = None  # reading a picture file
         self.old_loaders = []  # replaced by a newer one, still finishing
@@ -1037,9 +1047,16 @@ class MainWindow(QMainWindow):
         self.job_number += 1
         self.job = Job(self.job_number, self.img, self.settings.options(), self.settings.enlarge_setting(),
                        self.a_colors.isChecked(), auto)
+        # a quick preview first when the colors have to be reduced again (a new picture, or another
+        # number of colors, smoothing or mode): other settings reuse them and are quick anyway
+        o = self.job.options
+        colors_key = (id(self.img), o.mode, o.scans, o.smooth)
+        self.job.quick = auto or colors_key != self.colors_key
+        self.colors_key = colors_key
         self.worker = Worker(self.job)
         self.worker.progress.connect(self.on_progress)
         self.worker.auto_done.connect(self.on_auto_done)
+        self.worker.quick_done.connect(self.on_quick_done)
         self.worker.done.connect(self.on_done)
         self.worker.failed.connect(self.on_failed)
         self.worker.finished.connect(self.on_finished)
@@ -1047,6 +1064,16 @@ class MainWindow(QMainWindow):
         self.bar.show()
         self.status.setText("Picking settings..." if auto else "Tracing...")
         self.worker.start()
+
+    def on_quick_done(self, number, svg):
+        if number != self.job_number or self.job.cancelled:
+            return
+        # shown, not kept: Save and Copy wait for the whole picture's SVG
+        self.result = None
+        self.right.set_message("")
+        self.right.set_svg(svg)
+        self.status.setText("Quick preview shown; tracing the whole picture...")
+        self._update_actions()
 
     def on_auto_done(self, number, options, info):
         if number != self.job_number or self.job.cancelled:

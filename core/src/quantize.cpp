@@ -442,25 +442,11 @@ void octreeBuildLeaves(Pool<Ocnode> &pool, std::vector<Ocnode *> const &leaves, 
  * colors, so pruning would merge colors this close anyway, and as the sums
  * are exact, each palette color is still the exact mean of its pixels.
  */
-Ocnode *octreeBuild(Pool<Ocnode> &pool, RgbMap const &rgbmap, int ncolor)
+Ocnode *octreeBuild(Pool<Ocnode> &pool, ColorHistogram const &hist, int ncolor)
 {
-    constexpr int HIST_BITS = 6;
+    constexpr int HIST_BITS = ColorHistogram::BITS;
     constexpr int SHIFT = 8 - HIST_BITS;
-
-    struct Bin
-    {
-        uint64_t weight = 0;
-        uint64_t rs = 0, gs = 0, bs = 0;
-    };
-    std::vector<Bin> bins(1u << (3 * HIST_BITS));
-
-    for (auto const &px : rgbmap.pixels) {
-        auto &bin = bins[((px.r >> SHIFT) << (2 * HIST_BITS)) | ((px.g >> SHIFT) << HIST_BITS) | (px.b >> SHIFT)];
-        bin.weight++;
-        bin.rs += px.r;
-        bin.gs += px.g;
-        bin.bs += px.b;
-    }
+    auto const &bins = hist.bins;
 
     std::vector<Ocnode *> leaves;
     for (unsigned key = 0; key < bins.size(); key++) {
@@ -584,14 +570,52 @@ int findRGB(RGB const *rgbs, int ncolor, RGB rgb)
 /**
  * quantize an RGB image to a reduced number of colors.
  */
-IndexedMap rgbMapQuantize(RgbMap const &rgbmap, int ncolor)
+ColorHistogram colorHistogram(RgbMap const &rgbmap)
+{
+    constexpr int B = ColorHistogram::BITS, SHIFT = 8 - B;
+    ColorHistogram h;
+    h.bins.resize(size_t(1) << (3 * B));
+    // in parts on several cores, each its own sums, added up after (the same sums in any order)
+    int const parts = std::max(1, std::min(kz::threads(), (int)(rgbmap.pixels.size() >> 18)));
+    std::vector<std::vector<ColorHistogram::Bin>> partial(parts - 1);
+    kz::parallel_for(parts, [&](long b, long e) {
+        for (long part = b; part < e; part++) {
+            auto &bins = part == 0 ? h.bins : (partial[part - 1].resize(h.bins.size()), partial[part - 1]);
+            size_t from = rgbmap.pixels.size() * part / parts, to = rgbmap.pixels.size() * (part + 1) / parts;
+            for (size_t i = from; i < to; i++) {
+                auto const &px = rgbmap.pixels[i];
+                auto &bin = bins[((px.r >> SHIFT) << (2 * B)) | ((px.g >> SHIFT) << B) | (px.b >> SHIFT)];
+                bin.weight++;
+                bin.rs += px.r;
+                bin.gs += px.g;
+                bin.bs += px.b;
+            }
+        }
+    }, 1);
+    for (auto const &bins : partial) {
+        for (size_t k = 0; k < bins.size(); k++) {
+            h.bins[k].weight += bins[k].weight;
+            h.bins[k].rs += bins[k].rs;
+            h.bins[k].gs += bins[k].gs;
+            h.bins[k].bs += bins[k].bs;
+        }
+    }
+    return h;
+}
+
+IndexedMap rgbMapQuantize(RgbMap const &rgbmap, int ncolor, ColorHistogram const *histogram)
 {
     assert(ncolor > 0);
 
     auto imap = IndexedMap(rgbmap.width, rgbmap.height);
 
     Pool<Ocnode> pool;
-    auto tree = octreeBuild(pool, rgbmap, ncolor);
+    ColorHistogram own;
+    if (!histogram) {
+        own = colorHistogram(rgbmap);
+        histogram = &own;
+    }
+    auto tree = octreeBuild(pool, *histogram, ncolor);
 
     auto rgbs = std::make_unique<RGB[]>(ncolor);
     auto counts = std::make_unique<uint64_t[]>(ncolor);
@@ -631,23 +655,26 @@ IndexedMap rgbMapQuantize(RgbMap const &rgbmap, int ncolor)
     }
 
     // fill in new map pixels
-    if (nused < 255 && rgbmap.pixels.size() > (1u << 20)) {
-        // On big images, remember the nearest palette color of each color met
-        // (255 = not computed yet) instead of searching the palette per pixel.
-        std::vector<unsigned char> nearest(1u << 24, 255);
-        auto out = imap.pixels.begin();
-        for (auto const &rgb : rgbmap.pixels) {
-            auto &n = nearest[(rgb.r << 16) | (rgb.g << 8) | rgb.b];
-            if (n == 255) {
-                n = findRGB(rgbs.get(), nused, rgb);
+    // on several cores; on big images each part remembers the nearest palette color of each
+    // color it meets (255 = not computed yet) instead of searching the palette per pixel
+    bool const remember = nused < 255 && rgbmap.pixels.size() > (1u << 20);
+    kz::parallel_for((long)rgbmap.pixels.size(), [&](long b, long e) {
+        if (remember) {
+            std::vector<unsigned char> nearest(1u << 24, 255);
+            for (long i = b; i < e; i++) {
+                auto const &rgb = rgbmap.pixels[i];
+                auto &n = nearest[(rgb.r << 16) | (rgb.g << 8) | rgb.b];
+                if (n == 255) {
+                    n = findRGB(rgbs.get(), nused, rgb);
+                }
+                imap.pixels[i] = n;
             }
-            *out++ = n;
+        } else {
+            for (long i = b; i < e; i++) {
+                imap.pixels[i] = findRGB(rgbs.get(), nused, rgbmap.pixels[i]);
+            }
         }
-    } else {
-        for (size_t i = 0; i < rgbmap.pixels.size(); i++) {
-            imap.pixels[i] = findRGB(rgbs.get(), nused, rgbmap.pixels[i]);
-        }
-    }
+    }, 1 << 18);
 
     return imap;
 }
