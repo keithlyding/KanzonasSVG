@@ -47,6 +47,16 @@ def plan(w=900, h=560, dark_strip=False):
     return image.to_rgba(img)
 
 
+def keep_for_looking(img, svg, name):
+    """A failed test's picture and SVG, in build/test-failures/ (the build uploads them)."""
+    import os
+    folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "build", "test-failures")
+    os.makedirs(folder, exist_ok=True)
+    img.save(os.path.join(folder, name + ".png"))
+    with open(os.path.join(folder, name + ".svg"), "w", encoding="utf-8") as f:
+        f.write(svg)
+
+
 def drawn(img, svg):
     out = QImage(img.width(), img.height(), QImage.Format.Format_ARGB32_Premultiplied)
     out.fill(Qt.GlobalColor.white)
@@ -75,7 +85,10 @@ class TestLineArt(unittest.TestCase):
         self.assertTrue(any(abs(int(f[0:2], 16) - int(f[2:4], 16)) < 12 and 0x70 < int(f[0:2], 16) < 0xe0
                             for f in fills), "no gray for the lines: %s" % fills)
         kept = line_kept(drawn(img, res.svg), ON_LINES)
-        self.assertGreaterEqual(kept, len(ON_LINES) * 0.9, "the gray lines are gone (%d of %d)" % (kept, len(ON_LINES)))
+        if kept < len(ON_LINES) * 0.9:
+            keep_for_looking(img, res.svg, "plan")
+        self.assertGreaterEqual(kept, len(ON_LINES) * 0.9, "the gray lines are gone (%d of %d); Auto: %d colors, "
+                                "%s, fills %s" % (kept, len(ON_LINES), o.scans, info, fills))
 
     def test_gray_lines_are_not_edge_shades(self):
         # with a dark strip elsewhere, gray lies between white and it, but the lines touch only
@@ -83,6 +96,8 @@ class TestLineArt(unittest.TestCase):
         img = plan(dark_strip=True)
         res = tracing.trace_image(img, engine.Options(scans=6, smooth=False), 4)
         kept = line_kept(drawn(img, res.svg), ON_LINES)
+        if kept < len(ON_LINES) * 0.9:
+            keep_for_looking(img, res.svg, "plan-dark-strip")
         self.assertGreaterEqual(kept, len(ON_LINES) * 0.9, "gray lines dropped (%d of %d)" % (kept, len(ON_LINES)))
 
     def test_logos_and_photos_are_not_line_art(self):
