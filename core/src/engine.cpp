@@ -26,6 +26,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -1290,20 +1291,23 @@ AutoResult choose_settings(unsigned char const *rgba, int width, int height, int
 
     // How many colors: the wrong part of the flat areas at 2, 3, ... colors.
     auto smoothed = res.o.smooth ? rgbMapGaussian(map) : map;
+    // (up to 16 for any picture; a flat one with more colors, up to 64: see below)
     constexpr int MAX_COLORS = 16;
-    constexpr int WRONG = 32; // levels: visibly another color
-    std::vector<double> wrong(MAX_COLORS + 1, 1.0);
+    constexpr int MAX_FLAT_COLORS = 64; // (the window's Colors setting goes up to 64)
+    constexpr int WRONG = 32;           // levels: visibly another color
+    std::vector<double> wrong(MAX_FLAT_COLORS + 1, 1.0);
     std::vector<std::array<RGB, 2>> two(1);
     int chosen = 0;
-    int actual_at[MAX_COLORS + 1] = {0};
+    int actual_at[MAX_FLAT_COLORS + 1] = {0};
     // The counts are tried a few at a time on several cores (each try is independent), then
     // judged in order, so the first count that does is the one picked, as when tried one by one.
     auto hist = colorHistogram(smoothed);
     int const batch = std::max(1, kz::threads());
-    for (int first = 2; first <= MAX_COLORS && !chosen; first += batch) {
-        int const last = std::min(MAX_COLORS, first + batch - 1);
-        std::vector<int> kept(MAX_COLORS + 1, 0);
-        std::vector<std::array<RGB, 2>> two_of(MAX_COLORS + 1);
+    auto try_counts = [&](int from, int to, double limit) {
+    for (int first = from; first <= to && !chosen; first += batch) {
+        int const last = std::min(to, first + batch - 1);
+        std::vector<int> kept(MAX_FLAT_COLORS + 1, 0);
+        std::vector<std::array<RGB, 2>> two_of(MAX_FLAT_COLORS + 1);
         kz::parallel_for(last - first + 1, [&](long b, long e) {
             for (long k = b; k < e; k++) {
                 int n = first + (int)k;
@@ -1327,14 +1331,56 @@ AutoResult choose_settings(unsigned char const *rgba, int width, int height, int
             if (std::getenv("KZ_AUTO_DEBUG")) {
                 std::fprintf(stderr, "auto: %2d colors (%2d kept): %.4f wrong\n", n, kept[n], wrong[n]);
             }
-            if (kept[n] < n && wrong[n] <= 0.002) {
+            if (kept[n] < n && wrong[n] <= limit) {
                 // the picture has no more colors to give
                 chosen = kept[n];
                 break;
             }
-            if (wrong[n] <= 0.002) {
+            if (wrong[n] <= limit) {
                 chosen = n;
                 break;
+            }
+        }
+    }
+    };
+    try_counts(2, MAX_COLORS, 0.002);
+    // A flat picture (an illustration, a logo, a map) with more than 16 colors: its flat areas
+    // are a few exact colors, where a photo's or painting's are thousands of near ones. Count the
+    // colors that cover the flat areas; if a few dozen cover them all, try up to that many (a
+    // photo never gets here: it's never flat enough, and costs no more than before).
+    if (!chosen && !res.info.noisy && nflat > 0) {
+        std::unordered_map<uint32_t, long long> counts;
+        for (size_t i = 0; i < flat.size() && counts.size() <= 4096; i++) {
+            if (flat[i]) {
+                auto c = map.pixels[i];
+                counts[((uint32_t)c.r << 16) | ((uint32_t)c.g << 8) | c.b]++;
+            }
+        }
+        if (counts.size() <= 4096) {
+            // significant: at least 1/2000 of the flat area (a blend at a corner isn't a color)
+            long long const least = std::max<long long>(8, nflat / 2000);
+            long long covered = 0;
+            int significant = 0;
+            for (auto const &kv : counts) {
+                if (kv.second >= least) {
+                    significant++;
+                    covered += kv.second;
+                }
+            }
+            if (significant > MAX_COLORS && significant <= MAX_FLAT_COLORS && covered * 1000 >= nflat * 995) {
+                // (a few more than counted: the counting and the quantizer don't split colors
+                // quite alike.) Stricter than up to 16: no color of the significant ones may go
+                // (each is at least 1/2000 of the flat area; up to 16, a small one could).
+                try_counts(MAX_COLORS + 1, std::min(MAX_FLAT_COLORS, significant + 4), 0.0002);
+                if (!chosen) {
+                    // never exact even so: the count that came closest
+                    chosen = MAX_COLORS + 1;
+                    for (int n = MAX_COLORS + 1; n <= std::min(MAX_FLAT_COLORS, significant + 4); n++) {
+                        if (wrong[n] < wrong[chosen]) {
+                            chosen = n;
+                        }
+                    }
+                }
             }
         }
     }
@@ -1354,7 +1400,7 @@ AutoResult choose_settings(unsigned char const *rgba, int width, int height, int
     chosen = std::max(2, chosen);
     res.o.scans = chosen;
     res.info.colors = chosen;
-    res.info.wrong = wrong[std::min(chosen, MAX_COLORS)];
+    res.info.wrong = wrong[std::min(chosen, MAX_FLAT_COLORS)];
     if (actual_at[chosen] && actual_at[chosen] < chosen) {
         res.info.wrong = 0.0;
     }

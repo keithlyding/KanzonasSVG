@@ -46,7 +46,7 @@ installed until you click it. (1.0.x doesn't have this: install 1.1 by hand once
 
 1. Open a picture: *File > Open picture* (Ctrl+O), drag it into the window, or copy a picture
    and *File > Paste picture* (Ctrl+V).
-2. KanzonasSVG picks the settings for the picture (**Auto settings**: exactly a logo's colors,
+2. KanzonasSVG picks the settings for the picture (**Auto settings**: exactly a logo's or a flat illustration's colors, up to 64,
    smoothing for JPEGs and scans, a transparent background kept transparent, black and white
    for a scan of dark lines) and the status bar says what it picked. Change any setting on the
    right and the SVG updates.

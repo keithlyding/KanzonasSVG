@@ -51,8 +51,8 @@ is off: then press <i>Trace &gt; Update now</i>, F5).</li>
 <h3>Auto settings</h3>
 <p>The <b>Auto settings</b> button (or <i>Trace &gt; Auto settings</i>, Ctrl+Shift+A) picks the
 settings for the picture: how many colors it needs (the fewest after which more colors no
-longer make it visibly closer: a logo gets exactly its colors, a photo or painting a number
-that keeps the file reasonable), <b>Smooth</b> when it has JPEG blotches or scan noise,
+longer make it visibly closer: a logo or a flat illustration gets exactly its colors, up to 64,
+a photo or painting a number up to 16 that keeps the file reasonable), <b>Smooth</b> when it has JPEG blotches or scan noise,
 <b>Background: Remove</b> when its background is transparent (so the SVG's is too), and
 <b>Black and white</b> with its <b>Threshold</b> for a scan of dark lines on a light page.
 The status bar says what it picked. Change anything after: Auto doesn't change it back.</p>

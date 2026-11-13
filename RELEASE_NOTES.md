@@ -2,6 +2,13 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.1.1
+
+Fixed:
+- Auto settings gives flat pictures with more than 16 colors (illustrations, maps, charts)
+  all their colors, up to 64. Before, it stopped at 16 and treated them like a photo, so
+  some colors were lost or swapped. Photos and paintings are handled as before.
+
 ## 1.1
 
 New:
