@@ -353,6 +353,24 @@ class TestBattleFound(unittest.TestCase):
             svg, n = trace(logo(), **o.__dict__)
             self.assertTrue(svg.endswith("</svg>\n"))
 
+    def test_autotrace_many_shapes_quickly(self):
+        # Autotrace grew its lists (outlines, curves, points, splines) one element at a time:
+        # time and memory traffic grew with the square of the number of shapes. A noise picture
+        # in 256 colors (46,000 shapes; engine battery seed 90724, step 2292) took 147 s with
+        # AddressSanitizer, 2.5 s now; without it 0.34 s -> 0.30 s here (Linux's allocator hid
+        # most of it), the same SVG. Lists now double (xstd.h, XGROW).
+        import time
+        import numpy as np
+        from PySide6.QtGui import QImage
+        a = np.random.default_rng(1).integers(0, 256, (500, 600, 4), dtype=np.uint8)
+        a[..., 3] = 255
+        img = QImage(a.tobytes(), 600, 500, 2400, QImage.Format.Format_RGBA8888).copy()
+        t = time.perf_counter()
+        svg, n = trace(img, mode=engine.AUTOTRACE, scans=256, remove_background=1)
+        secs = time.perf_counter() - t
+        self.assertGreater(n, 100000)
+        self.assertLess(secs, 5.0, "Autotrace, 160,000 shapes: %.1f s (0.9 s on Linux)" % secs)
+
     def test_no_near_copies_of_colors_with_smooth(self):
         # a clean picture of 3 colors, hard edges between two similar ones, Smooth on, many
         # colors asked: used to give near-copies of its colors (#33e8a2 beside #31e8a1)

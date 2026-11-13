@@ -95,6 +95,14 @@ Rules for all of it:
   behavior the same. The AppImage builds on Ubuntu 22.04 and fails if a bundled file needs a
   newer glibc or C++ runtime.
 - American spelling in all user-visible text.
+- Updates inside the app (`kanzonassvg/updates.py`, the same design as KanzonasPDF's): copies
+  already out there look for the release files by name (`KanzonasSVG-v<version>-setup.exe`,
+  `KanzonasSVG-windows.zip` with a `KanzonasSVG/` folder inside, `KanzonasSVG-x86_64.AppImage`),
+  for the notes between `<!-- kanzonas-notes -->` marks in the release text, and for the setup's
+  AppId and `/RELAUNCH`: never change those, or every installed copy stops updating. An update is
+  only ever taken from GitHub's release hosts over https with the sha256 GitHub publishes for
+  the file; never loosen that. The Windows build runs the zip swap and the quiet setup on the
+  finished program (`tools/test_windows_update.py`).
 - Logos: no Kanzonas logo is made or edited here; logos come from the Kanzonas-Site
   repository's `brand/` folder (`brand/make_logos.py`). KanzonasSVG's are copied in unchanged
   (`assets/kanzonassvg-logo.png` for the README, `kanzonassvg/logo.png` for Help > About) and

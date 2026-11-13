@@ -78,6 +78,83 @@ for _name in ("warning", "information", "critical", "question"):
     setattr(QMessageBox, _name, staticmethod(_box(_name)))
 QMessageBox.about = staticmethod(lambda *a, **k: MESSAGES.append(("about", "")))
 
+# Dialogs (the update box) are shown, then answered with one of their buttons at random; links
+# are remembered instead of opened.
+from PySide6.QtGui import QDesktopServices  # noqa: E402
+from PySide6.QtWidgets import QDialog, QDialogButtonBox, QPushButton  # noqa: E402
+
+OPENED = []
+DIALOG_RNG = random.Random(0)
+QDesktopServices.openUrl = staticmethod(lambda url: OPENED.append(url.toString()) or True)
+
+
+def _dialog_exec(self):
+    self.show()
+    QApplication.processEvents()
+    buttons = [b for box in self.findChildren(QDialogButtonBox) for b in box.buttons()]
+    if buttons:
+        DIALOG_RNG.choice(buttons).click()
+    self.hide()
+    return 0
+
+
+QDialog.exec = _dialog_exec
+
+
+def random_release_text(rng):
+    """A release's text as anyone could write it: marks in odd places, odd lengths."""
+    parts = ["<!-- kanzonas-notes -->", "<!-- /kanzonas-notes -->", "<!-- kanzonas-notes", "## heading",
+             "[link](javascript:alert(1))", "<script>x</script>", "\x00", "plain words", "\n" * 3, "*" * 50]
+    return "".join(rng.choice(parts) for _ in range(rng.randrange(0, 12)))
+
+
+def random_releases(rng):
+    """GitHub's answer as an attacker or a broken network could make it."""
+    out = []
+    for _ in range(rng.randrange(0, 6)):
+        r = {"tag_name": rng.choice(["v99.%d" % rng.randrange(9), "v1.0", "v" + "9" * 12, "", None, 5, "v2.x",
+                                     "v99.1.%d" % rng.randrange(9)])}
+        if rng.random() < 0.7:
+            r["body"] = random_release_text(rng) if rng.random() < 0.9 else rng.choice([None, 5, []])
+        if rng.random() < 0.5:
+            r["html_url"] = rng.choice(["https://github.com/keithlyding/KanzonasSVG/releases/tag/v99.1",
+                                        "https://evil.example/", "javascript:alert(1)", None, 7])
+        if rng.random() < 0.6:
+            r["assets"] = rng.choice([[], "x", None, [{"name": n, "digest": rng.choice(["sha256:" + "ab" * 32, "x"]),
+                                                       "browser_download_url": rng.choice(
+                                                           ["https://github.com/a/b", "https://evil.example/a"])}
+                                                      for n in ("KanzonasSVG-windows.zip",
+                                                                "KanzonasSVG-x86_64.AppImage")]])
+        for key in ("draft", "prerelease"):
+            if rng.random() < 0.15:
+                r[key] = True
+        out.append(r if rng.random() < 0.95 else rng.choice(["x", 5, None]))
+    return out
+
+
+def update_step(rng, w, fails, seed, step):
+    """A newer release found (or not), with odd release data; the notice's buttons and the update
+    box answered at random. Only GitHub pages may be opened, and nothing is downloaded."""
+    from kanzonassvg import updates
+    u = w.updater()
+    u.settings = w.qs
+    u.releases = random_releases(rng)
+    u.release = updates.newest_release(u.releases)
+    u.manual = rng.random() < 0.4
+    if u.release is not None:
+        u.found.emit(updates.release_version(u.release))
+    bar = getattr(w, "_update_bar", None)
+    if bar is not None and rng.random() < 0.8:
+        buttons = bar.findChildren(QPushButton)
+        if buttons:
+            rng.choice(buttons).click()
+    if updates.downloading():
+        fails.append("window seed %d step %d: a download started (run from source, it only tells)" % (seed, step))
+    for url in OPENED:
+        if not url.startswith("https://github.com/"):
+            fails.append("window seed %d step %d: opened %r" % (seed, step, url))
+    OPENED.clear()
+
 
 def picture(rng, w, h):
     img = QImage(w, h, QImage.Format.Format_RGBA8888)
@@ -242,6 +319,7 @@ def random_setting(rng, s):
 
 def check_window(steps, seed, fails):
     rng = random.Random(seed)
+    DIALOG_RNG.seed(seed)
     with tempfile.TemporaryDirectory() as folder:
         pics = []
         for k in range(6):
@@ -258,7 +336,7 @@ def check_window(steps, seed, fails):
             before = len(ERRORS)
             action = rng.choice(["open", "open", "paste", "setting", "setting", "setting", "setting", "auto",
                                  "update", "colors", "zoom", "move", "fit", "save", "copy", "reopen", "auto_new",
-                                 "events"])
+                                 "events", "new_version"])
             try:
                 if action == "open":
                     w.open_path(rng.choice(pics))
@@ -292,6 +370,8 @@ def check_window(steps, seed, fails):
                     w = app.MainWindow()
                     w.qs = QSettings(os.path.join(folder, "s.ini"), QSettings.Format.IniFormat)
                     w.show()
+                elif action == "new_version":
+                    update_step(rng, w, fails, seed, step)
                 elif action == "auto_new":
                     w.a_auto_new.setChecked(not w.a_auto_new.isChecked())
                 # a few events: traces start, are cancelled and finish in every order

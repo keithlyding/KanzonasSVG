@@ -11,8 +11,8 @@ engine = os.path.join(ROOT, "kanzonassvg", "lib", ENGINE)
 if not os.path.exists(engine):
     raise SystemExit("Build the engine first: python tools/build_engine.py")
 
-# Only the parts of Qt the app uses
-EXCLUDES = ["tkinter", "PySide6.QtNetwork", "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtPdf",
+# Only the parts of Qt the app uses (QtNetwork, with its TLS plugins: the update check)
+EXCLUDES = ["tkinter", "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtPdf",
             "PySide6.QtMultimedia", "PySide6.QtWebEngineCore", "PySide6.Qt3DCore", "PySide6.QtOpenGL",
             "PySide6.QtDBus", "PySide6.QtXml", "PySide6.QtSql", "PySide6.QtTest", "unittest", "pydoc", "numpy"]
 
@@ -24,7 +24,7 @@ a = Analysis(
     binaries=[(engine, "kanzonassvg/lib")],
     datas=[(os.path.join(ROOT, "kanzonassvg", "icon.png"), "kanzonassvg"),
            (os.path.join(ROOT, "kanzonassvg", "logo.png"), "kanzonassvg")],
-    hiddenimports=["kanzonassvg.app", "kanzonassvg.cli", "kanzonassvg.selftest", "PySide6.QtSvg"],
+    hiddenimports=["kanzonassvg.app", "kanzonassvg.cli", "kanzonassvg.selftest", "PySide6.QtSvg", "PySide6.QtNetwork", "kanzonassvg.updates"],
     excludes=EXCLUDES,
     runtime_hooks=runtime_hooks,
 )

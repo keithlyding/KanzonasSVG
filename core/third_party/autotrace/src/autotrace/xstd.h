@@ -82,4 +82,27 @@ do									  \
   } while (0)
 #endif
 
+/* KanzonasSVG: lists grown one element at a time (append_*) are reallocated only when their
+   length reaches a power of two, to twice that, instead of at every element: growing a list of
+   n elements took time and memory traffic proportional to n squared (a noisy picture traced in
+   many colors makes tens of thousands of outlines; each realloc of a big block is a copy, or a
+   new mapping). The allocation of a list of length n is always at least XCAPACITY(n) elements:
+   the smallest power of two above n. Lists made all at once (concat) allocate XCAPACITY too. */
+#define XCAPACITY(n) at_capacity((size_t)(n))
+static inline size_t at_capacity(size_t n)
+{
+  size_t c = 1;
+  while (c <= n)
+    c <<= 1;
+  return c;
+}
+
+#define XGROW(old_ptr, n, elem_size)                               \
+do                                                                 \
+  {                                                                \
+    size_t at_n_ = (size_t)(n);                                    \
+    if (at_n_ && (at_n_ & (at_n_ - 1)) == 0)                       \
+      XREALLOC (old_ptr, 2 * at_n_ * (elem_size));                 \
+  } while (0)
+
 #endif /* Not XSTD_H */
