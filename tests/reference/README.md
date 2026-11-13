@@ -7,5 +7,7 @@
 | `logo.png` | a flat four-color logo with soft edges | drawn for these tests (not a real company's logo); CC0 |
 | `logo_jpg.jpg` | the same, saved as a JPEG (blotches) | as above; CC0 |
 | `logo_alpha.png` | the same on a transparent background | as above; CC0 |
+| `plan.png` | line art: a floor plan of one-pixel gray outlines and blue labels (tests/test_auto_line_art.py) | drawn for these tests by `plan()` there; CC0 |
+| `plan-dark-strip.png` | the same with a dark toolbar strip, as in a screenshot | as above; CC0 |
 
 Never put a company's logo here.

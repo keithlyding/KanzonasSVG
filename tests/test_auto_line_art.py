@@ -19,9 +19,19 @@ GRAY = QColor(0x9A, 0x9A, 0x9A)
 BLUE = QColor(0x1F, 0x3C, 0xC8)
 
 
+def reference_plan(dark_strip=False):
+    """The floor plan drawn by plan(), as saved in tests/reference/ (plan.png, plan-dark-strip.png):
+    the same pixels on every system (drawn at test time, its labels came out differently on
+    Windows, whose fonts differ, and the test traced another picture there)."""
+    import os
+    name = "plan-dark-strip.png" if dark_strip else "plan.png"
+    return image.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "reference", name))
+
+
 def plan(w=900, h=560, dark_strip=False):
     """A floor plan as drawn by a CAD program: one-pixel gray outlines (chairs, a table, a door),
-    blue labels with leader lines; optionally a dark toolbar strip (as in a screenshot)."""
+    blue labels with leader lines; optionally a dark toolbar strip (as in a screenshot). Made
+    tests/reference/plan.png and plan-dark-strip.png (the tests use those)."""
     img = QImage(w, h, QImage.Format.Format_RGBA8888)
     img.fill(Qt.GlobalColor.white)
     p = QPainter(img)
@@ -75,7 +85,7 @@ ON_LINES = [(150 + 40 * k, 220) for k in range(14)] + [(115, 175 + 5 * k) for k 
 
 class TestLineArt(unittest.TestCase):
     def test_a_plan_is_line_art(self):
-        img = plan()
+        img = reference_plan()
         o, info = engine.auto(*image.pixels(img))
         self.assertTrue(info.line_art)
         self.assertFalse(o.smooth, "smoothing wipes thin lines out")
@@ -93,7 +103,7 @@ class TestLineArt(unittest.TestCase):
     def test_gray_lines_are_not_edge_shades(self):
         # with a dark strip elsewhere, gray lies between white and it, but the lines touch only
         # white: they're lines of their own color, not the soft edge of the strip
-        img = plan(dark_strip=True)
+        img = reference_plan(dark_strip=True)
         res = tracing.trace_image(img, engine.Options(scans=6, smooth=False), 4)
         kept = line_kept(drawn(img, res.svg), ON_LINES)
         if kept < len(ON_LINES) * 0.9:
@@ -117,7 +127,7 @@ class TestAutoSetsEverything(unittest.TestCase):
             s.optimize.setChecked(False)
             s.tolerance.setValue(0.0)
             s.enlarge.setCurrentIndex(s.enlarge.findData(1))
-            w.set_image(plan(), None)
+            w.set_image(reference_plan(), None)
             end = __import__("time").time() + 60
             while (w.worker is not None or w.result is None) and __import__("time").time() < end:
                 QApplication.processEvents()
