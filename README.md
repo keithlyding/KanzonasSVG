@@ -80,22 +80,61 @@ kanzonassvg-cli --mode bw scan.jpg -o scan.svg
 kanzonassvg-cli --help                        every option
 ```
 
-## How much better
+## Compared with Inkscape
 
-Badly wrong pixels (off by over 25% when the SVG is drawn and compared with the picture),
-Inkscape's code before these fixes against KanzonasSVG:
+KanzonasSVG's tracing is Inkscape's *Trace Bitmap* with fixes. Measured against Inkscape's own
+code (its development version of 10 November 2026, whose tracing is the same as Inkscape
+1.4.4's, the newest release), on the same pictures, with the same settings (Inkscape's
+defaults) and with KanzonasSVG's Auto settings. Every SVG was drawn by the same renderer
+(rsvg-convert) and compared with the picture on white.
 
-| Picture | Mode | Before | KanzonasSVG |
-|---|---|---|---|
-| [Smiley](https://commons.wikimedia.org/wiki/File:Smiley.svg) (public domain) | Colors, 8 | 0.47% | 0.27% |
-| Smiley | Autotrace colors, 8 | 65% | 0.61% |
-| [The Starry Night](https://commons.wikimedia.org/wiki/File:Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg) (public domain) | Colors, 16 | 3.0% | 2.3% |
-| The Starry Night | Autotrace colors, 16 | 30% | 12.7% |
-| A two-color logo | Colors, 8 | 0.89% | 0.17% |
+**Pixels clearly the wrong color** (off by over 25%; lower is better):
+
+| Picture | Inkscape, 8 colors | KanzonasSVG, 8 colors | KanzonasSVG, Auto | Inkscape, Autotrace | KanzonasSVG, Autotrace |
+|---|---|---|---|---|---|
+| A two-color logo | 1.6% | 0.27% | 0.26% | 3.9% | 0.52% |
+| The same logo as a JPEG | 1.5% | 0.34% | 0.34% | 4.2% | 2.3% |
+| Sunflower and cactus (transparent) | 6.5% | 1.9% | 2.5% | 8.0% | 4.3% |
+| [Smiley](https://commons.wikimedia.org/wiki/File:Smiley.svg) (public domain) | 0.46% | 0.27% | 0.23% | 65% (a black disc) | 0.60% |
+| A flat illustration, 15 colors | 1.7% | 0.79% | 0.29% | 3.9% | 0.91% |
+| A floor plan (thin gray lines, blue labels) | 0.87% | 0.07% | 0.002% | | |
+| [The Starry Night](https://commons.wikimedia.org/wiki/File:Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg) (public domain) | 3.7% | 3.2% | 2.9% | 23% | 8.8% |
+
+**Time and file size**, Inkscape with 8 colors and KanzonasSVG with Auto settings (picking the
+settings included). On a 4-core computer; KanzonasSVG uses all its cores, and traces pictures
+under 1000 pixels at twice their size (Enlarge first: Auto), the floor plan at four times:
+
+| Picture | Inkscape | KanzonasSVG |
+|---|---|---|
+| A two-color logo | 0.08 s, 160 KB | 0.06 s, 24 KB |
+| The same logo as a JPEG | 0.10 s, 164 KB | 0.03 s, 25 KB |
+| Sunflower and cactus | 0.02 s, 152 KB | 0.02 s, 160 KB |
+| Smiley | 0.20 s, 39 KB | 0.06 s, 15 KB |
+| A flat illustration, 15 colors | 0.07 s, 100 KB | 0.13 s, 182 KB (all 14 colors kept; Inkscape's 8 lose some) |
+| A floor plan | 0.08 s, 176 KB | 0.41 s, 185 KB |
+| The Starry Night (1280 x 1014) | 1.1 s, 6.3 MB | 0.24 s, 4.1 MB |
+
+What each does:
+
+| | Inkscape's Trace Bitmap | KanzonasSVG |
+|---|---|---|
+| Picks the settings for each picture | No | Auto settings: colors, smoothing, background, line art |
+| Colors | Close to the picture's | Exactly the picture's, for flat colors |
+| Edges between colors | In-between shades as extra outlines | Sharp |
+| Thin lines (plans, drawings, screenshots) | Thickened and faded by smoothing | Kept, in their colors |
+| Autotrace | Big areas cover the rest (the smiley: a black disc), holes filled in | Fixed |
+| Leaving the background out | Remove background (the bottom layer) | The color around the edge, around the picture or everywhere, or the transparent part |
+| Tracing part of a picture | | Crop |
+| The result while you set it up | A small preview | The SVG beside the picture, zooming together |
+| Many files at once | | The command line |
+| Editing the SVG afterwards | Yes: it's a vector editor | No: open the SVG in Inkscape, Illustrator or another editor |
+| Pixel art (Depixelize), selecting the foreground (SIOX) | Yes | No |
+| Systems | Windows, macOS, Linux | Windows, Linux |
 
 Costs: keeping strong edges sharp adds about 15% more nodes on detailed pictures (paintings,
-screenshots), and Autotrace takes longer on big pictures because the colors are reduced
-first (it makes far fewer shapes).
+screenshots), Autotrace takes longer on big pictures because the colors are reduced first (it
+makes far fewer shapes), and line art is traced at four times its size (slower, and a bigger
+file, for lines that stay solid).
 
 The same fixes were offered to Inkscape:
 [inkscape!8302](https://gitlab.com/inkscape/inkscape/-/merge_requests/8302).
