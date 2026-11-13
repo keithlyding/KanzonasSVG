@@ -257,7 +257,9 @@ void check_svg(std::string const &svg, Pic const &p, int nshapes, kz_options con
     // exact colors (Potrace color modes: the palette colors come from the picture; Grays makes grays of them)
     // (Smooth off: smoothing a clean picture softens hard edges, and a thin rim of the mix of two
     // colors can stay where a shape is too small to tell it from a color of its own.)
-    if (p.exact && o.mode == KZ_COLORS && !o.smooth && o.scans >= 2 && o.scans <= 256) {
+    // (and no more colors in the picture than asked for: more are merged, into a color between them)
+    if (p.exact && o.mode == KZ_COLORS && !o.smooth && o.scans >= 2 && o.scans <= 256 &&
+        (int)p.colors.size() <= o.scans) {
         for (auto f : fills) {
             if (!p.colors.count(f)) {
                 char buf[64];
