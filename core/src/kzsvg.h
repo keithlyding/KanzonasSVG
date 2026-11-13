@@ -91,6 +91,8 @@ typedef struct kz_auto_info {
     int noisy;              /* JPEG blotches, scan noise or texture found (1/0) */
     int photo;              /* too many colors to trace exactly: a photo or painting (1/0) */
     double wrong;           /* fraction of the picture's flat areas still off at that many colors */
+    int line_art;           /* thin lines on a plain background (a drawing, a plan) (1/0) */
+    int enlarge;            /* how much to enlarge it first: 4 for line art, 0 the usual (small pictures 2) */
 } kz_auto_info;
 
 /*

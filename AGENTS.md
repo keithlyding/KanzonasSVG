@@ -34,6 +34,13 @@ Every change, minor (1.0.1, 1.0.2) or major, before pushing:
   tests, with short runs of the app battery, the tracing quality on the reference pictures
   against the baseline (`tools/quality.py`), and the speed budgets (`tests/test_speed.py`).
 - `QT_QPA_PLATFORM=offscreen python run.py --selftest selftest.log`
+- The slop check, `python tools/slop_check.py` (also in the unit tests, so every build runs it):
+  debugging left in, TODO/FIXME notes, unused imports, functions nothing uses, stray files; in
+  what people read, filler and buzzwords ("seamless", "robust", "leverage"...), placeholders,
+  British spellings, doubled words; and claims that aren't true (a menu command the help or
+  README names that the window doesn't have, a README link to a missing file, a version
+  without notes). Fix what it finds; widen its lists when new slop turns up, never narrow them
+  to get green.
 - After a change in `core/`: `tests/engine_battery.sh 3000 SEED` with one or two seeds (random
   pictures and settings through the engine, with AddressSanitizer, UBSan and leak checks; it
   names the seed and step of each failure, `KZ_STEP=N` reruns one).

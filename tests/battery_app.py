@@ -336,7 +336,7 @@ def check_window(steps, seed, fails):
             before = len(ERRORS)
             action = rng.choice(["open", "open", "paste", "setting", "setting", "setting", "setting", "auto",
                                  "update", "colors", "zoom", "move", "fit", "save", "copy", "reopen", "auto_new",
-                                 "events", "new_version"])
+                                 "events", "new_version", "crop", "uncrop"])
             try:
                 if action == "open":
                     w.open_path(rng.choice(pics))
@@ -370,6 +370,21 @@ def check_window(steps, seed, fails):
                     w = app.MainWindow()
                     w.qs = QSettings(os.path.join(folder, "s.ini"), QSettings.Format.IniFormat)
                     w.show()
+                elif action == "crop":
+                    if w.img is not None:
+                        # a rectangle anywhere (partly or wholly off the picture, tiny or all of it)
+                        from PySide6.QtCore import QRectF as _R
+                        iw, ih = w.img.width(), w.img.height()
+                        x, y = rng.uniform(-0.3, 1.1) * iw, rng.uniform(-0.3, 1.1) * ih
+                        w.start_crop()
+                        w.on_cropped(_R(x, y, rng.uniform(0, 1.2) * iw, rng.uniform(0, 1.2) * ih))
+                        if w.crop is not None and (w.img.width(), w.img.height()) != (w.crop.width(), w.crop.height()):
+                            fails.append("window seed %d step %d: cropped picture %dx%d, crop %s" % (
+                                seed, step, w.img.width(), w.img.height(), w.crop))
+                elif action == "uncrop":
+                    w.remove_crop()
+                    if w.crop is not None:
+                        fails.append("window seed %d step %d: Remove crop left a crop" % (seed, step))
                 elif action == "new_version":
                     update_step(rng, w, fails, seed, step)
                 elif action == "auto_new":

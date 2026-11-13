@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /** @file
- * TODO: insert short description here
+ * Pixel maps the tracing works on: gray, RGB and indexed (a palette and an index per pixel).
  *//*
  * Authors: see git history
  *

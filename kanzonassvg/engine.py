@@ -101,6 +101,8 @@ class _AutoInfo(ctypes.Structure):
         ("noisy", ctypes.c_int),
         ("photo", ctypes.c_int),
         ("wrong", ctypes.c_double),
+        ("line_art", ctypes.c_int),
+        ("enlarge", ctypes.c_int),
     ]
 
 
@@ -113,6 +115,8 @@ class AutoInfo:
     noisy: bool
     photo: bool
     wrong: float  # fraction of the flat areas still off
+    line_art: bool = False  # thin lines on a plain background
+    enlarge: int = 0  # enlarge first: 4 for line art, 0 the usual
 
 
 _PROGRESS = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_double, ctypes.c_void_p)
@@ -274,7 +278,8 @@ def auto(rgba, width, height, stride=None):
     for f in fields(o):
         v = getattr(opts, f.name)
         setattr(o, f.name, bool(v) if isinstance(getattr(o, f.name), bool) else v)
-    return o, AutoInfo(info.colors, bool(info.transparent), bool(info.noisy), bool(info.photo), info.wrong)
+    return o, AutoInfo(info.colors, bool(info.transparent), bool(info.noisy), bool(info.photo), info.wrong,
+                       bool(info.line_art), info.enlarge)
 
 
 class Drawing:

@@ -6,9 +6,10 @@ import sys
 import threading
 from dataclasses import replace
 
-from PySide6.QtCore import QUrl, QByteArray, QMimeData, QObject, QRectF, QSettings, Qt, QThread, \
+from PySide6.QtCore import QUrl, QByteArray, QMimeData, QObject, QPointF, QRect, QRectF, QSettings, Qt, QThread, \
     QTimer, Signal
-from PySide6.QtGui import QAction, QColor, QDesktopServices, QGuiApplication, QIcon, QImage, QKeySequence, QPainter, QPalette
+from PySide6.QtGui import QAction, QColor, QDesktopServices, QGuiApplication, QIcon, QImage, QKeySequence, QPainter, \
+    QPalette, QPen
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, \
     QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QProgressBar, \
@@ -51,11 +52,17 @@ is off: then press <i>Trace &gt; Update now</i>, F5).</li>
 <h3>Auto settings</h3>
 <p>The <b>Auto settings</b> button (or <i>Trace &gt; Auto settings</i>, Ctrl+Shift+A) picks the
 settings for the picture: how many colors it needs (the fewest after which more colors no
-longer make it visibly closer: a logo gets exactly its colors, a photo or painting a number
-that keeps the file reasonable), <b>Smooth</b> when it has JPEG blotches or scan noise,
+longer make it visibly closer: a logo or a flat illustration gets exactly its colors, up to 64,
+a photo or painting a number up to 16 that keeps the file reasonable), <b>Smooth</b> when it has JPEG blotches or scan noise,
 <b>Background: Remove</b> when its background is transparent (so the SVG's is too), and
 <b>Black and white</b> with its <b>Threshold</b> for a scan of dark lines on a light page.
-The status bar says what it picked. Change anything after: Auto doesn't change it back.</p>
+For <b>line art</b> (a plan, a drawing or a screenshot of one: thin lines on a plain
+background) it keeps the lines' own colors, leaves <b>Smooth</b> off (it would wipe thin lines
+out) and sets <b>Enlarge first</b> to 4 times, so lines a pixel or two wide trace as solid
+shapes. It also puts the curve settings (<b>Speckles</b>, <b>Smooth corners</b>,
+<b>Optimize</b>, <b>Tolerance</b>) back to the values that suit the picture: Auto sets every
+setting. The status bar says what it picked. Change anything after: Auto doesn't change it
+back.</p>
 <p><i>Trace &gt; Auto settings for new pictures</i> (on at first) does this for every picture you
 open or paste; turn it off to keep your own settings for each new picture.</p>
 <h3>Modes</h3>
@@ -78,7 +85,8 @@ while keeping edges sharp.</li>
 <li><b>Stack</b>: each color layer also covers the area of the layers above it, so no gaps
 show between colors. Off: the layers are tiled side by side.</li>
 <li><b>Background</b>: <i>Keep</i> traces the background like any color. <i>Remove</i> leaves
-out the picture's background (the color that most of its edge has, light or dark) around the
+out the picture's background (its transparent part when its edge has one, otherwise the color
+that most of its edge has, light or dark) around the
 picture: the SVG is see-through there, and that color inside shapes (the white inside a
 logo's letters) stays. <i>Remove, also inside</i> leaves that color out everywhere, so gaps
 inside shapes are see-through too. (Brightness steps: the bottom layer is left out. Autotrace
@@ -101,6 +109,15 @@ nothing from it); the status bar says how much it was.</li>
 <p>A big picture (over 3 megapixels) first shows a quick preview, traced from a smaller copy,
 while the whole picture is traced; the status bar says so, and <i>Save SVG</i> and <i>Copy SVG</i>
 wait for the whole picture's SVG.</p>
+<h3>Cropping</h3>
+<p>To trace only part of a picture (the drawing in a screenshot, without the program's
+toolbars around it; one logo of several), use <i>Trace &gt; Crop picture</i> (Ctrl+R) and
+drag across that part on the left side. Only it is shown and traced, and the SVG is its size;
+with <i>Auto settings for new pictures</i> on, Auto picks the settings for the part (a
+screenshot's toolbars can make a drawing look like something else to it). Crop again to
+crop further; Esc stops cropping before you drag. <i>Trace &gt; Remove crop</i>
+(Ctrl+Shift+R) brings the whole picture back. The command line's <code>--crop X,Y,W,H</code>
+does the same.</p>
 <h3>Looking at it</h3>
 <p>The left side shows the picture; <i>View &gt; Show colors to trace</i> (Ctrl+T) shows it
 with its colors reduced, as it will be traced. Both sides zoom and move together: turn the
@@ -115,6 +132,7 @@ size</i> (Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> 
 <tr><td>Ctrl+Shift+C</td><td>Copy SVG</td></tr>
 <tr><td>F5</td><td>Update now</td></tr>
 <tr><td>Ctrl+Shift+A</td><td>Auto settings</td></tr>
+<tr><td>Ctrl+R / Ctrl+Shift+R</td><td>Crop picture / Remove crop</td></tr>
 <tr><td>Ctrl+T</td><td>Show colors to trace</td></tr>
 <tr><td>Ctrl+0 / Ctrl+1</td><td>Zoom to fit / Actual size</td></tr>
 <tr><td>Ctrl++ / Ctrl+-</td><td>Zoom in / Zoom out</td></tr>
@@ -332,9 +350,12 @@ class Canvas(QWidget):
     current zoom and position is ready, the last one is shown moved and scaled to match."""
 
     _ids = itertools.count(1)
+    cropped = Signal(QRectF)  # (Crop picture) the rectangle dragged, in picture pixels
 
     def __init__(self, view, title):
         super().__init__()
+        self.crop_mode = False
+        self.band = None  # [start, end] of the rectangle being dragged, in widget coordinates
         self.view = view
         self.title = title
         self.picture = None  # QImage
@@ -416,6 +437,22 @@ class Canvas(QWidget):
                 left = w / 2 + (cx - self.view.cx) * self.view.scale - w / 2 * f
                 top = h / 2 + (cy - self.view.cy) * self.view.scale - h / 2 * f
                 p.drawImage(QRectF(left, top, w * f, h * f), img)
+        if self.band is not None:
+            # the rectangle being dragged: outside it dimmed, its edge dashed
+            r = QRectF(self.band[0], self.band[1]).normalized()
+            dim = QColor(0, 0, 0, 110)
+            p.fillRect(QRectF(0, 0, self.width(), r.top()), dim)
+            p.fillRect(QRectF(0, r.bottom(), self.width(), self.height() - r.bottom()), dim)
+            p.fillRect(QRectF(0, r.top(), r.left(), r.height()), dim)
+            p.fillRect(QRectF(r.right(), r.top(), self.width() - r.right(), r.height()), dim)
+            pen = QPen(QColor(255, 255, 255), 1, Qt.PenStyle.DashLine)
+            p.setPen(pen)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRect(r)
+            pen.setColor(QColor(0, 0, 0))
+            pen.setDashOffset(4)
+            p.setPen(pen)
+            p.drawRect(r)
         if self.message:
             p.setPen(self.palette().color(QPalette.ColorRole.Text))
             p.drawText(self.rect().adjusted(20, 20, -20, -20), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap,
@@ -429,20 +466,51 @@ class Canvas(QWidget):
         if steps:
             self.view.zoom(1.25 ** steps, e.position(), self.size())
 
+    def set_crop_mode(self, on):
+        self.crop_mode = on
+        self.band = None
+        if on:
+            self.setCursor(Qt.CursorShape.CrossCursor)
+        else:
+            self.unsetCursor()
+        self.update()
+
+    def to_picture(self, point):
+        """A widget point in picture pixels (not clamped)."""
+        t = self.view.target(self.size())
+        return QPointF((point.x() - t.x()) / self.view.scale, (point.y() - t.y()) / self.view.scale)
+
     def mousePressEvent(self, e):
+        if self.crop_mode and e.button() == Qt.MouseButton.LeftButton and self.has_content():
+            self.band = [e.position(), e.position()]
+            self.update()
+            return
         if e.button() in (Qt.MouseButton.LeftButton, Qt.MouseButton.MiddleButton):
             self.drag = e.position()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
 
     def mouseMoveEvent(self, e):
+        if self.band is not None:
+            self.band[1] = e.position()
+            self.update()
+            return
         if self.drag is not None:
             d = e.position() - self.drag
             self.drag = e.position()
             self.view.move(d.x(), d.y())
 
     def mouseReleaseEvent(self, _e):
+        if self.band is not None:
+            a, b = self.to_picture(self.band[0]), self.to_picture(self.band[1])
+            self.band = None
+            self.update()
+            self.cropped.emit(QRectF(a, b).normalized())
+            return
         self.drag = None
-        self.unsetCursor()
+        if self.crop_mode:
+            self.setCursor(Qt.CursorShape.CrossCursor)
+        else:
+            self.unsetCursor()
 
     def resizeEvent(self, e):
         if self.view.fitted:
@@ -508,6 +576,7 @@ class Worker(QThread):
 
             if job.auto:
                 job.options, job.auto_info = auto_options(job.img, job.options)
+                job.enlarge = job.auto_info.enlarge or tracing.AUTO
                 self.auto_done.emit(job.number, job.options, job.auto_info)
             if job.quick and not job.cancelled:
                 svg = tracing.quick_trace(job.img, job.options)
@@ -525,15 +594,14 @@ class Worker(QThread):
 
 
 def auto_options(img, current):
-    """The settings Auto picks for <img>: mode, colors, smoothing, background, threshold
-    (the curve settings stay as they are). Returns (Options, engine.AutoInfo)."""
+    """The settings Auto picks for <img>: all of them (mode, colors, smoothing, background,
+    threshold, and the curve settings at the values that suit it). Returns (Options,
+    engine.AutoInfo); info.enlarge is Enlarge first (0: Auto)."""
     picked, info = engine.auto(*image.pixels(img))
     # the threshold only when Auto picks Black and white (the panel shows it only then; otherwise
     # the trace was made with another threshold than the one the panel keeps)
     threshold = picked.threshold if picked.mode == engine.BRIGHTNESS else current.threshold
-    return replace(current, mode=picked.mode, scans=picked.scans, smooth=picked.smooth,
-                   remove_background=picked.remove_background, threshold=threshold,
-                   stack=True, invert=False), info
+    return replace(picked, threshold=threshold, stack=True, invert=False), info
 
 
 def describe_auto(options, info):
@@ -548,6 +616,8 @@ def describe_auto(options, info):
         parts.append("smoothed")
     if options.remove_background:
         parts.append("transparent background kept")
+    if getattr(info, "line_art", False):
+        parts.append("thin lines: enlarged %d times first" % info.enlarge)
     return "Auto: " + ", ".join(parts)
 
 
@@ -769,8 +839,9 @@ class Settings(QScrollArea):
         self.tolerance.setEnabled(self.optimize.isChecked())
         self._update_visible()
 
-    def apply_auto(self, o):
-        """Show the settings Auto picked (without tracing again: they're being traced)."""
+    def apply_auto(self, o, enlarge=None):
+        """Show the settings Auto picked (without tracing again: they're being traced): all of
+        them, Enlarge first too (enlarge: its setting, tracing.AUTO by default)."""
         widgets = [w for _, w in self._widgets()]
         for w in widgets:
             w.blockSignals(True)
@@ -786,6 +857,15 @@ class Settings(QScrollArea):
             self._bw = o.threshold
         elif o.mode == engine.EDGES:
             self.threshold.setValue(self._edge)
+        self.speckles.setValue(o.speckles)
+        self.corners.setValue(o.smooth_corners)
+        self.optimize.setChecked(o.optimize)
+        self.tolerance.setValue(o.optimize_tolerance)
+        self.tolerance.setEnabled(bool(o.optimize))
+        self.error.setValue(o.error_threshold)
+        self.filters.setValue(o.filter_iterations)
+        self.width.setChecked(o.preserve_width)
+        self.enlarge.setCurrentIndex(max(0, self.enlarge.findData(tracing.AUTO if enlarge is None else enlarge)))
         for w in widgets:
             w.blockSignals(False)
         self._last_mode = o.mode
@@ -822,7 +902,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.qs = QSettings("Kanzonas", APP_NAME)
-        self.img = None  # QImage, RGBA8888
+        self.img = None  # QImage, RGBA8888: the picture traced (cropped, if it is)
+        self.full_img = None  # the whole picture opened
+        self.crop = None  # QRect of full_img that img is, or None
         self.source_path = None
         self.save_path = None
         self.result = None  # tracing.Result
@@ -840,6 +922,7 @@ class MainWindow(QMainWindow):
 
         self.view = View()
         self.left = Canvas(self.view, "Picture")
+        self.left.cropped.connect(self.on_cropped)
         self.right = Canvas(self.view, "SVG")
         self.left.set_message("Open a picture (Ctrl+O), drag one here, or paste one (Ctrl+V).")
         split = QSplitter()
@@ -919,6 +1002,9 @@ class MainWindow(QMainWindow):
         self.a_auto_new = self._action(m, "Auto settings for new pictures", self.auto_new_changed, None, True)
         self.a_auto_new.setChecked(bool(int(self.qs.value("trace/auto_new", 1))))
         self._action(m, "Reset settings", self.settings.reset_all)
+        m.addSeparator()
+        self.a_crop = self._action(m, "Crop picture", self.start_crop, "Ctrl+R")
+        self.a_uncrop = self._action(m, "Remove crop", self.remove_crop, "Ctrl+Shift+R")
 
         m = mb.addMenu("&Help")
         self._action(m, "How to use KanzonasSVG", self.show_help, QKeySequence.StandardKey.HelpContents)
@@ -934,6 +1020,8 @@ class MainWindow(QMainWindow):
         self.a_save.setEnabled(has)
         self.a_save_as.setEnabled(has)
         self.a_copy.setEnabled(has)
+        self.a_crop.setEnabled(self.img is not None)
+        self.a_uncrop.setEnabled(self.crop is not None)
 
     def _update_title(self):
         name = os.path.basename(self.source_path) if self.source_path else None
@@ -1003,9 +1091,17 @@ class MainWindow(QMainWindow):
         return True
 
     def set_image(self, img, path):
-        self.img = img
+        """A new picture: opened, pasted or dropped."""
+        self.full_img = img
+        self.crop = None
         self.source_path = path
         self.save_path = None
+        self.cancel_crop()
+        self._show_picture(img)
+
+    def _show_picture(self, img):
+        """Trace img (the picture, or the part of it cropped to) as a new picture."""
+        self.img = img
         self.result = None
         self.preview = None
         self.view.set_picture(img.width(), img.height())
@@ -1017,6 +1113,51 @@ class MainWindow(QMainWindow):
         self._update_title()
         self._update_actions()
         self.start_trace(auto=self.a_auto_new.isChecked())
+
+    # cropping
+
+    def start_crop(self):
+        if self.img is None:
+            return
+        self.left.set_crop_mode(True)
+        self.status.setText("Drag across the picture on the left to crop it (Esc: cancel).")
+
+    def cancel_crop(self):
+        if self.left.crop_mode:
+            self.left.set_crop_mode(False)
+            return True
+        return False
+
+    def keyPressEvent(self, e):
+        if e.key() == Qt.Key.Key_Escape and self.cancel_crop():
+            self.status.setText("")
+            return
+        super().keyPressEvent(e)
+
+    def on_cropped(self, rect):
+        """The rectangle dragged (picture pixels of what's shown): trace only that part."""
+        self.left.set_crop_mode(False)
+        if self.img is None:
+            return
+        r = rect.toAlignedRect().intersected(QRect(0, 0, self.img.width(), self.img.height()))
+        if r.width() < 2 or r.height() < 2:
+            self.status.setText("Too small to crop to: drag across the part to trace.")
+            return
+        self.crop_to(r)
+
+    def crop_to(self, r):
+        """Crop to r, a QRect of the picture shown (which may be cropped already)."""
+        if self.crop is not None:
+            r = r.translated(self.crop.topLeft())
+        self.crop = r
+        self._show_picture(self.full_img.copy(r))
+
+    def remove_crop(self):
+        if self.crop is None or self.full_img is None:
+            return
+        self.cancel_crop()
+        self.crop = None
+        self._show_picture(self.full_img)
 
     def dragEnterEvent(self, e):
         if e.mimeData().hasUrls() or e.mimeData().hasImage():
@@ -1098,7 +1239,7 @@ class MainWindow(QMainWindow):
     def on_auto_done(self, number, options, info):
         if number != self.job_number or self.job.cancelled:
             return
-        self.settings.apply_auto(options)
+        self.settings.apply_auto(options, self.job.enlarge)
         self.settings.save(self.qs)
         self.status.setText(describe_auto(options, info) + ". Tracing...")
 
@@ -1120,6 +1261,8 @@ class MainWindow(QMainWindow):
         text = "%d shapes, %s, traced in %.2f s" % (result.shapes, _size_text(size), result.seconds)
         if result.factor != 1:
             text += " (at %d times the size)" % result.factor
+        if self.crop is not None:
+            text += "; cropped to %d x %d pixels" % (self.crop.width(), self.crop.height())
         if self.job.auto_info is not None:
             text = describe_auto(self.job.options, self.job.auto_info) + ". " + text[0].upper() + text[1:]
         self.status.setText(text)

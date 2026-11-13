@@ -36,8 +36,8 @@ W, H = 1400, 820
 
 
 def landscape(path, w=900, h=640):
-    """A flat illustration: sky, sun, hills, a lake, pines, a house with a red roof, flowers. 15
-    colors (Auto settings tries up to 16: more and it would treat it as a painting)."""
+    """A flat illustration: sky, sun, hills, a lake, pines, a house with a red roof, flowers,
+    in 15 colors."""
     img = QImage(w, h, QImage.Format.Format_RGBA8888)
     img.fill(QColor("#8fd3f4"))
     p = QPainter(img)

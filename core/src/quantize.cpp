@@ -891,6 +891,65 @@ void dropBlendColors(RgbMap const &rgbmap, IndexedMap &imap)
     }
     auto thin = [&](int k) { return total[k] > 0 && onEdge[k] * 2 > total[k]; };
 
+    // For thin colors: how many of their pixels touch each other color. A rim between two
+    // colors touches both of them; a thin line of its own color (a gray line on white in a
+    // drawing or a screenshot) touches only what it's drawn on, and is kept.
+    std::vector<size_t> touch;
+    std::vector<int> row(n, -1);
+    int nthin = 0;
+    for (int k = 0; k < n; k++) {
+        if (thin(k)) {
+            row[k] = nthin++;
+        }
+    }
+    if (nthin == 0) {
+        return;
+    }
+    touch.assign((size_t)nthin * n, 0);
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            size_t i = (size_t)y * width + x;
+            int const r = row[imap.pixels[i]];
+            if (r < 0) {
+                continue;
+            }
+            unsigned const k = imap.pixels[i];
+            unsigned seen[4];
+            int ns = 0;
+            auto mark = [&](unsigned other) {
+                if (other == k) {
+                    return;
+                }
+                for (int j = 0; j < ns; j++) {
+                    if (seen[j] == other) {
+                        return;
+                    }
+                }
+                seen[ns++] = other;
+                touch[(size_t)r * n + other]++;
+            };
+            if (x > 0) mark(imap.pixels[i - 1]);
+            if (x + 1 < width) mark(imap.pixels[i + 1]);
+            if (y > 0) mark(imap.pixels[i - width]);
+            if (y + 1 < height) mark(imap.pixels[i + width]);
+        }
+    }
+    // c touches a: at least a quarter of its edge pixels do, or of those touching another thin
+    // color that touches a (a soft edge can be two shades wide: the lighter one touches only
+    // the background and the darker shade)
+    auto direct = [&](int c, int a) { return touch[(size_t)row[c] * n + a] * 4 >= onEdge[c]; };
+    auto touches = [&](int c, int a) {
+        if (direct(c, a)) {
+            return true;
+        }
+        for (int t = 0; t < n; t++) {
+            if (t != c && t != a && row[t] >= 0 && direct(c, t) && direct(t, a)) {
+                return true;
+            }
+        }
+        return false;
+    };
+
     // For each thin color, the pair of colors filling areas of their own that it mixes.
     auto const &pal = imap.clut;
     std::vector<int> endA(n, -1), endB(n, -1);
@@ -921,7 +980,7 @@ void dropBlendColors(RgbMap const &rgbmap, IndexedMap &imap)
                 // Within a tenth of the two colors' distance from the line between them.
                 // A rim is much smaller than the two areas it lies between; colors
                 // in a painting or photo are of like sizes and are kept.
-                bool const rim = total[c] * 4 <= std::min(total[a], total[b]);
+                bool const rim = total[c] * 4 <= std::min(total[a], total[b]) && touches(c, a) && touches(c, b);
                 if (rim && e * 100 <= len2 && (best < 0 || e < best)) {
                     best = e;
                     endA[c] = a;

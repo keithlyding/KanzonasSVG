@@ -11,7 +11,8 @@ fuzzer and ThreadSanitizer, gcc or clang for the engine battery, numpy, and a bu
 
 The checks (AGENTS.md, "Testing"):
  1. the unit tests (with the short batteries and the speed budgets) and the self test;
- 2. tracing quality on the reference pictures against the last release's numbers;
+ 2. tracing quality on the reference pictures against the last release's numbers, and the slop
+    check (tools/slop_check.py);
  3. the engine battery with AddressSanitizer, UBSan and leak checks: 5 seeds x 3,000 steps;
  4. the engine battery with ThreadSanitizer: 2 seeds x 1,000 steps;
  5. the fuzzer: 30 minutes on 2 workers;
@@ -80,6 +81,7 @@ def main():
          [py, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-t", "."], None),
         ("Self test", [py, "run.py", "--selftest", os.path.join("build", "selftest.log")], None),
         ("Tracing quality against the last release", [py, "tools/quality.py"], None),
+        ("The slop check", [py, "tools/slop_check.py"], None),
     ]
     for s in seeds[:n(5, 1)]:
         checks.append(("Engine battery, ASan/UBSan, seed %d" % s,

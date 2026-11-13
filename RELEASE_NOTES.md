@@ -2,6 +2,26 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.1.1
+
+New:
+- Crop: *Trace > Crop picture* (Ctrl+R), then drag across the part of the picture to trace,
+  for example the drawing in a screenshot without the program's toolbars around it. Auto
+  settings picks the settings for that part. *Trace > Remove crop* (Ctrl+Shift+R) brings the
+  whole picture back. On the command line: `--crop X,Y,W,H`.
+
+Fixed:
+- Background: Remove on a picture with transparent parts at its edge removes those parts, not
+  a shape that covers most of the edge.
+- Drawings, plans and screenshots of them trace much better with Auto settings: thin lines
+  are kept (gray outlines used to disappear), in their own colors, and the picture is enlarged
+  4 times first so lines a pixel wide trace cleanly.
+- Auto settings now sets every setting, including Speckles, Smooth corners, Optimize,
+  Tolerance and Enlarge first.
+- Auto settings gives flat pictures with more than 16 colors (illustrations, maps, charts)
+  all their colors, up to 64. Before, it stopped at 16 and treated them like a photo, so
+  some colors were lost or swapped. Photos and paintings are handled as before.
+
 ## 1.1
 
 New:
