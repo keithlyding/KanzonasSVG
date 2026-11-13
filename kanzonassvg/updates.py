@@ -442,11 +442,11 @@ def restart_env(env=None):
     if mount:
         mount = mount.rstrip("/")
         for key, value in list(env.items()):
-            parts = value.split(os.pathsep)
+            parts = value.split(":")       # (Linux's separator: this runs only there)
             kept = [p for p in parts if not (p == mount or p.startswith(mount + "/"))]
             if kept != parts:
                 if any(kept):
-                    env[key] = os.pathsep.join(kept)
+                    env[key] = ":".join(kept)
                 else:
                     del env[key]
     return env
