@@ -4,7 +4,7 @@
 
 Turn pictures (logos, drawings, scans) into SVG files, on Windows and Linux.
 
-![A picture and its SVG side by side](docs/screenshot.png)
+![The KanzonasSVG window: on the left, a picture of a yellow sunflower with a brown center on a dark green cactus; on the right, its SVG traced in 6 flat colors with Auto settings, petals, center and cactus matching the picture; the settings panel on the right shows Colors mode, 6 colors and Background: Remove](docs/screenshot.png)
 
 KanzonasSVG does one thing: it traces a picture into an SVG. Open a picture and it picks the
 settings that suit it (how many colors, smoothing, background) and shows the SVG beside it;
@@ -48,6 +48,8 @@ From [Releases](https://github.com/keithlyding/KanzonasSVG/releases):
 **Background**: *Remove* makes the picture's background (the color around its edge, light or
 dark) see-through and keeps that color inside shapes; *Remove, also inside* removes that color
 everywhere.
+
+![A flat illustration traced with Auto settings: an orange sky with a pale yellow sun, purple mountains, a green hill, a blue lake, dark green pines, a cream house with a red roof and blue door, and pink, orange, yellow and lilac flowers in the grass; the SVG on the right matches it in 14 flat colors](docs/screenshot-landscape.png)
 
 Modes: **Colors** (best for logos: count the background as a color), Grays, Brightness steps,
 Black and white, Edges, Autotrace colors, and Autotrace centerline (lines along the middle of
