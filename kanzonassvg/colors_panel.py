@@ -297,6 +297,3 @@ class ColorsPanel(QGroupBox):
             self.edits = []
         self._done()
 
-
-def set_visible_for(panel, mode):
-    panel.setVisible(mode in (engine.COLORS, engine.GRAYS, engine.AUTOTRACE))

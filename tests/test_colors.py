@@ -14,7 +14,7 @@ from PySide6.QtCore import QPointF, QSettings, Qt
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import QApplication, QColorDialog
 
-from kanzonassvg import app, cli, engine, image, tracing
+from kanzonassvg import app, cli, engine, image
 from tests.helpers import logo
 
 RED, BLUE, WHITE = (0xB2, 0x00, 0x2D), (0x1D, 0x3F, 0x8F), (0xFF, 0xFF, 0xFF)

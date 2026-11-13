@@ -47,7 +47,10 @@ STRAY = re.compile(r"(\.orig|\.rej|\.bak|\.part|\.tmp|~)$|(^|/)__pycache__/|^tes
 
 
 def tracked():
-    out = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout
+    """The files git tracks, and new ones it would (not yet committed, not ignored): a new file's
+    slop is caught before its first commit."""
+    out = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard"], cwd=ROOT,
+                         capture_output=True, text=True, check=True).stdout
     return [f for f in out.splitlines() if f and os.path.exists(os.path.join(ROOT, f))]
 
 
