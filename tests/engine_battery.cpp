@@ -372,6 +372,14 @@ int main(int argc, char **argv)
                     kz_default_options(&d);
                     eff = d;
                     std::memcpy(&eff, &o, std::max(0, std::min(o.size, (int)sizeof(o))));
+                    // (as the engine: the edits only from a struct that holds them whole)
+                    if (o.size < (int)(offsetof(kz_options, edits) + sizeof(o.edits))) {
+                        eff.nedits = 0;
+                        eff.edits = nullptr;
+                    }
+                }
+                if (!eff.edits) {
+                    eff.nedits = 0;
                 }
                 eff.scans = std::max(2, std::min(256, eff.scans));
                 check_svg(svg, p, n, eff, errs);

@@ -530,10 +530,13 @@ class Canvas(QWidget):
                 and self.has_content():
             self.clicked.emit(self.to_picture(e.position()))
         if self.band is not None:
+            moved = (self.band[1] - self.band[0]).manhattanLength()
             a, b = self.to_picture(self.band[0]), self.to_picture(self.band[1])
             self.band = None
             self.update()
-            self.cropped.emit(QRectF(a, b).normalized())
+            # a click is no rectangle (rounded out to whole pixels, a click across a pixel's edge
+            # made a 2 x 2 crop)
+            self.cropped.emit(QRectF(a, b).normalized() if moved >= 4 else QRectF())
             return
         self.drag = None
         if self.crop_mode:
