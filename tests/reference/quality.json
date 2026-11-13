@@ -1,0 +1,74 @@
+{
+ "logo.png, auto": {
+  "badly_wrong_pct": 0.253,
+  "kb": 24,
+  "seconds": 0.059,
+  "shapes": 4
+ },
+ "logo.png, autotrace 8": {
+  "badly_wrong_pct": 0.522,
+  "kb": 6,
+  "seconds": 0.053,
+  "shapes": 3
+ },
+ "logo.png, colors 8": {
+  "badly_wrong_pct": 0.257,
+  "kb": 24,
+  "seconds": 0.032,
+  "shapes": 4
+ },
+ "logo_alpha.png, auto": {
+  "badly_wrong_pct": 0.254,
+  "kb": 32,
+  "seconds": 0.052,
+  "shapes": 4
+ },
+ "logo_jpg.jpg, auto": {
+  "badly_wrong_pct": 0.327,
+  "kb": 25,
+  "seconds": 0.062,
+  "shapes": 4
+ },
+ "smiley.png, auto": {
+  "badly_wrong_pct": 0.238,
+  "kb": 15,
+  "seconds": 0.147,
+  "shapes": 5
+ },
+ "smiley.png, autotrace 8": {
+  "badly_wrong_pct": 0.598,
+  "kb": 41,
+  "seconds": 0.155,
+  "shapes": 31
+ },
+ "smiley.png, colors 8": {
+  "badly_wrong_pct": 0.27,
+  "kb": 40,
+  "seconds": 0.093,
+  "shapes": 8
+ },
+ "starry-night.jpg, auto": {
+  "badly_wrong_pct": 2.865,
+  "kb": 4103,
+  "seconds": 0.535,
+  "shapes": 19
+ },
+ "starry-night.jpg, autotrace 16": {
+  "badly_wrong_pct": 12.466,
+  "kb": 2930,
+  "seconds": 1.149,
+  "shapes": 16542
+ },
+ "starry-night.jpg, bw": {
+  "badly_wrong_pct": 71.37,
+  "kb": 2844,
+  "seconds": 0.405,
+  "shapes": 7
+ },
+ "starry-night.jpg, colors 16": {
+  "badly_wrong_pct": 2.132,
+  "kb": 7705,
+  "seconds": 0.282,
+  "shapes": 34
+ }
+}

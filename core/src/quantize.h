@@ -28,6 +28,11 @@ IndexedMap rgbMapQuantize(RgbMap const &rgbmap, int nrColors);
 void refinePalette(RgbMap const &original, IndexedMap &imap);
 
 /**
+ * Merge palette colors that ended up nearly the same; returns how many were merged.
+ */
+int mergeDuplicateColors(IndexedMap &imap);
+
+/**
  * Drop the palette colors that only exist as rims between two other colors.
  */
 void dropBlendColors(RgbMap const &rgbmap, IndexedMap &imap);

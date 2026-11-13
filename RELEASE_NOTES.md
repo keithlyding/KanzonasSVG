@@ -2,6 +2,30 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.0.2
+
+Faster:
+- The window never freezes: zooming, moving and new results used to freeze it for up to a
+  second on photos. SVGs are now drawn by KanzonasSVG itself, 8 to 20 times faster, in the
+  background, and pictures are opened in the background.
+- Tracing uses all the computer's cores (a 12-megapixel photo: 1.9 s, now 1.0 s), and changing
+  a setting that doesn't change the colors (speckles, corners, optimize, background) traces again
+  about three times faster.
+
+Fixed (found by a new battery of tests that tries to break it):
+- On Windows, detailed pictures (photos, paintings) were traced with worse colors than on Linux
+  (an overflow in the color reduction, from Inkscape's code). They now trace the same on both.
+- Quitting right after Copy SVG could crash the program.
+- An SVG of thousands of small shapes could show only in part in the window (and in some other
+  programs). Very long paths are now split, and the window always shows the whole SVG.
+- On a clean picture with Smooth on and many colors, near-copies of the picture's colors could
+  come out as extra layers.
+- Enlarge first on a big picture could use gigabytes of memory; pictures are now enlarged to at
+  most 40 megapixels.
+- A very noisy picture with very many colors could make an SVG of gigabytes; tracing now stops
+  past 500 MB and says to use fewer colors, Smooth or Speckles.
+- A threshold of "nan" on the command line, and Auto settings keeping the threshold shown.
+
 ## 1.0.1
 
 New:

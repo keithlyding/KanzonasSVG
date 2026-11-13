@@ -10,11 +10,14 @@
  * Released under GNU GPL v2+, read the file 'COPYING' for more information.
  */
 #include "quantize.h"
+#include "parallel.h"
 
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
+#include <cstdint>
 #include <cstdlib>
+#include <tuple>
 #include <memory>
 #include <vector>
 
@@ -29,6 +32,8 @@ namespace {
 /**
  * an octree node datastructure
  */
+// (64-bit counts: Inkscape's unsigned long is 32 bits on Windows, where the impact values
+// overflowed on big pictures and the palette came out worse than on Linux.)
 struct Ocnode
 {
     Ocnode *parent;           // parent node
@@ -37,10 +42,10 @@ struct Ocnode
     int nchild;               // number of children
     int width;                // width level of this node
     RGB rgb;                  // rgb's prefix of that node
-    unsigned long weight;     // number of pixels this node accounts for
-    unsigned long rs, gs, bs; // sum of pixels colors this node accounts for
+    uint64_t weight;          // number of pixels this node accounts for
+    uint64_t rs, gs, bs;      // sum of pixels colors this node accounts for
     int nleaf;                // number of leaves under this node
-    unsigned long mi;         // minimum impact
+    uint64_t mi;              // minimum impact (weight << 2*width: up to 2^16 times the weight)
 };
 
 /*
@@ -338,7 +343,7 @@ void ocnodeMi(Ocnode *node)
  * <count> leaves are removed, and <count> is decreased on each removal.
  * all parameters including minimal impact values are regenerated.
  */
-void ocnodeStrip(Pool<Ocnode> &pool, Ocnode **ref, int &count, unsigned long lvl)
+void ocnodeStrip(Pool<Ocnode> &pool, Ocnode **ref, int &count, uint64_t lvl)
 {
     Ocnode *node = *ref;
     if (!node) return;
@@ -444,8 +449,8 @@ Ocnode *octreeBuild(Pool<Ocnode> &pool, RgbMap const &rgbmap, int ncolor)
 
     struct Bin
     {
-        unsigned long weight = 0;
-        unsigned long rs = 0, gs = 0, bs = 0;
+        uint64_t weight = 0;
+        uint64_t rs = 0, gs = 0, bs = 0;
     };
     std::vector<Bin> bins(1u << (3 * HIST_BITS));
 
@@ -493,7 +498,7 @@ Ocnode *octreeBuild(Pool<Ocnode> &pool, RgbMap const &rgbmap, int ncolor)
 /**
  * compute the color palette associated to an octree, with the weight of each color.
  */
-void octreeIndex(Ocnode *node, RGB *rgbpal, unsigned long *weights, int &index)
+void octreeIndex(Ocnode *node, RGB *rgbpal, uint64_t *weights, int &index)
 {
     if (!node) return;
     if (node->nchild == 0) {
@@ -518,7 +523,7 @@ void octreeIndex(Ocnode *node, RGB *rgbpal, unsigned long *weights, int &index)
  * for, the spare ones split a color into near-identical twins (JPEG noise in a flat
  * area), and the border between twins is noise: thousands of nodes for nothing.
  */
-int mergeCloseColors(RGB *rgbs, unsigned long *weights, int n)
+int mergeCloseColors(RGB *rgbs, uint64_t *weights, int n)
 {
     constexpr int CLOSE = 3 * 10 * 10; // about 10 levels per channel
     auto dist2 = [](RGB a, RGB b) {
@@ -539,7 +544,7 @@ int mergeCloseColors(RGB *rgbs, unsigned long *weights, int n)
         if (bi < 0) {
             break;
         }
-        unsigned long wi = weights[bi], wj = weights[bj], w = std::max(wi + wj, 1ul);
+        uint64_t wi = weights[bi], wj = weights[bj], w = std::max<uint64_t>(wi + wj, 1);
         rgbs[bi].r = (rgbs[bi].r * wi + rgbs[bj].r * wj + w / 2) / w;
         rgbs[bi].g = (rgbs[bi].g * wi + rgbs[bj].g * wj + w / 2) / w;
         rgbs[bi].b = (rgbs[bi].b * wi + rgbs[bj].b * wj + w / 2) / w;
@@ -589,7 +594,7 @@ IndexedMap rgbMapQuantize(RgbMap const &rgbmap, int ncolor)
     auto tree = octreeBuild(pool, rgbmap, ncolor);
 
     auto rgbs = std::make_unique<RGB[]>(ncolor);
-    auto counts = std::make_unique<unsigned long[]>(ncolor);
+    auto counts = std::make_unique<uint64_t[]>(ncolor);
     int index = 0;
     octreeIndex(tree, rgbs.get(), counts.get(), index);
 
@@ -604,8 +609,15 @@ IndexedMap rgbMapQuantize(RgbMap const &rgbmap, int ncolor)
     int const nused = index;
 
     // stacking with increasing contrasts
-    std::sort(rgbs.get(), rgbs.get() + nused,
-              [](auto &ra, auto &rb) { return (ra.r + ra.g + ra.b) < (rb.r + rb.g + rb.b); });
+    // (ties broken by the colors themselves: std::sort leaves equal ones in an order that differs
+    // between C++ libraries, and the order is the stacking order)
+    std::sort(rgbs.get(), rgbs.get() + nused, [](auto &ra, auto &rb) {
+        int a = ra.r + ra.g + ra.b, b = rb.r + rb.g + rb.b;
+        if (a != b) {
+            return a < b;
+        }
+        return std::tie(ra.r, ra.g, ra.b) < std::tie(rb.r, rb.g, rb.b);
+    });
 
     // make the new map
     // fill in the color lookup table
@@ -641,6 +653,88 @@ IndexedMap rgbMapQuantize(RgbMap const &rgbmap, int ncolor)
 }
 
 /**
+ * Merge palette colors that ended up nearly the same (about 10 levels per channel): each
+ * one's pixels go to the one with more pixels. Returns how many were merged.
+ *
+ * The palette is picked on the smoothed picture, where a hard edge between two colors that
+ * aren't far apart comes out softened: the pixels next to it, a few levels off, can get a
+ * palette color of their own, and once refinePalette() has set each color from the original
+ * picture, two of them can be the same color give or take a level or two (a clean picture of
+ * 3 colors traced with Smooth on gave 6 layers, two of them copies).
+ */
+int mergeDuplicateColors(IndexedMap &imap)
+{
+    int n = imap.nrColors;
+    if (n < 2) {
+        return 0;
+    }
+    constexpr int CLOSE = 3 * 10 * 10;
+    std::vector<size_t> count(n, 0);
+    for (auto k : imap.pixels) {
+        if ((int)k < n) {
+            count[k]++;
+        }
+    }
+    std::vector<int> target(n);
+    for (int k = 0; k < n; k++) {
+        target[k] = k;
+    }
+    auto dist2 = [](RGB a, RGB b) {
+        return (a.r - b.r) * (a.r - b.r) + (a.g - b.g) * (a.g - b.g) + (a.b - b.b) * (a.b - b.b);
+    };
+    int merged = 0;
+    while (true) {
+        int bi = -1, bj = -1, bd = CLOSE + 1;
+        for (int i = 0; i < n; i++) {
+            if (target[i] != i) {
+                continue;
+            }
+            for (int j = i + 1; j < n; j++) {
+                if (target[j] != j) {
+                    continue;
+                }
+                int d = dist2(imap.clut[i], imap.clut[j]);
+                if (d < bd) {
+                    bd = d;
+                    bi = i;
+                    bj = j;
+                }
+            }
+        }
+        if (bi < 0) {
+            break;
+        }
+        int keep = count[bi] >= count[bj] ? bi : bj, gone = keep == bi ? bj : bi;
+        for (int k = 0; k < n; k++) {
+            if (target[k] == gone) {
+                target[k] = keep;
+            }
+        }
+        count[keep] += count[gone];
+        merged++;
+    }
+    if (!merged) {
+        return 0;
+    }
+    // compact the palette, keeping its order (stacking goes by it)
+    std::vector<int> newIndex(n, -1);
+    int m = 0;
+    for (int k = 0; k < n; k++) {
+        if (target[k] == k) {
+            imap.clut[m] = imap.clut[k];
+            newIndex[k] = m++;
+        }
+    }
+    for (auto &k : imap.pixels) {
+        if ((int)k < n) {
+            k = newIndex[target[k]];
+        }
+    }
+    imap.nrColors = m;
+    return merged;
+}
+
+/**
  * Set each palette color to the color of <original> over the pixels of that color whose
  * eight neighbors have it too (over all its pixels if it has no such pixel): the color
  * that most of those pixels have exactly, when one does (a flat color), else their mean.
@@ -662,7 +756,7 @@ void refinePalette(RgbMap const &original, IndexedMap &imap)
 
     struct Sum
     {
-        unsigned long long r = 0, g = 0, b = 0, count = 0;
+        uint64_t r = 0, g = 0, b = 0, count = 0;
         void add(RGB c)
         {
             r += c.r;
@@ -708,7 +802,7 @@ void refinePalette(RgbMap const &original, IndexedMap &imap)
     }
 
     // Is the candidate really over half of them?
-    std::vector<unsigned long long> exact(n, 0);
+    std::vector<uint64_t> exact(n, 0);
     for (int y = 1; y + 1 < height; y++) {
         for (int x = 1; x + 1 < width; x++) {
             size_t i = (size_t)y * width + x;
@@ -870,14 +964,18 @@ void snapBlendedEdges(RgbMap const &rgbmap, IndexedMap &imap)
     // about 16 levels per channel, above JPEG and scanner noise in flat areas.
     constexpr int SURE = 3 * 16 * 16;
     std::vector<unsigned char> sure(imap.pixels.size());
-    for (size_t i = 0; i < sure.size(); i++) {
-        auto c = rgbmap.pixels[i];
-        sure[i] = dist2(c.r, c.g, c.b, pal[imap.pixels[i]]) <= SURE;
-    }
+    kz::parallel_for((long)sure.size(), [&](long b, long e) {
+        for (long i = b; i < e; i++) {
+            auto c = rgbmap.pixels[i];
+            sure[i] = dist2(c.r, c.g, c.b, pal[imap.pixels[i]]) <= SURE;
+        }
+    }, 1 << 16);
 
     auto out = imap.pixels;
     constexpr int R = 2; // look this far around a pixel for the colors it may blend
-    for (int y = 0; y < height; y++) {
+    // (rows independent: each reads imap and sure, and writes only its own row of out)
+    kz::parallel_for(height, [&](long y0, long y1) {
+    for (int y = (int)y0; y < (int)y1; y++) {
         for (int x = 0; x < width; x++) {
             size_t i = (size_t)y * width + x;
             if (sure[i]) {
@@ -950,6 +1048,7 @@ void snapBlendedEdges(RgbMap const &rgbmap, IndexedMap &imap)
             }
         }
     }
+    });
 
     imap.pixels = std::move(out);
 }

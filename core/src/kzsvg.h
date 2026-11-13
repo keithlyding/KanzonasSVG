@@ -100,6 +100,18 @@ typedef struct kz_auto_info {
 KZ_API int kz_auto(const unsigned char *rgba, int width, int height, int stride, kz_options *o,
                    kz_auto_info *info);
 
+/*
+ * Drawing an SVG this engine wrote, for showing it (fast, on several cores; through ctypes it
+ * doesn't hold Python's lock, which Qt's SVG renderer does). kz_drawing_open parses it once
+ * (NULL if it can't); kz_drawing_render draws its viewBox into the rectangle at (left, top),
+ * target_width x target_height pixels, over what <out> already holds: width x height pixels,
+ * <stride> bytes a row, premultiplied ARGB32 as Qt's QImage keeps it (B, G, R, A in memory).
+ */
+KZ_API void *kz_drawing_open(const char *svg);
+KZ_API int kz_drawing_render(void *drawing, unsigned char *out, int width, int height, int stride, double left,
+                             double top, double target_width, double target_height);
+KZ_API void kz_drawing_close(void *drawing);
+
 KZ_API void kz_free(void *p);
 
 /* The engine's version, for example "1.0". */

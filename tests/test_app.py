@@ -42,7 +42,8 @@ class TestWindow(unittest.TestCase):
         self.tmp.cleanup()
 
     def traced(self):
-        return wait(lambda: self.w.worker is None and not self.w.timer.isActive() and self.w.result is not None)
+        return wait(lambda: not self.w.loading() and self.w.worker is None and not self.w.timer.isActive()
+                    and self.w.result is not None)
 
     def test_open_trace_save(self):
         self.assertFalse(self.w.a_save.isEnabled())
@@ -85,6 +86,16 @@ class TestWindow(unittest.TestCase):
         self.assertTrue(self.traced())
         self.assertEqual(self.w.settings.scans.value(), 5)
         self.assertNotIn("Auto", self.w.status.text())
+
+    def test_auto_keeps_the_threshold_shown(self):
+        # Auto used to trace with its own threshold while the panel kept another: the SVG shown
+        # wasn't the trace of the settings shown (found by tests/battery_app.py)
+        self.w.settings.threshold.setValue(0.7)
+        QApplication.processEvents()
+        self.w.timer.stop()
+        self.w.open_path(self.png)
+        self.assertTrue(self.traced())
+        self.assertEqual(self.w.job.options, self.w.settings.options())
 
     def test_settings_retrace(self):
         self.w.open_path(self.png)
@@ -162,3 +173,32 @@ class TestWindow(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestExit(unittest.TestCase):
+    def test_quit_after_copy_svg(self):
+        # Copy SVG, then quit: the program used to crash on its way out (Qt destroying clipboard
+        # data made from Python after Python had stopped)
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory() as d:
+            png = os.path.join(d, "a.png")
+            logo().save(png)
+            code = (
+                "import sys; sys.path.insert(0, %r)\n"
+                "from PySide6.QtCore import QTimer\n"
+                "from PySide6.QtWidgets import QApplication\n"
+                "from kanzonassvg import app\n"
+                "qa = QApplication([sys.argv[0]])\n"
+                "def go():\n"
+                "    w = [x for x in QApplication.topLevelWidgets() if isinstance(x, app.MainWindow)][0]\n"
+                "    w.open_path(%r)\n"
+                "    def done():\n"
+                "        if w.result is None: return QTimer.singleShot(50, done)\n"
+                "        w.copy_svg(); QApplication.quit()\n"
+                "    done()\n"
+                "QTimer.singleShot(200, go)\n"
+                "sys.exit(app.run([]))\n" % (os.path.dirname(os.path.dirname(os.path.abspath(__file__))), png))
+            env = dict(os.environ, QT_QPA_PLATFORM="offscreen", XDG_CONFIG_HOME=d)
+            r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, timeout=120)
+            self.assertEqual(r.returncode, 0, r.stderr.decode(errors="replace")[-2000:])

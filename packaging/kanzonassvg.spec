@@ -14,7 +14,7 @@ if not os.path.exists(engine):
 # Only the parts of Qt the app uses
 EXCLUDES = ["tkinter", "PySide6.QtNetwork", "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtPdf",
             "PySide6.QtMultimedia", "PySide6.QtWebEngineCore", "PySide6.Qt3DCore", "PySide6.QtOpenGL",
-            "PySide6.QtDBus", "PySide6.QtXml", "PySide6.QtSql", "PySide6.QtTest", "unittest", "pydoc"]
+            "PySide6.QtDBus", "PySide6.QtXml", "PySide6.QtSql", "PySide6.QtTest", "unittest", "pydoc", "numpy"]
 
 runtime_hooks = [] if WINDOWS else [os.path.join(ROOT, "packaging", "linux", "pyi_rth_linux_env.py")]
 

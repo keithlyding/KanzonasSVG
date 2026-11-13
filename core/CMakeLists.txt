@@ -34,7 +34,7 @@ else()
   target_compile_options(autotrace PRIVATE -Wno-int-in-bool-context -Wno-address)
 endif()
 
-add_library(kzsvg SHARED src/engine.cpp src/filterset.cpp src/imagemap.cpp src/quantize.cpp)
+add_library(kzsvg SHARED src/engine.cpp src/drawing.cpp src/filterset.cpp src/imagemap.cpp src/quantize.cpp)
 target_link_libraries(kzsvg PRIVATE potrace autotrace)
 if(UNIX)
   target_link_libraries(kzsvg PRIVATE m)
