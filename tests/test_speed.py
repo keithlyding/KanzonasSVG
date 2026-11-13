@@ -76,7 +76,10 @@ class TestSpeed(unittest.TestCase):
             t = time.perf_counter()
             d.render_image(img, 0, 0, 1600, 1066)
             best = min(best, time.perf_counter() - t)
-        self.assertLess(best, 0.15 * SLACK, "drawing the SVG: %.3f s" % best)
+        # this SVG (22.6 MB, the detailed test picture): 0.11 s on 4 cores, 0.26 s on one; Qt's
+        # renderer took 3.6 s. (0.15 s was set before the test picture was made detailed, and a
+        # slower build machine took 0.17 s.)
+        self.assertLess(best, 0.45 * SLACK, "drawing the SVG: %.3f s" % best)
 
     def test_quick_preview_of_a_big_picture(self):
         w = app.MainWindow()
