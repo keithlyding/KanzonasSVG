@@ -112,14 +112,15 @@ while the whole picture is traced; the status bar says so, and <i>Save SVG</i> a
 wait for the whole picture's SVG.</p>
 <h3>Editing colors</h3>
 <p>In <b>Colors</b>, <b>Grays</b> and <b>Autotrace: colors</b>, the <b>Colors</b> box shows the
-colors the SVG is traced with, one swatch each. Click swatches to select them (click again to
-unselect; clicking the picture on the left selects the color traced there), then:</p>
+colors the SVG is traced with, one swatch each. Click a swatch to select its color, and
+Ctrl+click more to select them too (Ctrl+click a selected one to unselect it). Clicking the
+picture or the SVG does the same with the color traced there. Then:</p>
 <ul>
 <li><b>Change color...</b> traces them as another color you pick: the shapes stay, only their
 color changes.</li>
-<li><b>Merge</b> traces them as one color (that of the biggest of them), in one layer: for a
-picture with too many shades of the same color, merge the shades you don't need apart. Merged
-colors show as one swatch.</li>
+<li><b>Merge</b> traces them as one color, in one layer: pick which of them from the list it
+opens (biggest first), or <b>Another color...</b>. For a picture with too many shades of the
+same color, merge the shades you don't need apart. Merged colors show as one swatch.</li>
 <li><b>Leave out</b> leaves them out: the SVG is see-through there (a crossed-out swatch;
 select it and click <b>Put back</b> to trace it again).</li>
 <li><b>Reset colors</b> undoes the edits of the selected colors, or of all when none is
@@ -132,6 +133,11 @@ the color nearest the one it was made on (within 24 levels). An edit no color ma
 is kept, and the box says so; it applies again if that color comes back. The status bar says
 how many colors are edited. On the command line: <code>--list-colors</code>,
 <code>--recolor FROM=TO</code> and <code>--leave-out COLOR</code>.</p>
+<h3>Undo</h3>
+<p><i>Edit &gt; Undo</i> (Ctrl+Z) goes back to the SVG before, as it was traced: its settings,
+color edits and crop. <i>Edit &gt; Redo</i> (Ctrl+Y, or Ctrl+Shift+Z) goes forward again. Every
+SVG traced for the picture shown can be gone back to; a change made after an Undo drops what
+Redo would have brought back, and a new picture starts afresh.</p>
 <h3>Cropping</h3>
 <p>To trace only part of a picture (the drawing in a screenshot, without the program's
 toolbars around it; one logo of several), use <i>Trace &gt; Crop picture</i> (Ctrl+R) and
@@ -142,6 +148,8 @@ crop further; Esc stops cropping before you drag. <i>Trace &gt; Remove crop</i>
 (Ctrl+Shift+R) brings the whole picture back. The command line's <code>--crop X,Y,W,H</code>
 does the same.</p>
 <h3>Looking at it</h3>
+<p>Above the SVG: its size, as Save SVG will write it, and how many shapes it has (also in the
+status bar).</p>
 <p>The left side shows the picture; <i>View &gt; Show colors to trace</i> (Ctrl+T) shows it
 with its colors reduced, as it will be traced. Both sides zoom and move together: turn the
 mouse wheel to zoom, drag to move. <i>View &gt; Zoom to fit</i> (Ctrl+0), <i>View &gt; Actual
@@ -155,6 +163,8 @@ size</i> (Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> 
 <tr><td>Ctrl+Shift+C</td><td>Copy SVG</td></tr>
 <tr><td>F5</td><td>Update now</td></tr>
 <tr><td>Ctrl+Shift+A</td><td>Auto settings</td></tr>
+<tr><td>Ctrl+Z / Ctrl+Y</td><td>Undo / Redo</td></tr>
+<tr><td>Ctrl+click</td><td>Select more colors (a swatch, the picture or the SVG)</td></tr>
 <tr><td>Ctrl+R / Ctrl+Shift+R</td><td>Crop picture / Remove crop</td></tr>
 <tr><td>Ctrl+T</td><td>Show colors to trace</td></tr>
 <tr><td>Ctrl+0 / Ctrl+1</td><td>Zoom to fit / Actual size</td></tr>
@@ -374,7 +384,7 @@ class Canvas(QWidget):
 
     _ids = itertools.count(1)
     cropped = Signal(QRectF)  # (Crop picture) the rectangle dragged, in picture pixels
-    clicked = Signal(QPointF)  # a click (no drag) on the picture, in picture pixels
+    clicked = Signal(QPointF, bool)  # a click (no drag), in picture pixels, and whether Ctrl was held
 
     def __init__(self, view, title):
         super().__init__()
@@ -528,7 +538,8 @@ class Canvas(QWidget):
         press, self.press = getattr(self, "press", None), None
         if press is not None and self.band is None and (e.position() - press).manhattanLength() < 4 \
                 and self.has_content():
-            self.clicked.emit(self.to_picture(e.position()))
+            self.clicked.emit(self.to_picture(e.position()),
+                              bool(e.modifiers() & Qt.KeyboardModifier.ControlModifier))
         if self.band is not None:
             moved = (self.band[1] - self.band[0]).manhattanLength()
             a, b = self.to_picture(self.band[0]), self.to_picture(self.band[1])
@@ -878,6 +889,38 @@ class Settings(QScrollArea):
         self.tolerance.setEnabled(self.optimize.isChecked())
         self._update_visible()
 
+    # for Undo: every setting as it is, and put back
+
+    def snapshot(self):
+        values = []
+        for name, w in self._widgets():
+            if isinstance(w, QComboBox):
+                values.append((name, w.currentIndex()))
+            elif isinstance(w, QCheckBox):
+                values.append((name, w.isChecked()))
+            else:
+                values.append((name, w.value()))
+        return (tuple(values), self._edge, self._bw, self.colors.state())
+
+    def restore(self, snap):
+        """Put the settings of snapshot() back (without tracing: the caller traces)."""
+        values, self._edge, self._bw, edits = snap
+        widgets = dict(self._widgets())
+        for name, v in values:
+            w = widgets[name]
+            w.blockSignals(True)
+            if isinstance(w, QComboBox):
+                w.setCurrentIndex(v)
+            elif isinstance(w, QCheckBox):
+                w.setChecked(v)
+            else:
+                w.setValue(v)
+            w.blockSignals(False)
+        self._last_mode = self.current_mode()
+        self.tolerance.setEnabled(self.optimize.isChecked())
+        self.colors.set_state(edits)
+        self._update_visible()
+
     def apply_auto(self, o, enlarge=None):
         """Show the settings Auto picked (without tracing again: they're being traced): all of
         them, Enlarge first too (enlarge: its setting, tracing.AUTO by default)."""
@@ -945,6 +988,8 @@ class MainWindow(QMainWindow):
         self.img = None  # QImage, RGBA8888: the picture traced (cropped, if it is)
         self.full_img = None  # the whole picture opened
         self.crop = None  # QRect of full_img that img is, or None
+        self.history = []  # Undo: (settings, crop) of each SVG traced for this picture
+        self.history_at = -1
         self.source_path = None
         self.save_path = None
         self.result = None  # tracing.Result
@@ -965,6 +1010,7 @@ class MainWindow(QMainWindow):
         self.left.cropped.connect(self.on_cropped)
         self.left.clicked.connect(self.on_picture_clicked)
         self.right = Canvas(self.view, "SVG")
+        self.right.clicked.connect(self.on_picture_clicked)    # (the SVG: the same place in the picture)
         self.left.set_message("Open a picture (Ctrl+O), drag one here, or paste one (Ctrl+V).")
         split = QSplitter()
         split.addWidget(self.left)
@@ -1026,6 +1072,10 @@ class MainWindow(QMainWindow):
         m.addSeparator()
         self._action(m, "Quit", self.close, QKeySequence.StandardKey.Quit)
 
+        m = mb.addMenu("&Edit")
+        self.a_undo = self._action(m, "Undo", self.undo, QKeySequence.StandardKey.Undo)
+        self.a_redo = self._action(m, "Redo", self.redo, QKeySequence.StandardKey.Redo)
+
         m = mb.addMenu("&View")
         self.a_colors = self._action(m, "Show colors to trace", self.show_colors_changed, "Ctrl+T", True)
         m.addSeparator()
@@ -1062,6 +1112,8 @@ class MainWindow(QMainWindow):
         self.a_save_as.setEnabled(has)
         self.a_copy.setEnabled(has)
         self.a_crop.setEnabled(self.img is not None)
+        self.a_undo.setEnabled(self.history_at > 0)
+        self.a_redo.setEnabled(self.history_at + 1 < len(self.history))
         self.a_uncrop.setEnabled(self.crop is not None)
 
     def _update_title(self):
@@ -1135,14 +1187,16 @@ class MainWindow(QMainWindow):
         """A new picture: opened, pasted or dropped."""
         self.full_img = img
         self.crop = None
+        self.history, self.history_at = [], -1     # (Undo is for this picture)
         self.settings.colors.clear()    # (color edits are for the picture they were made on)
         self.source_path = path
         self.save_path = None
         self.cancel_crop()
         self._show_picture(img)
 
-    def _show_picture(self, img):
-        """Trace img (the picture, or the part of it cropped to) as a new picture."""
+    def _show_picture(self, img, auto=None):
+        """Trace img (the picture, or the part of it cropped to) as a new picture (auto: run Auto
+        settings; by default as Auto settings for new pictures says)."""
         self.img = img
         self.result = None
         self.preview = None
@@ -1154,10 +1208,59 @@ class MainWindow(QMainWindow):
         self.right.set_message("")
         self._update_title()
         self._update_actions()
-        self.start_trace(auto=self.a_auto_new.isChecked())
+        self.right.title = "SVG"
+        self.start_trace(auto=self.a_auto_new.isChecked() if auto is None else auto)
 
-    def on_picture_clicked(self, point):
-        """A click on the picture: select the color traced there in the Colors panel."""
+    # Undo: every SVG traced for this picture, with the settings and crop it was traced with
+
+    def _state(self):
+        c = self.crop
+        return (self.settings.snapshot(), None if c is None else (c.x(), c.y(), c.width(), c.height()))
+
+    def remember(self):
+        """The SVG shown is done: remember how it was made (unless more changes are on their way,
+        or it's the one remembered last: Undo and Redo trace those again)."""
+        if self.timer.isActive() or self.pending or self.restoring:
+            return
+        state = self._state()
+        if self.history_at >= 0 and self.history[self.history_at] == state:
+            return
+        del self.history[self.history_at + 1:]
+        self.history.append(state)
+        self.history_at = len(self.history) - 1
+        self._update_actions()
+
+    restoring = False
+
+    def _restore(self, at):
+        if not (0 <= at < len(self.history)) or self.full_img is None:
+            return
+        self.history_at = at
+        snap, crop = self.history[at]
+        self.cancel_crop()
+        self.restoring = True
+        try:
+            self.settings.restore(snap)
+            self.settings.save(self.qs)
+            new_crop = None if crop is None else QRect(*crop)
+            if new_crop != self.crop:
+                self.crop = new_crop
+                self._show_picture(self.full_img if new_crop is None else self.full_img.copy(new_crop), auto=False)
+            else:
+                self.start_trace()
+        finally:
+            self.restoring = False
+        self._update_actions()
+
+    def undo(self):
+        self._restore(self.history_at - 1)
+
+    def redo(self):
+        self._restore(self.history_at + 1)
+
+    def on_picture_clicked(self, point, add=False):
+        """A click on the picture or the SVG: select the color traced there in the Colors panel
+        (add: Ctrl held, add it to the selection or take it out)."""
         colors = self.settings.colors
         if self.img is None or not colors.isVisible() or not colors.palette:
             return
@@ -1167,11 +1270,14 @@ class MainWindow(QMainWindow):
         c = self.img.pixelColor(x, y)
         if c.alpha() < 128:
             c = QColor(255, 255, 255)   # (transparent parts are traced as white)
-        g = colors.select_only((c.red(), c.green(), c.blue()))
+        g = colors.select_at((c.red(), c.green(), c.blue()), add)
         if g is not None:
-            self.status.setText("Selected %s in Colors (%s)." % (
+            n = len(colors._selected_groups())
+            self.status.setText("%s %s in Colors (%s)%s." % (
+                "Unselected" if add and not set(g.members) & colors.selected else "Selected",
                 "#%02x%02x%02x" % g.color, "left out" if g.left_out else "%d%% of the picture" % round(
-                    100.0 * g.count / max(1, sum(n for _, n in colors.palette)))))
+                    100.0 * g.count / max(1, sum(n for _, n in colors.palette))),
+                "; %d colors selected" % n if n > 1 else ""))
 
     # cropping
 
@@ -1292,6 +1398,7 @@ class MainWindow(QMainWindow):
         self.result = None
         self.right.set_message("")
         self.right.set_svg(svg)
+        self.right.title = "SVG (quick preview)"
         self.status.setText("Quick preview shown; tracing the whole picture...")
         self._update_actions()
 
@@ -1318,6 +1425,10 @@ class MainWindow(QMainWindow):
         if self.a_colors.isChecked() and self.preview is not None:
             self.left.set_picture(self.preview)
         size = len(result.svg.encode("utf-8"))
+        # (the size Save writes: the same bytes)
+        self.right.title = "SVG: %s, %d shapes" % (_size_text(size), result.shapes)
+        self.right.update()
+        self.remember()
         text = "%d shapes, %s, traced in %.2f s" % (result.shapes, _size_text(size), result.seconds)
         if result.factor != 1:
             text += " (at %d times the size)" % result.factor

@@ -51,9 +51,11 @@ installed until you click it. (1.0.x doesn't have this: install 1.1 by hand once
    for a scan of dark lines, and for a drawing or plan of thin lines, its lines' colors and
    enlarging 4 times; every setting, the curve settings too) and the status bar says what it picked. Change any setting on the
    right and the SVG updates.
-3. To change the colors it's traced with, use the **Colors** box: select colors (or click the
-   picture), then **Change color...**, **Merge** (several shades into one, for a simpler SVG) or
-   **Leave out** (see-through). The picture itself stays as it is.
+3. To change the colors it's traced with, use the **Colors** box: select colors (Ctrl+click
+   for several, on the swatches, the picture or the SVG), then **Change color...**, **Merge**
+   (several shades into the one you pick, for a simpler SVG) or **Leave out** (see-through).
+   The picture itself stays as it is, and *Edit > Undo* (Ctrl+Z) goes back a step. The SVG's
+   size shows above it.
 4. To trace only part of the picture (a drawing in a screenshot, without the toolbars around
    it), *Trace > Crop picture* (Ctrl+R) and drag across that part.
 5. *File > Save SVG* (Ctrl+S), or *File > Copy SVG* (Ctrl+Shift+C) to paste it into Inkscape or
