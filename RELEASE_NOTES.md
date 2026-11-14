@@ -2,6 +2,16 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.2
+
+New:
+- Edit the colors before tracing: the **Colors** box shows a swatch for each color the SVG
+  is traced with. Select colors (or click the picture), then **Change color...**, **Merge**
+  several shades into one for a simpler SVG, or **Leave out** a color so the SVG is see-through
+  there. The picture itself never changes, and the edits still apply when you change the
+  number of colors or crop.
+- On the command line: `--list-colors`, `--recolor FROM=TO` and `--leave-out COLOR`.
+
 ## 1.1.1
 
 New:

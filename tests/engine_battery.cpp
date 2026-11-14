@@ -178,6 +178,8 @@ Pic make_picture(Rng &r)
     return p;
 }
 
+std::vector<kz_color_edit> edits_storage; // (the edits make_options hands over live here)
+
 kz_options make_options(Rng &r)
 {
     kz_options o;
@@ -203,6 +205,26 @@ kz_options make_options(Rng &r)
     if (rnd(r, 0, 9) == 0) {
         o.threshold = NAN;
         o.smooth_corners = INFINITY;
+    }
+    // color edits: random ones, sometimes a count with no list (a caller's mistake)
+    edits_storage.clear();
+    if (rnd(r, 0, 3) == 0) {
+        int n = rnd(r, 1, 12);
+        for (int k = 0; k < n; k++) {
+            kz_color_edit e;
+            for (int c = 0; c < 3; c++) {
+                e.from[c] = (unsigned char)rnd(r, 0, 255);
+                e.to[c] = (unsigned char)rnd(r, 0, 255);
+            }
+            e.leave_out = rnd(r, 0, 3) == 0 ? 1 : rnd(r, 0, 20) == 0 ? rnd(r, -5, 5) : 0;
+            edits_storage.push_back(e);
+        }
+        o.nedits = n;
+        o.edits = edits_storage.data();
+        if (rnd(r, 0, 15) == 0) {
+            o.edits = nullptr;
+            o.nedits = rnd(r, -10, 100);
+        }
     }
     return o;
 }
@@ -260,8 +282,12 @@ void check_svg(std::string const &svg, Pic const &p, int nshapes, kz_options con
     // (and no more colors in the picture than asked for: more are merged, into a color between them)
     if (p.exact && o.mode == KZ_COLORS && !o.smooth && o.scans >= 2 && o.scans <= 256 &&
         (int)p.colors.size() <= o.scans) {
+        std::set<uint32_t> targets;     // (an edit's new color is a fill too)
+        for (int e = 0; o.edits && e < o.nedits; e++) {
+            targets.insert((uint32_t)o.edits[e].to[0] << 16 | (uint32_t)o.edits[e].to[1] << 8 | o.edits[e].to[2]);
+        }
         for (auto f : fills) {
-            if (!p.colors.count(f)) {
+            if (!p.colors.count(f) && !targets.count(f)) {
                 char buf[64];
                 std::snprintf(buf, sizeof buf, "fill #%06x isn't a color of the picture", f);
                 fail(buf);
@@ -346,6 +372,14 @@ int main(int argc, char **argv)
                     kz_default_options(&d);
                     eff = d;
                     std::memcpy(&eff, &o, std::max(0, std::min(o.size, (int)sizeof(o))));
+                    // (as the engine: the edits only from a struct that holds them whole)
+                    if (o.size < (int)(offsetof(kz_options, edits) + sizeof(o.edits))) {
+                        eff.nedits = 0;
+                        eff.edits = nullptr;
+                    }
+                }
+                if (!eff.edits) {
+                    eff.nedits = 0;
                 }
                 eff.scans = std::max(2, std::min(256, eff.scans));
                 check_svg(svg, p, n, eff, errs);
@@ -382,13 +416,52 @@ int main(int argc, char **argv)
             int ps = kz_preview(p.px.data(), p.w, p.h, p.stride, &o, out.data());
             if (ps != KZ_OK && o.mode >= 0 && o.mode <= 6) errs.push_back("preview failed");
         }
+        // the palette: in range, with odd buffers; then edits on its own colors trace (recolored,
+        // left out, merged) to an SVG whose fills are its colors or the new ones
+        if (rnd(r, 0, 2) == 0 && o.size == (int)sizeof(o)) {
+            int maxn = rnd(r, 0, 4) == 0 ? rnd(r, 0, 2) : 256;
+            std::vector<unsigned char> rgb((size_t)std::max(1, maxn) * 3);
+            std::vector<long long> counts((size_t)std::max(1, maxn));
+            int n = -1;
+            int ps = kz_palette(p.px.data(), p.w, p.h, p.stride, &o, rgb.data(), rnd(r, 0, 3) ? counts.data() : nullptr,
+                                maxn, &n);
+            if (ps == KZ_OK && (n < 0 || n > maxn)) errs.push_back("palette: a count out of range");
+            if (ps == KZ_OK && n >= 2 && maxn == 256 && (o.mode == KZ_COLORS || o.mode == KZ_AUTOTRACE)) {
+                kz_options e = o;
+                std::vector<kz_color_edit> ed(3);
+                for (int c = 0; c < 3; c++) {
+                    ed[0].from[c] = rgb[c];                     // recolored
+                    ed[0].to[c] = (unsigned char)rnd(r, 0, 255);
+                    ed[1].from[c] = rgb[3 + c];                 // left out, or merged into the first
+                    ed[1].to[c] = ed[0].to[c];
+                    ed[2].from[c] = rgb[3 * (n - 1) + c];
+                    ed[2].to[c] = rgb[3 * (n - 1) + c];
+                }
+                ed[0].leave_out = 0;
+                ed[1].leave_out = rnd(r, 0, 1);
+                ed[2].leave_out = 0;
+                e.edits = ed.data();
+                e.nedits = 3;
+                char *svg3 = nullptr, *err3 = nullptr;
+                int n3 = 0;
+                if (kz_trace(p.px.data(), p.w, p.h, p.stride, &e, nullptr, nullptr, &svg3, &n3, &err3) != KZ_OK)
+                    errs.push_back(std::string("trace with edits failed: ") + (err3 ? err3 : ""));
+                else {
+                    kz_options eff = e;
+                    eff.scans = std::max(2, std::min(256, eff.scans));
+                    check_svg(svg3, p, n3, eff, errs);
+                }
+                kz_free(svg3);
+                kz_free(err3);
+            }
+        }
         // auto: settings in range
         if (rnd(r, 0, 2) == 0) {
             kz_options a;
             kz_auto_info info;
             info.size = rnd(r, 0, 1) ? (int)sizeof(info) : rnd(r, 0, (int)sizeof(info));
             if (kz_auto(p.px.data(), p.w, p.h, p.stride, &a, &info) != KZ_OK) errs.push_back("auto failed");
-            else if (a.mode < 0 || a.mode > 6 || a.scans < 2 || a.scans > 16 || a.remove_background < 0 ||
+            else if (a.mode < 0 || a.mode > 6 || a.scans < 2 || a.scans > 64 || a.remove_background < 0 ||
                      a.remove_background > 2 || !(a.threshold >= 0 && a.threshold <= 1))
                 errs.push_back("auto picked settings out of range");
         }

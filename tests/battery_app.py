@@ -336,7 +336,7 @@ def check_window(steps, seed, fails):
             before = len(ERRORS)
             action = rng.choice(["open", "open", "paste", "setting", "setting", "setting", "setting", "auto",
                                  "update", "colors", "zoom", "move", "fit", "save", "copy", "reopen", "auto_new",
-                                 "events", "new_version", "crop", "uncrop"])
+                                 "events", "new_version", "crop", "uncrop", "colors", "colors", "pick"])
             try:
                 if action == "open":
                     w.open_path(rng.choice(pics))
@@ -381,6 +381,29 @@ def check_window(steps, seed, fails):
                         if w.crop is not None and (w.img.width(), w.img.height()) != (w.crop.width(), w.crop.height()):
                             fails.append("window seed %d step %d: cropped picture %dx%d, crop %s" % (
                                 seed, step, w.img.width(), w.img.height(), w.crop))
+                elif action == "colors":
+                    # random swatches, then change, merge, leave out (or put back) or reset
+                    c = w.settings.colors
+                    for b in c.buttons:
+                        b.setChecked(rng.random() < 0.3)
+                    what = rng.choice(["change", "merge", "out", "reset", "reset_all"])
+                    if what == "change":
+                        c.change_color(tuple(rng.randrange(256) for _ in range(3)))
+                    elif what == "merge":
+                        c.merge()
+                    elif what == "out":
+                        c.leave_out()
+                    elif what == "reset":
+                        c.reset()
+                    else:
+                        c.selected = set()
+                        c.reset()
+                    if w.settings.options().edits != c.edits_tuple():
+                        fails.append("window seed %d step %d: the edits aren't in the settings" % (seed, step))
+                elif action == "pick":
+                    if w.img is not None:
+                        from PySide6.QtCore import QPointF as _P
+                        w.on_picture_clicked(_P(rng.uniform(-5, w.img.width() + 5), rng.uniform(-5, w.img.height() + 5)))
                 elif action == "uncrop":
                     w.remove_crop()
                     if w.crop is not None:

@@ -150,6 +150,20 @@ def run(argv):
             assert rc == 0 and os.path.exists(os.path.join(d, "a.svg")), rc
         return "ok"
 
+    def color_edits():
+        # the engine's colors, and edits on them: recolored, merged, left out
+        from dataclasses import replace
+        o = engine.Options(smooth=False)
+        pal = engine.palette(*image.pixels(img), options=o)
+        cols = [c for c, _ in pal]
+        assert (0xB2, 0x00, 0x2D) in cols and (0x1D, 0x3F, 0x8F) in cols, cols
+        red, blue = (0xB2, 0x00, 0x2D), (0x1D, 0x3F, 0x8F)
+        svg = tracing.trace_image(img, replace(o, edits=((red, (0, 160, 0)), (blue, None))), 1).svg
+        assert "fill:#00a000" in svg and "fill:#1d3f8f" not in svg and "fill:#b2002d" not in svg, svg[:300]
+        out = render(svg)
+        assert out.pixelColor(50, 80).name() == "#00a000", out.pixelColor(50, 80).name()
+        return "%d colors; recolored and left out" % len(cols)
+
     def update_check():
         # the update check reaches GitHub over TLS (Qt's network backend in the program), and
         # its pieces work in the finished program
@@ -184,7 +198,8 @@ def run(argv):
     for name, fn in [("engine loads", engine_loads), ("exact colors and holes", colors_exact),
                      ("logo and icon", logo_and_icon), ("auto settings", auto_settings), ("drawing SVGs", drawing), ("every mode", every_mode), ("reads pictures", reads_pictures),
                      ("big picture speed", big_picture), ("window opens and traces", window_opens),
-                     ("command line", command_line), ("update check", update_check)]:
+                     ("command line", command_line), ("color edits", color_edits),
+                     ("update check", update_check)]:
         check(name, fn)
 
     log("%s: %d failed" % ("FAILED" if failures else "ALL PASSED", failures))

@@ -51,14 +51,19 @@ installed until you click it. (1.0.x doesn't have this: install 1.1 by hand once
    for a scan of dark lines, and for a drawing or plan of thin lines, its lines' colors and
    enlarging 4 times; every setting, the curve settings too) and the status bar says what it picked. Change any setting on the
    right and the SVG updates.
-3. To trace only part of the picture (a drawing in a screenshot, without the toolbars around
+3. To change the colors it's traced with, use the **Colors** box: select colors (or click the
+   picture), then **Change color...**, **Merge** (several shades into one, for a simpler SVG) or
+   **Leave out** (see-through). The picture itself stays as it is.
+4. To trace only part of the picture (a drawing in a screenshot, without the toolbars around
    it), *Trace > Crop picture* (Ctrl+R) and drag across that part.
-4. *File > Save SVG* (Ctrl+S), or *File > Copy SVG* (Ctrl+Shift+C) to paste it into Inkscape or
+5. *File > Save SVG* (Ctrl+S), or *File > Copy SVG* (Ctrl+Shift+C) to paste it into Inkscape or
    another program.
 
 **Background**: *Remove* makes the picture's background (the color around its edge, light or
 dark) see-through and keeps that color inside shapes; *Remove, also inside* removes that color
 everywhere.
+
+![The Colors box: the flat illustration's SVG with its sky traced blue instead of orange, its roof slate gray instead of red, and its two darker greens merged into one; the swatches of the colors traced on the right, the sun's yellow selected](docs/screenshot-colors.png)
 
 ![A flat illustration traced with Auto settings: an orange sky with a pale yellow sun, purple mountains, a green hill, a blue lake, dark green pines, a cream house with a red roof and blue door, and pink, orange, yellow and lilac flowers in the grass; the SVG on the right matches it in 14 flat colors](docs/screenshot-landscape.png)
 

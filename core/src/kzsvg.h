@@ -38,6 +38,18 @@ enum kz_background {
 };
 
 /* Version of this struct: set kz_options.size to sizeof(kz_options). */
+/*
+ * A color edit (kz_options.edits): the trace's palette color nearest to <from> (within
+ * KZ_EDIT_MATCH levels in each channel) is traced as <to> instead, or left out (see-through)
+ * when <leave_out> is 1. Palette colors that end up the same are one layer (merged).
+ */
+#define KZ_EDIT_MATCH 24
+typedef struct kz_color_edit {
+    unsigned char from[3];  /* the palette color, as kz_palette gave it (R, G, B) */
+    unsigned char to[3];    /* the color to trace it as */
+    int leave_out;          /* 1: leave its areas out */
+} kz_color_edit;
+
 typedef struct kz_options {
     int size;               /* sizeof(kz_options) */
     int mode;               /* enum kz_mode */
@@ -55,6 +67,8 @@ typedef struct kz_options {
     double error_threshold; /* Autotrace: fitting error, in pixels */
     int filter_iterations;  /* Autotrace: smoothing passes on outlines */
     int preserve_width;     /* Autotrace centerline: keep line widths (1/0) */
+    int nedits;             /* colors, grays, Autotrace colors: how many color edits in <edits> */
+    const kz_color_edit *edits;
 } kz_options;
 
 /* Fill <o> with the defaults (Inkscape's Trace Bitmap dialog defaults). */
@@ -82,6 +96,15 @@ KZ_API int kz_trace(const unsigned char *rgba, int width, int height, int stride
  */
 KZ_API int kz_preview(const unsigned char *rgba, int width, int height, int stride, const kz_options *o,
                       unsigned char *rgb_out);
+
+/*
+ * The colors a trace with <o> uses (colors, grays and Autotrace colors; before any color
+ * edits), darkest-first as the layers are, and how many pixels each has: up to <max> of them
+ * into <rgb_out> (3 bytes each) and <counts> (may be NULL); *n is how many. Fast after a
+ * trace of the same picture (the colors are kept). Other modes: *n = 0.
+ */
+KZ_API int kz_palette(const unsigned char *rgba, int width, int height, int stride, const kz_options *o,
+                      unsigned char *rgb_out, long long *counts, int max, int *n);
 
 /* What kz_auto found out about a picture (besides the settings it picked). */
 typedef struct kz_auto_info {

@@ -113,6 +113,11 @@ class TestCrop(unittest.TestCase):
         self.drag((50, 50), (50.5, 50.5))                    # a click, not a drag
         self.assertIsNone(w.crop)
         self.assertIn("Too small", w.status.text())
+        # a click right across a pixel's edge: rounded out to whole pixels it made a 2 x 2 crop
+        # (on Windows, whose window put the click there): under a screen pixel moved is a click
+        w.start_crop()
+        self.drag((49.9, 49.9), (50.1, 50.1))
+        self.assertIsNone(w.crop)
         w.start_crop()
         self.drag((-500, -500), (-400, -400))                # off the picture
         self.assertIsNone(w.crop)
