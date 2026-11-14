@@ -172,27 +172,36 @@ class TestWindow(unittest.TestCase):
         return ok and w.job.options == w.settings.options()
 
     def select(self, *colors):
-        for b in self.c.buttons:
-            b.setChecked(False)
-        for g, b in zip(self.c.groups, self.c.buttons):
+        """A click on the first color's swatch, Ctrl+clicks on the others'."""
+        first = True
+        for g in list(self.c.groups):
             if set(g.members) & set(colors):
-                b.setChecked(True)
+                self.c.click_group(g, add=not first)
+                first = False
+
+    def merge_into(self, color):
+        """Merge, picking <color> from the list it opens."""
+        self.c.open_menu = lambda menu, where: next(x for x in menu.actions() if x.text().startswith(
+            "#%02x%02x%02x" % color))
+        try:
+            self.c.b_merge.click()
+        finally:
+            del self.c.open_menu
 
     def test_swatches_and_merge(self):
         self.assertEqual([g.color for g in self.c.groups], [RED, BLUE, WHITE])
         self.assertFalse(self.c.b_merge.isEnabled())
         self.select(RED, BLUE)
         self.assertTrue(self.c.b_merge.isEnabled())
-        self.c.b_merge.click()
+        self.merge_into(BLUE)                       # (the one picked: blue, the smaller of the two)
         self.assertTrue(self.traced())
-        # (into the color of the bigger: red, 7,000 pixels against blue's 5,404)
-        self.assertEqual(fills(self.w.result.svg), ["#ffffff", "#b2002d"])
+        self.assertEqual(fills(self.w.result.svg), ["#ffffff", "#1d3f8f"])
         self.assertEqual(len(self.c.groups), 2, "merged colors show as one swatch")
         # and only those are in the box (the swatches of before, deleted later, stayed on screen
         # until the event loop got to them)
         from PySide6.QtWidgets import QToolButton
         self.assertEqual(len(self.c.grid_box.findChildren(QToolButton)), 2)
-        self.assertIn("1 color edited", self.w.status.text())    # (blue, now traced as red)
+        self.assertIn("1 color edited", self.w.status.text())    # (red, now traced as blue)
         # Reset colors (none selected): all back
         self.c.selected = set()
         self.c.b_reset.click()
@@ -256,6 +265,98 @@ class TestWindow(unittest.TestCase):
         self.assertEqual(self.c.edits, [])
         self.assertTrue(self.traced())
         self.assertIn("#b2002d", fills(self.w.result.svg))
+
+    def test_ctrl_click_on_the_svg(self):
+        # a click selects just that color; Ctrl+click adds one, or takes a selected one out
+        right = self.w.right
+        self.w.on_picture_clicked(QPointF(50, 80))                 # red (as the SVG's click gives it)
+        self.w.on_picture_clicked(QPointF(165, 30), add=True)      # + blue
+        self.assertEqual(sorted(g.color for g in self.c._selected_groups()), sorted([RED, BLUE]))
+        self.assertIn("2 colors selected", self.w.status.text())
+        self.w.on_picture_clicked(QPointF(165, 30), add=True)      # blue out again
+        self.assertEqual([g.color for g in self.c._selected_groups()], [RED])
+        self.w.on_picture_clicked(QPointF(5, 5))                   # just white
+        self.assertEqual([g.color for g in self.c._selected_groups()], [WHITE])
+        # the SVG side sends its clicks with Ctrl's state
+        from PySide6.QtCore import QEvent
+        from PySide6.QtGui import QMouseEvent
+        t = self.w.view.target(right.size())
+        s = self.w.view.scale
+        for x, y, mod in ((50, 80, Qt.KeyboardModifier.NoModifier), (165, 30, Qt.KeyboardModifier.ControlModifier)):
+            pos = QPointF(t.x() + x * s, t.y() + y * s)
+            for kind in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease):
+                buttons = Qt.MouseButton.LeftButton if kind == QEvent.Type.MouseButtonPress else Qt.MouseButton.NoButton
+                QApplication.sendEvent(right, QMouseEvent(kind, pos, right.mapToGlobal(pos), Qt.MouseButton.LeftButton,
+                                                          buttons, mod))
+        self.assertEqual(sorted(g.color for g in self.c._selected_groups()), sorted([RED, BLUE]))
+        # swatches the same way
+        self.c.click_group(self.c.groups[2])
+        self.assertEqual([g.color for g in self.c._selected_groups()], [WHITE])
+
+    def test_merge_into_another_color(self):
+        self.select(RED, BLUE)
+        self.c.open_menu = lambda menu, where: next(x for x in menu.actions() if x.data() == "other")
+        orig = QColorDialog.getColor
+        QColorDialog.getColor = staticmethod(lambda *a, **k: QColor(9, 9, 9))
+        try:
+            self.c.b_merge.click()
+        finally:
+            QColorDialog.getColor = orig
+            del self.c.open_menu
+        self.assertTrue(self.traced())
+        self.assertEqual(fills(self.w.result.svg), ["#ffffff", "#090909"])
+        # the list chosen from: nothing chosen, nothing merged
+        self.select(WHITE, (9, 9, 9))
+        self.c.open_menu = lambda menu, where: None
+        self.c.b_merge.click()
+        del self.c.open_menu
+        self.assertEqual(fills(self.w.result.svg), ["#ffffff", "#090909"])
+
+    def test_undo_and_redo(self):
+        w = self.w
+        self.assertFalse(w.a_undo.isEnabled())
+        first = w.result.svg
+        self.select(RED)
+        self.c.change_color((0, 160, 0))
+        self.assertTrue(self.traced())
+        green = w.result.svg
+        w.settings.speckles.setValue(9)
+        self.assertTrue(self.traced())
+        w.crop_to(app.QRect(0, 0, 120, 160))
+        self.assertTrue(self.traced())
+        self.assertTrue(w.a_undo.isEnabled())
+        w.a_undo.trigger()                                 # the crop goes
+        self.assertTrue(self.traced())
+        self.assertIsNone(w.crop)
+        self.assertEqual(w.settings.speckles.value(), 9)
+        w.a_undo.trigger()                                 # speckles back
+        self.assertTrue(self.traced())
+        self.assertEqual(w.settings.speckles.value(), 2)
+        self.assertEqual(w.result.svg, green)
+        w.a_undo.trigger()                                 # the color edit goes
+        self.assertTrue(self.traced())
+        self.assertEqual(w.result.svg, first)
+        self.assertEqual(self.c.edits, [])
+        self.assertFalse(w.a_undo.isEnabled())
+        w.a_redo.trigger()
+        self.assertTrue(self.traced())
+        self.assertEqual(w.result.svg, green)
+        self.assertTrue(w.a_redo.isEnabled())
+        # a change after an Undo: no Redo
+        w.settings.speckles.setValue(4)
+        self.assertTrue(self.traced())
+        self.assertFalse(w.a_redo.isEnabled())
+        # a new picture starts afresh
+        w.set_image(logo(120, 80), None)
+        self.assertTrue(self.traced())
+        self.assertFalse(w.a_undo.isEnabled())
+
+    def test_the_svg_size_shown(self):
+        size = len(self.w.result.svg.encode("utf-8"))
+        self.assertEqual(self.w.right.title, "SVG: %s, %d shapes" % (app._size_text(size), self.w.result.shapes))
+        path = os.path.join(self.tmp.name, "out.svg")
+        self.assertTrue(self.w.write(path))
+        self.assertEqual(os.path.getsize(path), size, "the size shown isn't the size saved")
 
     def test_reset_settings_clears_them(self):
         self.select(RED)

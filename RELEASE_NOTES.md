@@ -2,6 +2,16 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.2.1
+
+New:
+- **Undo** and **Redo** (Edit menu, Ctrl+Z and Ctrl+Y): go back to any SVG you traced for the
+  picture, with its settings, color edits and crop.
+- Ctrl+click to select several colors, on the swatches, the picture or the SVG; a plain click
+  selects just one.
+- **Merge** asks which of the selected colors to keep (or another color).
+- The size of the SVG, as it will be saved, is shown above it.
+
 ## 1.2
 
 New:

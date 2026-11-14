@@ -336,7 +336,7 @@ def check_window(steps, seed, fails):
             before = len(ERRORS)
             action = rng.choice(["open", "open", "paste", "setting", "setting", "setting", "setting", "auto",
                                  "update", "colors", "zoom", "move", "fit", "save", "copy", "reopen", "auto_new",
-                                 "events", "new_version", "crop", "uncrop", "colors", "colors", "pick"])
+                                 "events", "new_version", "crop", "uncrop", "colors", "colors", "pick", "undo", "undo", "redo"])
             try:
                 if action == "open":
                     w.open_path(rng.choice(pics))
@@ -384,13 +384,16 @@ def check_window(steps, seed, fails):
                 elif action == "colors":
                     # random swatches, then change, merge, leave out (or put back) or reset
                     c = w.settings.colors
-                    for b in c.buttons:
-                        b.setChecked(rng.random() < 0.3)
+                    for i, g in enumerate(list(c.groups)):
+                        if rng.random() < 0.3:
+                            c.click_group(g, add=i > 0 and rng.random() < 0.8)
                     what = rng.choice(["change", "merge", "out", "reset", "reset_all"])
                     if what == "change":
                         c.change_color(tuple(rng.randrange(256) for _ in range(3)))
                     elif what == "merge":
-                        c.merge()
+                        kept = [g.color for g in c._selected_groups() if not g.left_out]
+                        c.merge(rng.choice(kept) if kept and rng.random() < 0.8
+                                else tuple(rng.randrange(256) for _ in range(3)))
                     elif what == "out":
                         c.leave_out()
                     elif what == "reset":
@@ -403,7 +406,12 @@ def check_window(steps, seed, fails):
                 elif action == "pick":
                     if w.img is not None:
                         from PySide6.QtCore import QPointF as _P
-                        w.on_picture_clicked(_P(rng.uniform(-5, w.img.width() + 5), rng.uniform(-5, w.img.height() + 5)))
+                        w.on_picture_clicked(_P(rng.uniform(-5, w.img.width() + 5), rng.uniform(-5, w.img.height() + 5)),
+                                             rng.random() < 0.5)     # (Ctrl held, or not)
+                elif action == "undo":
+                    w.undo()
+                elif action == "redo":
+                    w.redo()
                 elif action == "uncrop":
                     w.remove_crop()
                     if w.crop is not None:
@@ -437,6 +445,8 @@ def check_window(steps, seed, fails):
                     if "Couldn't trace" not in w.right.message:
                         fails.append("window seed %d step %d: no SVG and no message" % (seed, step))
                     continue
+                if w.history and w.history[w.history_at] != w._state():
+                    fails.append("window seed %d step %d: Undo's place isn't what's shown" % (seed, step))
                 if w.job.options != w.settings.options():
                     fails.append("window seed %d step %d: the SVG shown isn't for the settings shown:\n %s\n %s"
                                  % (seed, step, w.job.options, w.settings.options()))
