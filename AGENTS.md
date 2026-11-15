@@ -69,6 +69,17 @@ Rules for all of it:
 - `tests/reference/quality.json` changes only with a change meant to change tracing, with
   before and after numbers in the commit message.
 
+## Security updates
+- `.github/workflows/security-check.yml` runs every Monday (and by hand), as in KanzonasPDF and
+  KanzonasCAD: pip-audit on `constraints.txt`, and `tools/check_dependencies.py` for newer
+  releases of what reads untrusted pictures: Qt (PySide6_Essentials decodes every picture
+  opened; its fixes often have no PyPI advisory) and the Potrace and Autotrace code copied into
+  `core/third_party/` (no package manager knows about them). It reports in one open issue labeled
+  `security`. Act on it promptly: on a branch, bump the pin in `constraints.txt` (or bring the
+  upstream fixes into `core/third_party/`, saying so in its README.md, and update the versions
+  in `tools/check_dependencies.py`), read the release notes, and release when the builds are
+  green.
+
 ## Speed (the owner's priority: fast, efficient, never clunky)
 - The window never waits: tracing, reading picture files and drawing (both sides) happen in
   background threads, and the window only shows finished drawings (moved and scaled to the
