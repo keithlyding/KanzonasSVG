@@ -23,6 +23,11 @@ fixed:
   code before these fixes, 1.8 s here).
 - **Small pictures traced at twice the size** (Enlarge first: Auto), for smoother curves.
 
+**Actively maintained.** KanzonasSVG is worked on every week. Bug reports are usually answered
+the same day, and fixes often ship within hours: report one on
+[GitHub Issues](https://github.com/keithlyding/KanzonasSVG/issues) or at
+[support@kanzonas.com](mailto:support@kanzonas.com).
+
 ## Download
 
 From [Releases](https://github.com/keithlyding/KanzonasSVG/releases):
