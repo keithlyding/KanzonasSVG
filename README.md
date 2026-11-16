@@ -53,7 +53,8 @@ installed until you click it. (1.0.x doesn't have this: install 1.1 by hand once
    right and the SVG updates.
 3. To change the colors it's traced with, use the **Colors** box: select colors (Ctrl+click
    for several, on the swatches, the picture or the SVG), then **Change color...**, **Merge**
-   (several shades into the one you pick, for a simpler SVG) or **Leave out** (see-through).
+   (several shades into the one you pick, for a simpler SVG) or **Leave out** (see-through). The
+   background has a swatch of its own, apart from the same color inside the picture.
    The picture itself stays as it is, and *Edit > Undo* (Ctrl+Z) goes back a step. The SVG's
    size shows above it.
 4. To trace only part of the picture (a drawing in a screenshot, without the toolbars around

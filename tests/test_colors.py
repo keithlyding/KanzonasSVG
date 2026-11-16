@@ -51,11 +51,19 @@ class TestEngine(unittest.TestCase):
 
     def test_palette(self):
         pal = engine.palette(*self.px, options=self.o)
-        self.assertEqual([c for c, _ in pal], [RED, BLUE, WHITE], "darkest first, as the layers")
-        self.assertEqual(sum(n for _, n in pal), 240 * 160)
+        # darkest first, as the layers; then the background (white around the logo) on its own,
+        # apart from the white inside the ring
+        self.assertEqual([(c, bg) for c, _n, bg in pal], [(RED, False), (BLUE, False), (WHITE, False), (WHITE, True)])
+        self.assertEqual(sum(n for _c, n, _bg in pal), 240 * 160)
+        self.assertGreater(pal[2][1], 0, "no white inside the ring")
+        pal, mask = engine.palette(*self.px, options=self.o, mask=True)
+        self.assertEqual(len(mask), 240 * 160)
+        self.assertEqual(mask[5 * 240 + 5], 1, "the corner is background")
+        self.assertEqual(mask[55 * 240 + 165], 0, "inside the ring isn't")
+        self.assertEqual(mask.count(1), pal[3][1])
         self.assertEqual(engine.palette(*self.px, options=replace(self.o, mode=engine.BRIGHTNESS)), [])
         grays = engine.palette(*self.px, options=replace(self.o, mode=engine.GRAYS))
-        self.assertTrue(all(c[0] == c[1] == c[2] for c, _ in grays))
+        self.assertTrue(all(c[0] == c[1] == c[2] for c, _n, _bg in grays))
 
     def test_recolor_keeps_the_shapes(self):
         plain = self.trace()
@@ -103,7 +111,7 @@ class TestEngine(unittest.TestCase):
         gray = engine.palette(*self.px, options=replace(self.o, mode=engine.GRAYS))[0][0]
         self.assertIn("#ff0000", fills(self.trace(mode=engine.GRAYS, edits=((gray, (255, 0, 0)),))))
         at = engine.palette(*self.px, options=replace(self.o, mode=engine.AUTOTRACE))
-        red = min((c for c, _ in at), key=lambda c: sum((a - b) ** 2 for a, b in zip(c, RED)))
+        red = min((c for c, _n, _bg in at), key=lambda c: sum((a - b) ** 2 for a, b in zip(c, RED)))
         svg = self.trace(mode=engine.AUTOTRACE, edits=((red, (0, 160, 0)),))
         self.assertIn("#00a000", fills(svg))
         self.assertNotIn("#b2002d", fills(svg))
@@ -126,6 +134,32 @@ class TestEngine(unittest.TestCase):
             self.assertEqual(st, engine.OK)
             self.assertNotIn(b"#00a000", ctypes.string_at(svg.value))
             lib.kz_free(svg)
+
+    def test_the_background_apart_from_that_color_inside(self):
+        # (asked for: merging the white inside the picture merged the whole background with it)
+        inside = drawn(self.trace(edits=((WHITE, (0, 160, 0), engine.INSIDE),)))
+        self.assertEqual(rgb(inside.pixelColor(165, 55)), (0, 160, 0), "the white inside the ring")
+        self.assertEqual(rgb(inside.pixelColor(5, 5)), WHITE, "the background changed with it")
+        back = drawn(self.trace(edits=((WHITE, (250, 230, 0), engine.BACKGROUND),)))
+        self.assertEqual(rgb(back.pixelColor(5, 5)), (250, 230, 0))
+        self.assertEqual(rgb(back.pixelColor(165, 55)), WHITE, "the inside changed with the background")
+        both = drawn(self.trace(edits=((WHITE, (9, 9, 9)),)))      # (everywhere: the command line's)
+        self.assertEqual((rgb(both.pixelColor(5, 5)), rgb(both.pixelColor(165, 55))), ((9, 9, 9), (9, 9, 9)))
+        # an edit for the area over one for everywhere
+        svg = self.trace(edits=((WHITE, (9, 9, 9)), (WHITE, (250, 230, 0), engine.BACKGROUND)))
+        out = drawn(svg)
+        self.assertEqual((rgb(out.pixelColor(5, 5)), rgb(out.pixelColor(165, 55))), ((250, 230, 0), (9, 9, 9)))
+        # Background: Remove takes the picture's background, whatever it's traced as
+        out = drawn(self.trace(remove_background=engine.BG_REMOVE, edits=((WHITE, (250, 230, 0), engine.BACKGROUND),)))
+        self.assertEqual(out.pixelColor(5, 5).alpha(), 0)
+        self.assertEqual(rgb(out.pixelColor(165, 55)), WHITE)
+        # and merging another color into white keeps it a shape (not the background, which goes)
+        out = drawn(self.trace(remove_background=engine.BG_REMOVE, edits=((RED, WHITE),)))
+        self.assertEqual(out.pixelColor(50, 80).alpha(), 255)
+        self.assertEqual(rgb(out.pixelColor(50, 80)), WHITE)
+        self.assertEqual(out.pixelColor(5, 5).alpha(), 0)
+        # no edits: the same SVG as before there was a background swatch (one white layer)
+        self.assertEqual(fills(self.trace()), ["#ffffff", "#1d3f8f", "#b2002d"])
 
     def test_odd_edits(self):
         # many, duplicated, all left out: no crash, a valid SVG
@@ -171,11 +205,12 @@ class TestWindow(unittest.TestCase):
         ok = wait(lambda: w.worker is None and not w.timer.isActive() and not w.pending and w.result is not None)
         return ok and w.job.options == w.settings.options()
 
-    def select(self, *colors):
-        """A click on the first color's swatch, Ctrl+clicks on the others'."""
+    def select(self, *colors, background=False):
+        """A click on the first color's swatch, Ctrl+clicks on the others' (the swatches of the
+        areas inside the picture, or with background=True the background's)."""
         first = True
         for g in list(self.c.groups):
-            if set(g.members) & set(colors):
+            if g.background == background and {m for m, _w in g.members} & set(colors):
                 self.c.click_group(g, add=not first)
                 first = False
 
@@ -189,18 +224,19 @@ class TestWindow(unittest.TestCase):
             del self.c.open_menu
 
     def test_swatches_and_merge(self):
-        self.assertEqual([g.color for g in self.c.groups], [RED, BLUE, WHITE])
+        self.assertEqual([(g.color, g.background) for g in self.c.groups],
+                         [(RED, False), (BLUE, False), (WHITE, False), (WHITE, True)])
         self.assertFalse(self.c.b_merge.isEnabled())
         self.select(RED, BLUE)
         self.assertTrue(self.c.b_merge.isEnabled())
         self.merge_into(BLUE)                       # (the one picked: blue, the smaller of the two)
         self.assertTrue(self.traced())
         self.assertEqual(fills(self.w.result.svg), ["#ffffff", "#1d3f8f"])
-        self.assertEqual(len(self.c.groups), 2, "merged colors show as one swatch")
+        self.assertEqual(len(self.c.groups), 3, "merged colors show as one swatch")
         # and only those are in the box (the swatches of before, deleted later, stayed on screen
         # until the event loop got to them)
         from PySide6.QtWidgets import QToolButton
-        self.assertEqual(len(self.c.grid_box.findChildren(QToolButton)), 2)
+        self.assertEqual(len(self.c.grid_box.findChildren(QToolButton)), 3)
         self.assertIn("1 color edited", self.w.status.text())    # (red, now traced as blue)
         # Reset colors (none selected): all back
         self.c.selected = set()
@@ -265,6 +301,56 @@ class TestWindow(unittest.TestCase):
         self.assertEqual(self.c.edits, [])
         self.assertTrue(self.traced())
         self.assertIn("#b2002d", fills(self.w.result.svg))
+
+    def test_merging_the_white_inside_leaves_the_background(self):
+        # (asked for) the white inside the ring merged with blue: the background stays white
+        self.select(WHITE, BLUE)
+        self.merge_into(BLUE)
+        self.assertTrue(self.traced())
+        out = drawn(self.w.result.svg)
+        self.assertEqual(rgb(out.pixelColor(165, 55)), BLUE)
+        self.assertEqual(rgb(out.pixelColor(5, 5)), WHITE)
+        # clicks: the background selects the background's swatch, inside the ring the other
+        self.w.on_picture_clicked(QPointF(5, 5))
+        self.assertEqual([g.background for g in self.c._selected_groups()], [True])
+        self.assertIn("the background", self.w.status.text())
+        self.w.on_picture_clicked(QPointF(165, 55))
+        self.assertEqual([(g.background, g.color) for g in self.c._selected_groups()], [(False, BLUE)])
+        # the background on its own: changed, then left out, then put back
+        self.select(WHITE, background=True)
+        self.c.change_color((250, 230, 0))
+        self.assertTrue(self.traced())
+        out = drawn(self.w.result.svg)
+        self.assertEqual((rgb(out.pixelColor(5, 5)), rgb(out.pixelColor(165, 55))), ((250, 230, 0), BLUE))
+        self.select(WHITE, background=True)
+        self.c.leave_out()
+        self.assertTrue(self.traced())
+        self.assertEqual(drawn(self.w.result.svg).pixelColor(5, 5).alpha(), 0)
+        self.c.leave_out()                          # (still selected: Put back, in its own color)
+        self.assertTrue(self.traced())
+        self.assertEqual(rgb(drawn(self.w.result.svg).pixelColor(5, 5)), WHITE)
+        self.assertEqual(rgb(drawn(self.w.result.svg).pixelColor(165, 55)), BLUE)
+
+    def test_a_few_stray_pixels_go_with_the_background(self):
+        # the background color's only pixels inside are a 2 x 2 spot in a shape: no swatch of
+        # their own (a second sky swatch for 4 pixels), and the background's edits take them too
+        img = QImage(400, 300, QImage.Format.Format_RGBA8888)
+        img.fill(QColor(*WHITE))
+        for y in range(80, 220):
+            for x in range(100, 300):
+                img.setPixelColor(x, y, QColor(*RED))
+        for y in (150, 151):
+            for x in (200, 201):
+                img.setPixelColor(x, y, QColor(*WHITE))
+        img = image.to_rgba(img)
+        self.w.settings.speckles.setValue(0)
+        self.w.set_image(img, None)
+        self.assertTrue(self.traced())
+        self.assertEqual([(g.color, g.background) for g in self.c.groups], [(RED, False), (WHITE, True)])
+        self.c.click_group(self.c.groups[1])
+        self.c.change_color((0, 0, 200))
+        self.assertTrue(self.traced())
+        self.assertNotIn("#ffffff", fills(self.w.result.svg), "the stray white stayed white")
 
     def test_ctrl_click_on_the_svg(self):
         # a click selects just that color; Ctrl+click adds one, or takes a selected one out

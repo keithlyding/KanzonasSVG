@@ -46,7 +46,8 @@ class Cancelled(Exception):
 
 
 class _ColorEdit(ctypes.Structure):
-    _fields_ = [("from_", ctypes.c_ubyte * 3), ("to", ctypes.c_ubyte * 3), ("leave_out", ctypes.c_int)]
+    _fields_ = [("from_", ctypes.c_ubyte * 3), ("to", ctypes.c_ubyte * 3), ("leave_out", ctypes.c_int),
+                ("where", ctypes.c_int)]
 
 
 class _Options(ctypes.Structure):
@@ -72,16 +73,30 @@ class _Options(ctypes.Structure):
 
 
 EDIT_MATCH = 24  # KZ_EDIT_MATCH: an edit applies to the palette color within this many levels
+# kz_edit_where: which areas an edit is for (the background: the background color's area reaching
+# the picture's edge, or its transparent part, as Background: Remove takes it)
+EVERYWHERE, INSIDE, BACKGROUND = 0, 1, 2
 
 
-def edit_for(color, edits):
-    """The edit (from, to) that applies to palette color <color>, as the engine picks it (the
-    nearest original color within EDIT_MATCH levels in each channel, the first of equals), or None."""
-    best, best_d = None, EDIT_MATCH + 1
+def edit_where(e):
+    """The area an edit (from, to[, where]) is for (EVERYWHERE when it doesn't say)."""
+    return e[2] if len(e) > 2 and e[2] in (INSIDE, BACKGROUND) else EVERYWHERE
+
+
+def edit_for(color, edits, where=INSIDE):
+    """The edit (from, to[, where]) that applies to palette color <color> in the areas <where>
+    (INSIDE: all but the background; BACKGROUND), as the engine picks it: the nearest original
+    color within EDIT_MATCH levels in each channel; of equals, one for that area over one for
+    everywhere, then the first. None if none applies."""
+    best, best_d, best_own = None, EDIT_MATCH + 1, False
     for e in edits:
+        w = edit_where(e)
+        if w not in (EVERYWHERE, where):
+            continue
         d = max(abs(a - b) for a, b in zip(color, e[0]))
-        if d < best_d:
-            best, best_d = e, d
+        own = w == where
+        if d < best_d or (d == best_d and own and not best_own):
+            best, best_d, best_own = e, d, own
     return best
 
 
@@ -103,7 +118,8 @@ class Options:
     error_threshold: float = 2.0  # Autotrace
     filter_iterations: int = 4  # Autotrace
     preserve_width: bool = True  # Autotrace centerline
-    # color edits: ((r, g, b) of a palette color, (r, g, b) to trace it as, or None: leave it out)
+    # color edits: ((r, g, b) of a palette color, (r, g, b) to trace it as or None: leave it out,
+    # and optionally where: EVERYWHERE, INSIDE or BACKGROUND)
     edits: tuple = ()
 
     def _struct(self):
@@ -116,10 +132,12 @@ class Options:
             setattr(s, f.name, int(v) if isinstance(v, bool) else v)
         if self.edits:
             arr = (_ColorEdit * len(self.edits))()
-            for e, (src, dst) in zip(arr, self.edits):
+            for e, ed in zip(arr, self.edits):
+                src, dst = ed[0], ed[1]
                 e.from_[:] = [int(c) & 255 for c in src]
                 e.to[:] = [int(c) & 255 for c in (dst or (0, 0, 0))]
                 e.leave_out = 1 if dst is None else 0
+                e.where = edit_where(ed)
             s.nedits = len(self.edits)
             s.edits = ctypes.cast(arr, ctypes.POINTER(_ColorEdit))
             s._edits_kept = arr     # (alive as long as the struct)
@@ -217,7 +235,8 @@ def library():
     ]
     lib.kz_auto.restype = ctypes.c_int
     lib.kz_palette.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(_Options),
-                               ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.POINTER(ctypes.c_int)]
+                               ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int,
+                               ctypes.POINTER(ctypes.c_int)]
     lib.kz_palette.restype = ctypes.c_int
     lib.kz_drawing_open.argtypes = [ctypes.c_char_p]
     lib.kz_drawing_open.restype = ctypes.c_void_p
@@ -284,23 +303,29 @@ def trace(rgba, width, height, stride=None, options=None, progress=None):
             lib.kz_free(err)
 
 
-def palette(rgba, width, height, stride=None, options=None):
+def palette(rgba, width, height, stride=None, options=None, mask=False):
     """The colors a trace with <options> uses, darkest first as the layers are (before color
-    edits), each with its pixel count: [((r, g, b), count)]. Empty in modes without colors.
-    Fast after a trace of the same picture (the engine keeps them)."""
+    edits), each with its pixel count and whether it's the background (the last one, when the
+    picture has one; its color's other entry counts the areas inside):
+    [((r, g, b), count, is_background)]. Empty in modes without colors. Fast after a trace of
+    the same picture (the engine keeps the colors). mask: also return the background's pixels
+    (width x height bytes, 1 for the background): (colors, mask)."""
     lib = library()
     stride = stride or width * 4
     _check_image(rgba, width, height, stride)
     opts = (options or Options())._struct()
     buf = (ctypes.c_char * len(rgba)).from_buffer_copy(rgba) if isinstance(rgba, bytes) else \
         (ctypes.c_char * len(rgba)).from_buffer(rgba)
-    rgb = (ctypes.c_ubyte * (256 * 3))()
-    counts = (ctypes.c_longlong * 256)()
+    rgb = (ctypes.c_ubyte * (257 * 3))()
+    counts = (ctypes.c_longlong * 257)()
+    background = (ctypes.c_int * 257)()
     n = ctypes.c_int(0)
-    if lib.kz_palette(ctypes.addressof(buf), width, height, stride, ctypes.byref(opts), rgb, counts, 256,
-                      ctypes.byref(n)) != OK:
+    region = ctypes.create_string_buffer(width * height) if mask else None
+    if lib.kz_palette(ctypes.addressof(buf), width, height, stride, ctypes.byref(opts), rgb, counts, background,
+                      region, 257, ctypes.byref(n)) != OK:
         raise TraceError("Couldn't work out the colors.")
-    return [((rgb[3 * k], rgb[3 * k + 1], rgb[3 * k + 2]), counts[k]) for k in range(n.value)]
+    colors = [((rgb[3 * k], rgb[3 * k + 1], rgb[3 * k + 2]), counts[k], bool(background[k])) for k in range(n.value)]
+    return (colors, region.raw) if mask else colors
 
 
 def preview(rgba, width, height, stride=None, options=None):

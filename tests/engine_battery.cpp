@@ -217,6 +217,7 @@ kz_options make_options(Rng &r)
                 e.to[c] = (unsigned char)rnd(r, 0, 255);
             }
             e.leave_out = rnd(r, 0, 3) == 0 ? 1 : rnd(r, 0, 20) == 0 ? rnd(r, -5, 5) : 0;
+            e.where = rnd(r, 0, 15) == 0 ? rnd(r, -20, 20) : rnd(r, 0, 2);   // (and nonsense)
             edits_storage.push_back(e);
         }
         o.nedits = n;
@@ -423,8 +424,10 @@ int main(int argc, char **argv)
             std::vector<unsigned char> rgb((size_t)std::max(1, maxn) * 3);
             std::vector<long long> counts((size_t)std::max(1, maxn));
             int n = -1;
+            std::vector<int> isbg((size_t)std::max(1, maxn));
+            std::vector<unsigned char> mask((size_t)p.w * p.h);
             int ps = kz_palette(p.px.data(), p.w, p.h, p.stride, &o, rgb.data(), rnd(r, 0, 3) ? counts.data() : nullptr,
-                                maxn, &n);
+                                rnd(r, 0, 1) ? isbg.data() : nullptr, rnd(r, 0, 1) ? mask.data() : nullptr, maxn, &n);
             if (ps == KZ_OK && (n < 0 || n > maxn)) errs.push_back("palette: a count out of range");
             if (ps == KZ_OK && n >= 2 && maxn == 256 && (o.mode == KZ_COLORS || o.mode == KZ_AUTOTRACE)) {
                 kz_options e = o;
@@ -440,6 +443,9 @@ int main(int argc, char **argv)
                 ed[0].leave_out = 0;
                 ed[1].leave_out = rnd(r, 0, 1);
                 ed[2].leave_out = 0;
+                for (auto &x : ed) {
+                    x.where = rnd(r, 0, 2);     // (everywhere, inside, or the background)
+                }
                 e.edits = ed.data();
                 e.nedits = 3;
                 char *svg3 = nullptr, *err3 = nullptr;

@@ -42,12 +42,17 @@ enum kz_background {
  * A color edit (kz_options.edits): the trace's palette color nearest to <from> (within
  * KZ_EDIT_MATCH levels in each channel) is traced as <to> instead, or left out (see-through)
  * when <leave_out> is 1. Palette colors that end up the same are one layer (merged).
+ * <where> says which areas: the background (the background color's area reaching the picture's
+ * edge, or its transparent part: what Background: Remove leaves out), the rest, or both. Of the
+ * edits that apply to a color there, the nearest wins (one for that area over one for both).
  */
 #define KZ_EDIT_MATCH 24
+enum kz_edit_where { KZ_EDIT_EVERYWHERE = 0, KZ_EDIT_INSIDE = 1, KZ_EDIT_BACKGROUND = 2 };
 typedef struct kz_color_edit {
     unsigned char from[3];  /* the palette color, as kz_palette gave it (R, G, B) */
     unsigned char to[3];    /* the color to trace it as */
     int leave_out;          /* 1: leave its areas out */
+    int where;              /* enum kz_edit_where (since 1.2.2; 0 is what the edits did before) */
 } kz_color_edit;
 
 typedef struct kz_options {
@@ -100,11 +105,15 @@ KZ_API int kz_preview(const unsigned char *rgba, int width, int height, int stri
 /*
  * The colors a trace with <o> uses (colors, grays and Autotrace colors; before any color
  * edits), darkest-first as the layers are, and how many pixels each has: up to <max> of them
- * into <rgb_out> (3 bytes each) and <counts> (may be NULL); *n is how many. Fast after a
- * trace of the same picture (the colors are kept). Other modes: *n = 0.
+ * into <rgb_out> (3 bytes each) and <counts> (may be NULL); *n is how many. The background
+ * (see kz_color_edit) is one more, last, with <background> 1 for it (may be NULL); the count of
+ * its color is then of the areas inside. <mask_out> (may be NULL; width x height bytes) gets 1
+ * for the background's pixels, 0 for the rest. Fast after a trace of the same picture (the colors
+ * are kept). Other modes: *n = 0 (and the mask all 0).
  */
 KZ_API int kz_palette(const unsigned char *rgba, int width, int height, int stride, const kz_options *o,
-                      unsigned char *rgb_out, long long *counts, int max, int *n);
+                      unsigned char *rgb_out, long long *counts, int *background, unsigned char *mask_out,
+                      int max, int *n);
 
 /* What kz_auto found out about a picture (besides the settings it picked). */
 typedef struct kz_auto_info {

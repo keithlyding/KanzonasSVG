@@ -155,7 +155,7 @@ def run(argv):
         from dataclasses import replace
         o = engine.Options(smooth=False)
         pal = engine.palette(*image.pixels(img), options=o)
-        cols = [c for c, _ in pal]
+        cols = [c for c, _n, _bg in pal]
         assert (0xB2, 0x00, 0x2D) in cols and (0x1D, 0x3F, 0x8F) in cols, cols
         red, blue = (0xB2, 0x00, 0x2D), (0x1D, 0x3F, 0x8F)
         svg = tracing.trace_image(img, replace(o, edits=((red, (0, 160, 0)), (blue, None))), 1).svg
