@@ -122,10 +122,17 @@ color changes.</li>
 opens (biggest first), or <b>Another color...</b>. For a picture with too many shades of the
 same color, merge the shades you don't need apart. Merged colors show as one swatch.</li>
 <li><b>Leave out</b> leaves them out: the SVG is see-through there (a crossed-out swatch;
-select it and click <b>Put back</b> to trace it again).</li>
+select it and click <b>Put back</b> to trace it again, in its own color; <i>Edit &gt; Undo</i>
+brings back a color it had before).</li>
 <li><b>Reset colors</b> undoes the edits of the selected colors, or of all when none is
 selected.</li>
 </ul>
+<p>The <b>background</b> (the color around the picture, or its transparent part: what
+<b>Background: Remove</b> leaves out) has a swatch of its own, with a dashed frame, even when
+the same color is also inside the picture (the white inside a letter): editing one leaves the
+other as it is. Clicking the background selects its swatch, clicking that color inside the
+picture the other. (The command line's <code>--recolor</code> and <code>--leave-out</code> change
+a color everywhere, the background too.)</p>
 <p>The picture itself never changes, and the edits are for the picture shown: a new picture
 starts without them, and <i>Reset settings</i> clears them. They still apply when the colors
 are picked again (another number of colors, Smooth, a crop, Auto settings): each edit goes to
@@ -1270,13 +1277,15 @@ class MainWindow(QMainWindow):
         c = self.img.pixelColor(x, y)
         if c.alpha() < 128:
             c = QColor(255, 255, 255)   # (transparent parts are traced as white)
-        g = colors.select_at((c.red(), c.green(), c.blue()), add)
+        in_bg = self.result is not None and self.result.in_background(x, y)
+        g = colors.select_at((c.red(), c.green(), c.blue()), add, in_bg)
         if g is not None:
             n = len(colors._selected_groups())
-            self.status.setText("%s %s in Colors (%s)%s." % (
+            self.status.setText("%s %s%s in Colors (%s)%s." % (
                 "Unselected" if add and not set(g.members) & colors.selected else "Selected",
+                "the background, " if g.background else "",
                 "#%02x%02x%02x" % g.color, "left out" if g.left_out else "%d%% of the picture" % round(
-                    100.0 * g.count / max(1, sum(n for _, n in colors.palette))),
+                    100.0 * g.count / colors.total()),
                 "; %d colors selected" % n if n > 1 else ""))
 
     # cropping

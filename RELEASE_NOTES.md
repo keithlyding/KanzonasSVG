@@ -2,6 +2,13 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.2.2
+
+Fixed:
+- In the Colors box, the background has a swatch of its own (with a dashed frame), apart from
+  the same color inside the picture. Merging or changing the white inside a letter no longer
+  changes the whole background with it, and the background can still be edited on its own.
+
 ## 1.2.1
 
 New:

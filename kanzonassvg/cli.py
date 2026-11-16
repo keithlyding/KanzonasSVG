@@ -189,12 +189,14 @@ def list_colors(src, img, options, enlarge):
     if not colors:
         print("%s: %s mode traces no colors to list" % (src, engine.MODE_NAMES[options.mode]))
         return
-    total = sum(n for _, n in colors) or 1
-    print("%s: %d colors" % (src, len(colors)))
-    for c, n in sorted(colors, key=lambda x: -x[1]):
-        e = engine.edit_for(c, options.edits)
+    total = sum(n for _c, n, _bg in colors) or 1
+    print("%s: %d colors" % (src, len([1 for _c, n, bg in colors if n > 0 and not bg])))
+    for c, n, bg in sorted(colors, key=lambda x: -x[1]):
+        if n <= 0:
+            continue
+        e = engine.edit_for(c, options.edits, engine.BACKGROUND if bg else engine.INSIDE)
         what = "" if e is None else ("  -> left out" if e[1] is None else "  -> #%02x%02x%02x" % tuple(e[1]))
-        print("  #%02x%02x%02x  %5.1f%%%s" % (c + (100.0 * n / total, what)))
+        print("  #%02x%02x%02x  %5.1f%%%s%s" % (c + (100.0 * n / total, "  (the background)" if bg else "", what)))
 
 
 def run(argv):

@@ -832,32 +832,82 @@ std::vector<Paths> run_layers(int n, Progress &progress, Layer layer)
 }
 
 /**
- * The color edits (kz_options.edits) on a palette: each color takes the edit whose original
- * color is nearest (within KZ_EDIT_MATCH levels in each channel; the first of equals), and is
- * recolored or left out; colors that end up the same are one (the first of them, so stacking
- * keeps its order). Returns which pixels are left out (empty if none).
+ * The background, before any edit: its color's index (background_index) and its pixels (that
+ * color's area reaching the edge, what Background: Remove leaves out), or -1 and none.
  */
-std::vector<unsigned char> apply_edits(IndexedMap &imap, kz_options const &o)
+struct Background
+{
+    int index = -1;
+    std::vector<unsigned char> region;
+};
+
+Background find_background(IndexedMap const &imap)
+{
+    Background b;
+    b.index = background_index(imap);
+    if (b.index >= 0) {
+        b.region = background_mask(imap, b.index, KZ_BG_REMOVE);
+    }
+    return b;
+}
+
+/**
+ * The color edits (kz_options.edits) on a palette: each color takes the edit whose original
+ * color is nearest (within KZ_EDIT_MATCH levels in each channel; the first of equals, one for
+ * its area over one for everywhere), and is recolored or left out. The background (<bg>, found
+ * before the edits) can take another edit than the same color inside: then it's a color of its
+ * own (one more in the palette, last: stacked, it's the bottom layer). Colors that end up the
+ * same are one (the first of them, so stacking keeps its order). Returns which pixels are left
+ * out (empty if none).
+ */
+std::vector<unsigned char> apply_edits(IndexedMap &imap, kz_options const &o, Background const &bg = {})
 {
     std::vector<unsigned char> gone;
     if (!o.nedits || imap.nrColors <= 0) {
         return gone;
     }
-    int const n = imap.nrColors;
-    std::vector<char> left_out(n, 0);
-    for (int k = 0; k < n; k++) {
+    auto best_edit = [&](RGB c, int where) {
         int best = -1, best_d = KZ_EDIT_MATCH + 1;
-        RGB const c = imap.clut[k];
+        bool best_own = false;
         for (int e = 0; e < o.nedits; e++) {
             auto const &ed = o.edits[e];
+            int w = ed.where == KZ_EDIT_INSIDE || ed.where == KZ_EDIT_BACKGROUND ? ed.where : KZ_EDIT_EVERYWHERE;
+            if (w != KZ_EDIT_EVERYWHERE && w != where) {
+                continue;
+            }
             int d = std::max({std::abs(c.r - ed.from[0]), std::abs(c.g - ed.from[1]), std::abs(c.b - ed.from[2])});
-            if (d < best_d) {
+            bool own = w == where;
+            if (d < best_d || (d == best_d && own && !best_own)) {
                 best_d = d;
                 best = e;
+                best_own = own;
             }
         }
-        if (best >= 0) {
-            auto const &ed = o.edits[best];
+        return best;
+    };
+    int n = imap.nrColors;
+    std::vector<int> chosen(n);
+    for (int k = 0; k < n; k++) {
+        chosen[k] = best_edit(imap.clut[k], KZ_EDIT_INSIDE);
+    }
+    // the background its own color when its edit isn't the inside's (and there's room)
+    if (bg.index >= 0 && bg.index < n && !bg.region.empty() && n < (int)imap.clut.size()) {
+        int e = best_edit(imap.clut[bg.index], KZ_EDIT_BACKGROUND);
+        if (e != chosen[bg.index]) {
+            imap.clut[n] = imap.clut[bg.index];
+            chosen.push_back(e);
+            for (size_t i = 0; i < imap.pixels.size(); i++) {
+                if (bg.region[i]) {
+                    imap.pixels[i] = n;
+                }
+            }
+            imap.nrColors = ++n;
+        }
+    }
+    std::vector<char> left_out(n, 0);
+    for (int k = 0; k < n; k++) {
+        if (chosen[k] >= 0) {
+            auto const &ed = o.edits[chosen[k]];
             if (ed.leave_out) {
                 left_out[k] = 1;
             } else {
@@ -903,14 +953,19 @@ Shapes trace_colors(RgbMap const &map, kz_options const &o, Progress &progress)
         progress.report(1.0);
     }
     Progress::Part all(progress, 0.15, 0.85);
-    auto removed = apply_edits(imap, o);
 
-    // The background left out: its pixels are in no layer, so it shows through.
-    int const bg = o.remove_background ? background_index(imap) : -1;
-    std::vector<unsigned char> gone;
-    if (bg >= 0) {
-        gone = background_mask(imap, bg, o.remove_background);
+    // The background left out: its pixels are in no layer, so it shows through. (Found before
+    // the edits: it's the picture's, whatever its color is traced as.)
+    Background bg;
+    if (o.nedits || o.remove_background) {
+        bg = find_background(imap);
     }
+    std::vector<unsigned char> gone;
+    if (o.remove_background && bg.index >= 0) {
+        gone = o.remove_background == KZ_BG_REMOVE ? bg.region
+                                                   : background_mask(imap, bg.index, o.remove_background);
+    }
+    auto removed = apply_edits(imap, o, bg);
     if (!removed.empty()) {             // (and the colors left out by an edit)
         if (gone.empty()) {
             gone = std::move(removed);
@@ -1021,14 +1076,24 @@ RgbMap autotrace_input(RgbMap const &map, kz_options const &o, RGB *background =
 {
     auto prep = prepared(map, fingerprint(map), true);
     auto imap = palette(map, prep->smoothed, autotrace_colors(o), &prep->histogram);
-    auto removed = apply_edits(imap, o);   // (colors left out by an edit go with the background)
 
-    // The color Autotrace leaves out: white, or the picture's background when it is removed.
+    // The color Autotrace leaves out: white, or the picture's background when it is removed
+    // (found before the edits; colors left out by an edit go with it).
+    Background found;
+    if (o.nedits || o.remove_background) {
+        found = find_background(imap);
+    }
     RGB bg = {255, 255, 255};
-    if (o.remove_background) {
-        int b = background_index(imap);
-        if (b >= 0) {
-            bg = imap.clut[b];
+    if (o.remove_background && found.index >= 0) {
+        bg = imap.clut[found.index];
+    }
+    auto removed = apply_edits(imap, o, found);
+    if (o.remove_background && found.index >= 0) {
+        if (removed.empty()) {
+            removed.assign(imap.pixels.size(), 0);
+        }
+        for (size_t i = 0; i < removed.size(); i++) {
+            removed[i] |= found.region[i];      // (Remove: the background goes, whatever it's traced as)
         }
     }
     if (background) {
@@ -1761,6 +1826,8 @@ int kz_preview(unsigned char const *rgba, int width, int height, int stride, kz_
     }
     try {
         auto o = checked(options);
+        traced_input = Input{rgba, width, height, stride};     // (the background as kz_trace finds it)
+        struct Reset { ~Reset() { traced_input = Input{}; } } reset;
         auto map = to_rgbmap(rgba, width, height, stride);
         auto put = [&](size_t i, RGB c) {
             rgb_out[3 * i] = c.r;
@@ -1771,7 +1838,7 @@ int kz_preview(unsigned char const *rgba, int width, int height, int stride, kz_
             case KZ_COLORS:
             case KZ_GRAYS: {
                 auto imap = quantized(map, o);
-                auto removed = apply_edits(imap, o);
+                auto removed = apply_edits(imap, o, o.nedits ? find_background(imap) : Background{});
                 for (size_t i = 0; i < imap.pixels.size(); i++) {
                     // (a color left out shows as white, as transparent parts are traced)
                     put(i, !removed.empty() && removed[i] ? RGB{255, 255, 255}
@@ -1828,16 +1895,22 @@ int kz_auto(unsigned char const *rgba, int width, int height, int stride, kz_opt
 }
 
 int kz_palette(unsigned char const *rgba, int width, int height, int stride, kz_options const *options,
-               unsigned char *rgb_out, long long *counts, int max, int *n)
+               unsigned char *rgb_out, long long *counts, int *background, unsigned char *mask_out, int max,
+               int *n)
 {
     if (!n || !rgb_out || max < 0 || !valid_image(rgba, width, height, stride)) {
         return KZ_ERROR;
     }
     *n = 0;
+    if (mask_out) {
+        std::memset(mask_out, 0, (size_t)width * height);
+    }
     try {
         auto o = checked(options);
         IndexedMap imap(1, 1);
         auto map = to_rgbmap(rgba, width, height, stride);
+        traced_input = Input{rgba, width, height, stride};     // (the background as kz_trace finds it)
+        struct Reset { ~Reset() { traced_input = Input{}; } } reset;
         if (o.mode == KZ_COLORS || o.mode == KZ_GRAYS) {
             imap = quantized(map, o);
         } else if (o.mode == KZ_AUTOTRACE) {
@@ -1846,19 +1919,36 @@ int kz_palette(unsigned char const *rgba, int width, int height, int stride, kz_
         } else {
             return KZ_OK;
         }
+        // the colors, then the background as one more (its color's count is of the areas inside)
+        auto bg = find_background(imap);
+        std::vector<RGB> colors(imap.clut.begin(), imap.clut.begin() + imap.nrColors);
         std::vector<long long> count(imap.nrColors, 0);
-        for (auto k : imap.pixels) {
-            if ((int)k < imap.nrColors) {
+        long long in_background = 0;
+        for (size_t i = 0; i < imap.pixels.size(); i++) {
+            unsigned k = imap.pixels[i];
+            if (!bg.region.empty() && bg.region[i]) {
+                in_background++;
+            } else if ((int)k < imap.nrColors) {
                 count[k]++;
             }
         }
-        int const m = std::min(max, imap.nrColors);
+        if (bg.index >= 0 && in_background > 0) {
+            colors.push_back(imap.clut[bg.index]);
+            count.push_back(in_background);
+            if (mask_out) {
+                std::memcpy(mask_out, bg.region.data(), bg.region.size());
+            }
+        }
+        int const m = std::min(max, (int)colors.size());
         for (int k = 0; k < m; k++) {
-            rgb_out[3 * k] = imap.clut[k].r;
-            rgb_out[3 * k + 1] = imap.clut[k].g;
-            rgb_out[3 * k + 2] = imap.clut[k].b;
+            rgb_out[3 * k] = colors[k].r;
+            rgb_out[3 * k + 1] = colors[k].g;
+            rgb_out[3 * k + 2] = colors[k].b;
             if (counts) {
                 counts[k] = count[k];
+            }
+            if (background) {
+                background[k] = bg.index >= 0 && in_background > 0 && k == (int)colors.size() - 1;
             }
         }
         *n = m;

@@ -40,7 +40,18 @@ class Result:
     shapes: int
     seconds: float
     factor: int
-    palette: list = None  # [((r, g, b), pixels)]: the colors traced, before color edits (engine.palette)
+    palette: list = None  # [((r, g, b), pixels, is_background)]: the colors traced, before edits (engine.palette)
+    background: bytes = None  # the background's pixels in the picture traced (w x h at factor), 1 each
+
+    def in_background(self, x, y):
+        """The picture's pixel (x, y) is in the background (as the colors were traced)."""
+        if not self.background:
+            return False
+        w = len(self.background) // max(1, self._h)
+        tx, ty = int(x * self.factor), int(y * self.factor)
+        return 0 <= tx < w and 0 <= ty < self._h and self.background[ty * w + tx] == 1
+
+    _h: int = 1  # the traced picture's height
 
 
 _SIZE = re.compile(r'<svg ([^>]*?)width="\d+" height="\d+"')
@@ -61,8 +72,9 @@ def trace_image(img, options, enlarge=AUTO, progress=None):
     if factor != 1:
         svg = set_size(svg, img.width(), img.height())
     # (the engine kept the colors it just traced with: quick)
-    colors = engine.palette(data, w, h, stride, options) if options.mode in COLOR_MODES else None
-    return Result(svg, n, time.perf_counter() - t, factor, colors)
+    colors, region = engine.palette(data, w, h, stride, options, mask=True) if options.mode in COLOR_MODES \
+        else (None, None)
+    return Result(svg, n, time.perf_counter() - t, factor, colors, region, h)
 
 
 # A big picture is first traced as a small copy (about a megapixel, a tenth of a second) and
