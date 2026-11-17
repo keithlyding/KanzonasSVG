@@ -93,9 +93,10 @@ class ColorsPanel(QGroupBox):
         self.grid.setSpacing(3)
         # (at the top left, also when the box keeps room for more rows than it has: see _rebuild)
         self.grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        # all six columns always: the box (and the panel) as wide with 3 colors as with 40
+        # all six columns always, each as wide as a swatch is on this system (its style's padding
+        # varies): the box (and the panel) as wide with 3 colors as with 40
         for c in range(COLUMNS):
-            self.grid.setColumnMinimumWidth(c, SWATCH + 8)
+            self.grid.setColumnMinimumWidth(c, self.swatch_width())
         lay.addWidget(self.grid_box)
         self.note = QLabel()
         self.note.setWordWrap(True)
@@ -121,6 +122,16 @@ class ColorsPanel(QGroupBox):
         self.b_out.clicked.connect(self.leave_out)
         self.b_reset.clicked.connect(self.reset)
         self._rebuild()
+
+    def swatch_width(self):
+        """The width a swatch takes here (measured on one, styled as they are)."""
+        probe = QToolButton()
+        probe.setCheckable(True)
+        probe.setIcon(swatch_icon((0, 0, 0)))
+        probe.setIconSize(QSize(SWATCH, SWATCH))
+        probe.setStyleSheet(SWATCH_STYLE)
+        probe.ensurePolished()
+        return probe.sizeHint().width()
 
     # what the trace gets
 

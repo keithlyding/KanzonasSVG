@@ -477,6 +477,9 @@ class TestWindow(unittest.TestCase):
                                panel.widget().width(), panel.widget().minimumSizeHint().width(),
                                self.w.centralWidget().sizes()))
             self.assertEqual(len(spots), 1, "the arrows moved (window %d px tall):\n%s" % (height, "\n".join(how)))
+        # each swatch fits the column kept for it (with a wider style it didn't, and the panel grew)
+        for b in self.c.buttons:
+            self.assertLessEqual(b.sizeHint().width(), self.c.grid.columnMinimumWidth(0))
         # a new picture: the box compact again
         self.w.set_image(logo(), None)
         self.assertTrue(self.traced())
