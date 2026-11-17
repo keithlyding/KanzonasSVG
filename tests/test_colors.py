@@ -460,13 +460,23 @@ class TestWindow(unittest.TestCase):
                 bar = self.w.settings.verticalScrollBar()
                 bar.setValue(bar.maximum())
                 QApplication.processEvents()
-            spots = set()
+            spots, how = set(), []
+            panel = self.w.settings
             for n in (8, 24, 40, 6, 30, 3):
                 sp.setValue(n)
                 self.assertTrue(self.traced())
                 QApplication.processEvents()
-                spots.add(sp.mapTo(self.w, QPoint(sp.width() - 8, 6)).toTuple())
-            self.assertEqual(len(spots), 1, "the arrows moved (window %d px tall): %s" % (height, sorted(spots)))
+                spot = sp.mapTo(self.w, QPoint(sp.width() - 8, 6)).toTuple()
+                spots.add(spot)
+                # (what decides where the arrows are, for a failure's message)
+                how.append("%d colors: arrows %s, window %dx%d, panel x %d w %d, viewport w %d, bars v %s/%d h %s, "
+                           "content w %d min %d, splitter %s" % (
+                               n, spot, self.w.width(), self.w.height(), panel.mapTo(self.w, QPoint(0, 0)).x(),
+                               panel.width(), panel.viewport().width(), panel.verticalScrollBar().isVisible(),
+                               panel.verticalScrollBar().width(), panel.horizontalScrollBar().isVisible(),
+                               panel.widget().width(), panel.widget().minimumSizeHint().width(),
+                               self.w.centralWidget().sizes()))
+            self.assertEqual(len(spots), 1, "the arrows moved (window %d px tall):\n%s" % (height, "\n".join(how)))
         # a new picture: the box compact again
         self.w.set_image(logo(), None)
         self.assertTrue(self.traced())
