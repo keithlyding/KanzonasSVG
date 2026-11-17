@@ -790,16 +790,12 @@ class Settings(QScrollArea):
             w.toggled.connect(self._changed)
         self.reset.clicked.connect(self.reset_all)
         self._update_visible()
-        # The panel's width never changes when its scroll bar comes and goes (more colors, more
-        # rows of swatches): the space is kept for it, so the settings under the mouse (the
-        # Colors arrows) don't move sideways.
-        self.verticalScrollBar().rangeChanged.connect(self._keep_width)
-        self._keep_width()
-
-    def _keep_width(self, *_):
-        bar = self.verticalScrollBar()
-        needed = bar.maximum() > bar.minimum()
-        self.setViewportMargins(0, 0, 0 if needed else bar.sizeHint().width(), 0)
+        # The panel's width never changes: its scroll bar is always there (greyed when there's
+        # nothing to scroll). Coming and going (more colors, more rows of swatches) it made the
+        # panel narrower and moved the settings under the mouse (the Colors arrows) sideways;
+        # keeping room for it instead missed by a few pixels on some systems (its width depends
+        # on the style).
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
 
     def current_mode(self):
         return self.mode.currentData()
