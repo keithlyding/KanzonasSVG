@@ -6,7 +6,7 @@ import sys
 import threading
 from dataclasses import replace
 
-from PySide6.QtCore import QUrl, QByteArray, QMimeData, QObject, QPointF, QRect, QRectF, QSettings, Qt, QThread, \
+from PySide6.QtCore import QUrl, QByteArray, QEvent, QMimeData, QObject, QPointF, QRect, QRectF, QSettings, Qt, QThread, \
     QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QDesktopServices, QGuiApplication, QIcon, QImage, QKeySequence, QPainter, \
     QPalette, QPen
@@ -799,9 +799,22 @@ class Settings(QScrollArea):
         # and never narrower than what's in it (with fonts wider than these, it was: a scroll bar
         # across came and went with the rows of swatches, and the contents widened under the mouse)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # (what's in it needs more once a picture is traced, e.g. the swatches: worked out again
+        # whenever its layout changes, and only ever wider, so it doesn't move back and forth)
+        box.installEventFilter(self)
+        self._fit_contents()
+
+    def _fit_contents(self):
+        box = self.widget()
         box.ensurePolished()
-        self.setMinimumWidth(max(270, box.minimumSizeHint().width() + self.verticalScrollBar().sizeHint().width()
-                                 + 2 * self.frameWidth() + 4))
+        need = box.minimumSizeHint().width() + self.verticalScrollBar().sizeHint().width() + 2 * self.frameWidth() + 4
+        if need > self.minimumWidth():
+            self.setMinimumWidth(need)
+
+    def eventFilter(self, obj, event):
+        if obj is self.widget() and event.type() == QEvent.Type.LayoutRequest:
+            self._fit_contents()
+        return super().eventFilter(obj, event)
 
     def current_mode(self):
         return self.mode.currentData()

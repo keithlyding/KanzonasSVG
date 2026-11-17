@@ -455,6 +455,8 @@ class TestWindow(unittest.TestCase):
         sp = self.w.settings.scans
         for height in (900, 600):
             self.w.resize(1400, height)
+            # the panel as narrow as it goes (where it was on the build machines, with their fonts)
+            self.w.centralWidget().setSizes([10000, 1])
             QApplication.processEvents()
             if height == 600:
                 bar = self.w.settings.verticalScrollBar()
