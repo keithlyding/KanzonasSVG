@@ -63,11 +63,12 @@ def read(f):
         return fh.read()
 
 
-def words_found(text, words):
+def words_found(text, words, stems=False):
+    """The words (stems=True: words starting with them, "grey" in "greyed") found in text."""
     low = text.lower()
     found = []
     for w in words:
-        if re.search(r"(?<![a-z])" + re.escape(w) + r"(?![a-z])", low):
+        if re.search(r"(?<![a-z])" + re.escape(w) + ("" if stems else r"(?![a-z])"), low):
             found.append(w)
     return found
 
@@ -76,13 +77,13 @@ def readers_text():
     """[(where, text)] of what people read: the docs, the help, the window's and the command
     line's own words (string literals in the program)."""
     out = []
-    for f in ("README.md", "RELEASE_NOTES.md", "NOTICE.md"):
+    for f in ("README.md", "RELEASE_NOTES.md", "NOTICE.md", "CHANGELOG.md"):
         if os.path.exists(os.path.join(ROOT, f)):
             out.append((f, read(f)))
     from kanzonassvg import app
     out.append(("the help (app.HELP_HTML)", app.HELP_HTML))
     for f in ("kanzonassvg/app.py", "kanzonassvg/cli.py", "kanzonassvg/updates.py", "kanzonassvg/image.py",
-              "kanzonassvg/engine.py", "kanzonassvg/tracing.py"):
+              "kanzonassvg/engine.py", "kanzonassvg/tracing.py", "kanzonassvg/colors_panel.py"):
         tree = ast.parse(read(f))
         strings = [n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str)]
         out.append((f + " (its text)", "\n|\n".join(strings)))    # (no word runs on into the next)
@@ -147,7 +148,7 @@ def check():
             problems.append("%s: filler or a buzzword: %r" % (where, w))
         for w in words_found(text, PLACEHOLDERS):
             problems.append("%s: placeholder text: %r" % (where, w))
-        for w in words_found(text, BRITISH):
+        for w in words_found(text, BRITISH, stems=True):
             problems.append("%s: British spelling: %r (the rule: American)" % (where, w))
         for m in re.finditer(r"(?<![\w-])([A-Za-z]{2,})\s+\1(?![\w-])", text):
             if m.group(1).lower() not in ("that", "had", "is"):    # (rightly doubled sometimes)

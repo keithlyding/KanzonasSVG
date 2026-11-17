@@ -124,8 +124,9 @@ def evening(w):
     c.selected = set(group((0xFF, 0xC4, 0x6B)).members)
     c.change_color((0x6F, 0xA8, 0xDC))
     settle(w)
-    c.selected = set(group((0x1F, 0x6B, 0x3A)).members) | set(group((0x4F, 0x8A, 0x5B)).members)
-    c.merge()
+    greens = [group((0x1F, 0x6B, 0x3A)), group((0x4F, 0x8A, 0x5B))]
+    c.selected = set(greens[0].members) | set(greens[1].members)
+    c.merge(max(greens, key=lambda g: g.count).color)     # (merge() alone asks which color stays)
     settle(w)
     c.selected = set(group((0xD6, 0x3C, 0x3C)).members)
     c.change_color((0x5A, 0x63, 0x70))
