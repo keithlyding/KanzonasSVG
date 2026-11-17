@@ -2,6 +2,12 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.2.3
+
+Fixed:
+- The settings panel no longer shifts when you change the number of colors, so the mouse stays
+  over the Colors arrows.
+
 ## 1.2.2
 
 Fixed:

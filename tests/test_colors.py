@@ -444,6 +444,49 @@ class TestWindow(unittest.TestCase):
         self.assertTrue(self.w.write(path))
         self.assertEqual(os.path.getsize(path), size, "the size shown isn't the size saved")
 
+    def test_the_colors_arrows_stay_under_the_mouse(self):
+        # (the owner: changing the number of colors moved the panel, and the mouse was no longer
+        # over the arrows) more colors brought the scroll bar (the panel 14 px narrower: the
+        # arrows moved sideways); fewer, scrolled to the bottom, pulled it all 42 px down
+        from PySide6.QtCore import QPoint
+        here = os.path.dirname(os.path.abspath(__file__))
+        self.w.set_image(image.load(os.path.join(here, "reference", "starry-night.jpg")), None)
+        self.assertTrue(self.traced())
+        sp = self.w.settings.scans
+        for height in (900, 600):
+            self.w.resize(1400, height)
+            # the panel as narrow as it goes (where it was on the build machines, with their fonts)
+            self.w.centralWidget().setSizes([10000, 1])
+            QApplication.processEvents()
+            if height == 600:
+                bar = self.w.settings.verticalScrollBar()
+                bar.setValue(bar.maximum())
+                QApplication.processEvents()
+            spots, how = set(), []
+            panel = self.w.settings
+            for n in (8, 24, 40, 6, 30, 3):
+                sp.setValue(n)
+                self.assertTrue(self.traced())
+                QApplication.processEvents()
+                spot = sp.mapTo(self.w, QPoint(sp.width() - 8, 6)).toTuple()
+                spots.add(spot)
+                # (what decides where the arrows are, for a failure's message)
+                how.append("%d colors: arrows %s, window %dx%d, panel x %d w %d, viewport w %d, bars v %s/%d h %s, "
+                           "content w %d min %d, splitter %s" % (
+                               n, spot, self.w.width(), self.w.height(), panel.mapTo(self.w, QPoint(0, 0)).x(),
+                               panel.size().width(), panel.viewport().width(), panel.verticalScrollBar().isVisible(),
+                               panel.verticalScrollBar().width(), panel.horizontalScrollBar().isVisible(),
+                               panel.widget().width(), panel.widget().minimumSizeHint().width(),
+                               self.w.centralWidget().sizes()))
+            self.assertEqual(len(spots), 1, "the arrows moved (window %d px tall):\n%s" % (height, "\n".join(how)))
+        # each swatch fits the column kept for it (with a wider style it didn't, and the panel grew)
+        for b in self.c.buttons:
+            self.assertLessEqual(b.sizeHint().width(), self.c.grid.columnMinimumWidth(0))
+        # a new picture: the box compact again
+        self.w.set_image(logo(), None)
+        self.assertTrue(self.traced())
+        self.assertLess(self.c.grid_box.minimumHeight(), 100)
+
     def test_reset_settings_clears_them(self):
         self.select(RED)
         self.c.change_color((0, 160, 0))

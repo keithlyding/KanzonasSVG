@@ -4,7 +4,7 @@
 
 Turn pictures (logos, drawings, scans) into SVG files, on Windows and Linux.
 
-![The KanzonasSVG window: on the left, a picture of a yellow sunflower with a brown center on a dark green cactus; on the right, its SVG traced in 6 flat colors with Auto settings, petals, center and cactus matching the picture; the settings panel on the right shows Colors mode, 6 colors and Background: Remove](docs/screenshot.png)
+![The KanzonasSVG window: on the left, a picture of a yellow sunflower with a brown center on a dark green cactus; on the right, its SVG traced in 6 flat colors with Auto settings, petals, center and cactus matching the picture, its size (160 KB, 6 shapes) above it; the settings panel on the right shows Colors mode, 6 colors, Background: Remove, and the Colors box with the six colors traced and a dashed swatch for the see-through background](docs/screenshot.png)
 
 KanzonasSVG does one thing: it traces a picture into an SVG. Open a picture and it picks the
 settings that suit it (how many colors, smoothing, background) and shows the SVG beside it;
@@ -71,7 +71,7 @@ installed until you click it. (1.0.x doesn't have this: install 1.1 by hand once
 dark) see-through and keeps that color inside shapes; *Remove, also inside* removes that color
 everywhere.
 
-![The Colors box: the flat illustration's SVG with its sky traced blue instead of orange, its roof slate gray instead of red, and its two darker greens merged into one; the swatches of the colors traced on the right, the sun's yellow selected](docs/screenshot-colors.png)
+![The Colors box: the flat illustration's SVG with its sky traced blue instead of orange, its roof slate gray instead of red, and its two darker greens merged into one; the swatches of the colors traced on the right, the sun's yellow selected, and the status bar saying 4 colors edited](docs/screenshot-colors.png)
 
 ![A flat illustration traced with Auto settings: an orange sky with a pale yellow sun, purple mountains, a green hill, a blue lake, dark green pines, a cream house with a red roof and blue door, and pink, orange, yellow and lilac flowers in the grass; the SVG on the right matches it in 14 flat colors](docs/screenshot-landscape.png)
 
