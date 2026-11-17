@@ -796,6 +796,12 @@ class Settings(QScrollArea):
         # keeping room for it instead missed by a few pixels on some systems (its width depends
         # on the style).
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        # and never narrower than what's in it (with fonts wider than these, it was: a scroll bar
+        # across came and went with the rows of swatches, and the contents widened under the mouse)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        box.ensurePolished()
+        self.setMinimumWidth(max(270, box.minimumSizeHint().width() + self.verticalScrollBar().sizeHint().width()
+                                 + 2 * self.frameWidth() + 4))
 
     def current_mode(self):
         return self.mode.currentData()

@@ -93,6 +93,9 @@ class ColorsPanel(QGroupBox):
         self.grid.setSpacing(3)
         # (at the top left, also when the box keeps room for more rows than it has: see _rebuild)
         self.grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        # all six columns always: the box (and the panel) as wide with 3 colors as with 40
+        for c in range(COLUMNS):
+            self.grid.setColumnMinimumWidth(c, SWATCH + 8)
         lay.addWidget(self.grid_box)
         self.note = QLabel()
         self.note.setWordWrap(True)
