@@ -472,7 +472,7 @@ class TestWindow(unittest.TestCase):
                 how.append("%d colors: arrows %s, window %dx%d, panel x %d w %d, viewport w %d, bars v %s/%d h %s, "
                            "content w %d min %d, splitter %s" % (
                                n, spot, self.w.width(), self.w.height(), panel.mapTo(self.w, QPoint(0, 0)).x(),
-                               panel.width(), panel.viewport().width(), panel.verticalScrollBar().isVisible(),
+                               panel.size().width(), panel.viewport().width(), panel.verticalScrollBar().isVisible(),
                                panel.verticalScrollBar().width(), panel.horizontalScrollBar().isVisible(),
                                panel.widget().width(), panel.widget().minimumSizeHint().width(),
                                self.w.centralWidget().sizes()))
