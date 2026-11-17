@@ -91,6 +91,8 @@ class ColorsPanel(QGroupBox):
         self.grid = QGridLayout(self.grid_box)
         self.grid.setContentsMargins(0, 0, 0, 0)
         self.grid.setSpacing(3)
+        # (at the top left, also when the box keeps room for more rows than it has: see _rebuild)
+        self.grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         lay.addWidget(self.grid_box)
         self.note = QLabel()
         self.note.setWordWrap(True)
@@ -142,6 +144,7 @@ class ColorsPanel(QGroupBox):
         """A new picture: no edits, no colors yet."""
         changed = bool(self.edits)
         self.edits, self.palette, self.selected = [], [], set()
+        self.grid_box.setMinimumHeight(0)       # (compact again: see _rebuild)
         self._rebuild()
         return changed
 
@@ -221,6 +224,13 @@ class ColorsPanel(QGroupBox):
             b.clicked.connect(lambda _checked=False, g=g: self.click_group(g, ctrl_held()))
             self.grid.addWidget(b, i // COLUMNS, i % COLUMNS)
             self.buttons.append(b)
+        # The box keeps the height it has had for this picture: fewer colors (fewer rows) leave
+        # room rather than pulling everything under it up, which moved the panel (and the Colors
+        # arrows) under the mouse when it was scrolled to the bottom. A new picture: compact again.
+        rows = (len(self.groups) + COLUMNS - 1) // COLUMNS
+        if self.buttons:
+            row_h = self.buttons[0].sizeHint().height() + self.grid.verticalSpacing()
+            self.grid_box.setMinimumHeight(max(self.grid_box.minimumHeight(), rows * row_h))
         # edits that apply to no color now (the colors were picked again): kept, they apply again
         # if a matching color comes back
         used = {id(engine.edit_for(c, self.edits, w)) for c, w in self.entries()}
