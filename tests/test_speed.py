@@ -47,7 +47,13 @@ class TestSpeed(unittest.TestCase):
         cls.big = photo(3000, 2000)  # 6 megapixels
 
     def test_trace_and_retrace(self):
-        px = image.pixels(self.big)
+        # its own copy, one pixel different: the first trace really is a first (the engine keeps
+        # the smoothed picture and colors of the last pictures by their pixels, and the tests
+        # before this one traced self.big: a partly warm "first" left little for the caches to
+        # save, and the ratios below failed now and then on a slow build machine, 2.90 s of 3.16)
+        img = self.big.copy()
+        img.setPixelColor(0, 0, QColor(1, 2, 3))
+        px = image.pixels(img)
         o = engine.Options(scans=12)
         t = time.perf_counter()
         engine.trace(*px, options=o)
