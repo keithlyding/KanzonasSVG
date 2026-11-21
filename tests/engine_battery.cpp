@@ -28,6 +28,7 @@
 #include <cstring>
 #include <random>
 #include <set>
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -277,6 +278,45 @@ void check_svg(std::string const &svg, Pic const &p, int nshapes, kz_options con
         pos = end;
     }
     if (paths != nshapes) fail("nshapes " + std::to_string(nshapes) + " but " + std::to_string(paths) + " <path>");
+    // one group for each run of a color (1.3): every <path> in one, groups closed, not nested,
+    // ids unique, and each group's paths in its color
+    {
+        std::set<std::string> ids;
+        size_t at = 0;
+        std::string open_hex;
+        bool inside = false;
+        while (true) {
+            size_t g = svg.find("<g ", at), ge = svg.find("</g>", at), pa = svg.find("<path ", at);
+            size_t next = std::min({g, ge, pa});
+            if (next == std::string::npos) break;
+            if (next == g) {
+                if (inside) fail("a group inside a group");
+                size_t q = svg.find('"', g + 7);
+                std::string id = svg.substr(g + 7, q - g - 7);
+                if (id.rfind("color-", 0) != 0 || id.size() < 12) fail("bad group id " + id);
+                if (!ids.insert(id).second) fail("group id twice: " + id);
+                open_hex = id.substr(6, 6);
+                if (svg.find("inkscape:label=\"#" + open_hex, g) > svg.find('>', g)) fail("group label isn't its color");
+                inside = true;
+                at = g + 3;
+            } else if (next == ge) {
+                if (!inside) fail("</g> without <g>");
+                inside = false;
+                at = ge + 4;
+            } else {
+                if (!inside) fail("a <path> outside the groups");
+                size_t end = svg.find("/>", pa);
+                std::string el = svg.substr(pa, end - pa);
+                size_t h = el.find(":#");
+                if (h == std::string::npos || el.substr(h + 2, 6) != open_hex) fail("a path not in its color's group");
+                at = pa + 6;
+            }
+        }
+        if (inside) fail("a group never closed");
+        if (paths > 0 && ids.empty()) fail("paths but no groups");
+        if (svg.find("xmlns:inkscape=\"http://www.inkscape.org/namespaces/inkscape\"") == std::string::npos)
+            fail("no inkscape namespace for the groups' labels");
+    }
     // exact colors (Potrace color modes: the palette colors come from the picture; Grays makes grays of them)
     // (Smooth off: smoothing a clean picture softens hard edges, and a thin rim of the mix of two
     // colors can stay where a shape is too small to tell it from a color of its own.)

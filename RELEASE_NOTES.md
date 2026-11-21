@@ -2,6 +2,17 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.3
+
+New:
+- Save as **PDF**, **EPS** or **DXF** as well as SVG (*File > Save...*: pick the type), for
+  printers, Illustrator, cutting machines, lasers and CAD. A DXF has one layer for each color.
+- **Saved width** (under Size): save at a width in inches or millimeters; the height follows.
+- Each color is its own group in the SVG, named by its color (a layer in Inkscape), so programs
+  that show groups list the colors instead of hundreds of loose shapes.
+- The number of **nodes** is shown above the SVG: fewer nodes cut more cleanly.
+- Command line: `--format pdf` and `--width 100mm`; `-o logo.dxf` saves a DXF.
+
 ## 1.2.3
 
 Fixed:

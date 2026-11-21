@@ -4,7 +4,7 @@ import re
 import time
 from dataclasses import dataclass
 
-from kanzonassvg import engine, image
+from kanzonassvg import engine, export, image
 
 # "Enlarge first": Auto traces small pictures at twice their size. Potrace and
 # Autotrace follow pixel edges, so on a small picture curves come out lumpy; at 2x
@@ -52,6 +52,7 @@ class Result:
         return 0 <= tx < w and 0 <= ty < self._h and self.background[ty * w + tx] == 1
 
     _h: int = 1  # the traced picture's height
+    nodes: int = 0  # the points its outlines go through (export.node_count)
 
 
 _SIZE = re.compile(r'<svg ([^>]*?)width="\d+" height="\d+"')
@@ -62,6 +63,13 @@ def set_size(svg, width, height):
     return _SIZE.sub(lambda m: '<svg %swidth="%d" height="%d"' % (m.group(1), width, height), svg, count=1)
 
 
+def _stamp(svg):
+    """The program's version in the SVG's "Created with" note (the engine writes its own)."""
+    from kanzonassvg import __version__
+    return svg.replace("<!-- Created with KanzonasSVG %s -->" % engine.version(),
+                       "<!-- Created with KanzonasSVG %s -->" % __version__, 1)
+
+
 def trace_image(img, options, enlarge=AUTO, progress=None):
     """Trace a QImage (RGBA8888). The SVG has the picture's own size."""
     t = time.perf_counter()
@@ -69,12 +77,13 @@ def trace_image(img, options, enlarge=AUTO, progress=None):
     work = image.scaled(img, factor)
     data, w, h, stride = image.pixels(work)
     svg, n = engine.trace(data, w, h, stride, options, progress)
+    svg = _stamp(svg)
     if factor != 1:
         svg = set_size(svg, img.width(), img.height())
     # (the engine kept the colors it just traced with: quick)
     colors, region = engine.palette(data, w, h, stride, options, mask=True) if options.mode in COLOR_MODES \
         else (None, None)
-    return Result(svg, n, time.perf_counter() - t, factor, colors, region, h)
+    return Result(svg, n, time.perf_counter() - t, factor, colors, region, h, export.node_count(svg))
 
 
 # A big picture is first traced as a small copy (about a megapixel, a tenth of a second) and
@@ -95,7 +104,7 @@ def quick_trace(img, options):
     small = image.to_rgba(img.scaled(max(1, round(w * f)), max(1, round(h * f)), Qt.AspectRatioMode.IgnoreAspectRatio,
                                      Qt.TransformationMode.SmoothTransformation))
     svg, _n = engine.trace(*image.pixels(small), options=options)
-    return set_size(svg, w, h)
+    return set_size(_stamp(svg), w, h)
 
 
 def preview_image(img, options):

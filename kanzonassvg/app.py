@@ -15,7 +15,7 @@ from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDial
     QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QProgressBar, \
     QProgressDialog, QPushButton, QScrollArea, QSpinBox, QSplitter, QTextBrowser, QVBoxLayout, QWidget
 
-from kanzonassvg import APP_NAME, __version__, engine, image, tracing
+from kanzonassvg import APP_NAME, __version__, engine, export, image, tracing
 from kanzonassvg.colors_panel import ColorsPanel
 
 # (label, engine mode)
@@ -47,8 +47,9 @@ window, or copy a picture and use <i>File &gt; Paste picture</i> (Ctrl+V).</li>
 settings that suit it (see <b>Auto settings</b> below) and traces it. Change any setting and
 the SVG on the right side of the window updates (unless <i>Trace &gt; Update automatically</i>
 is off: then press <i>Trace &gt; Update now</i>, F5).</li>
-<li><b>Save</b>: <i>File &gt; Save SVG...</i> (Ctrl+S), or <i>File &gt; Copy SVG</i>
-(Ctrl+Shift+C) to paste it straight into Inkscape or another program.</li>
+<li><b>Save</b>: <i>File &gt; Save...</i> (Ctrl+S) as an SVG, or as a PDF, EPS or DXF (pick
+the type in the dialog; see <b>Saving</b> below), or <i>File &gt; Copy SVG</i> (Ctrl+Shift+C)
+to paste it straight into Inkscape or another program.</li>
 </ol>
 <h3>Auto settings</h3>
 <p>The <b>Auto settings</b> button (or <i>Trace &gt; Auto settings</i>, Ctrl+Shift+A) picks the
@@ -108,7 +109,7 @@ nothing from it); the status bar says how much it was.</li>
 <p>The settings are kept for next time. <i>Trace &gt; Reset settings</i> (or the
 <b>Reset settings</b> button) puts them all back to how they started.</p>
 <p>A big picture (over 3 megapixels) first shows a quick preview, traced from a smaller copy,
-while the whole picture is traced; the status bar says so, and <i>Save SVG</i> and <i>Copy SVG</i>
+while the whole picture is traced; the status bar says so, and <i>Save</i> and <i>Copy SVG</i>
 wait for the whole picture's SVG.</p>
 <h3>Editing colors</h3>
 <p>In <b>Colors</b>, <b>Grays</b> and <b>Autotrace: colors</b>, the <b>Colors</b> box shows the
@@ -154,9 +155,35 @@ screenshot's toolbars can make a drawing look like something else to it). Crop a
 crop further; Esc stops cropping before you drag. <i>Trace &gt; Remove crop</i>
 (Ctrl+Shift+R) brings the whole picture back. The command line's <code>--crop X,Y,W,H</code>
 does the same.</p>
+<h3>Saving</h3>
+<p><i>File &gt; Save...</i> (Ctrl+S) asks where the first time, then saves there again;
+<i>File &gt; Save as...</i> (Ctrl+Shift+S) always asks. The type you pick (or the file name's
+extension) decides what's written:</p>
+<ul>
+<li><b>SVG</b>: for vector editors (Inkscape, Illustrator, Affinity), cutting machines (Cricut
+Design Space, Silhouette Studio) and web pages.</li>
+<li><b>PDF</b> and <b>EPS</b>: one page the size of the picture, in its colors, for printers,
+sign makers, Illustrator and programs that don't read SVG.</li>
+<li><b>DXF</b>: for CAD, laser, CNC and vinyl cutting programs (LightBurn, AutoCAD, LibreCAD,
+Fusion): each shape's outlines as lines (curves become short straight pieces, within 0.025 mm
+of them), one layer for each color. A DXF can't hold fill colors, only outlines, and doesn't
+say its unit: it's in millimeters, or in inches when <b>Saved width</b> is in inches, so set
+that unit when a program asks.</li>
+</ul>
+<p>Each color is a group of its own, named by its color (an Inkscape layer; in a DXF, a
+layer such as COLOR_B2002D): programs that show groups list the colors instead of hundreds of
+loose shapes. (In the Autotrace modes a color can come back above another, and gets a
+second group, so the shapes stay in their order.)</p>
+<p><b>Saved width</b> (under <b>Size</b>) sets how big the file is: <i>Picture's pixels</i>
+keeps the picture's own size, 96 pixels to the inch (as browsers, Inkscape and Illustrator
+count them), or give a width in <i>Inches</i> or <i>Millimeters</i> and the height follows.
+The line under it shows the size the files get. It changes only what's saved (and copied),
+not the trace, and is kept for next time.</p>
 <h3>Looking at it</h3>
-<p>Above the SVG: its size, as Save SVG will write it, and how many shapes it has (also in the
-status bar).</p>
+<p>Above the SVG: its size, as Save writes an SVG, how many shapes it has, and how many
+<b>nodes</b> (the points its outlines go through; a cutting machine turns at each, and fewer
+cut cleaner: raise <b>Tolerance</b>, <b>Smooth corners</b> or <b>Speckles</b>, or use fewer
+colors, for fewer). The status bar says the same.</p>
 <p>The left side shows the picture; <i>View &gt; Show colors to trace</i> (Ctrl+T) shows it
 with its colors reduced, as it will be traced. Both sides zoom and move together: turn the
 mouse wheel to zoom, drag to move. <i>View &gt; Zoom to fit</i> (Ctrl+0), <i>View &gt; Actual
@@ -165,8 +192,8 @@ size</i> (Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> 
 <table cellpadding="2">
 <tr><td>Ctrl+O</td><td>Open picture</td></tr>
 <tr><td>Ctrl+V</td><td>Paste picture</td></tr>
-<tr><td>Ctrl+S</td><td>Save SVG</td></tr>
-<tr><td>Ctrl+Shift+S</td><td>Save SVG as</td></tr>
+<tr><td>Ctrl+S</td><td>Save</td></tr>
+<tr><td>Ctrl+Shift+S</td><td>Save as</td></tr>
 <tr><td>Ctrl+Shift+C</td><td>Copy SVG</td></tr>
 <tr><td>F5</td><td>Update now</td></tr>
 <tr><td>Ctrl+Shift+A</td><td>Auto settings</td></tr>
@@ -183,7 +210,9 @@ size</i> (Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> 
 <p>The same tracing works from a command prompt, for many files at once (on Windows,
 <code>kanzonassvg-cli.exe</code> in the program's folder). Run it with <code>--help</code> to
 see every option, for example:<br>
-<code>kanzonassvg-cli --colors 4 *.png -o svgs</code></p>
+<code>kanzonassvg-cli --colors 4 *.png -o svgs</code><br>
+<code>kanzonassvg-cli logo.png -o logo.dxf --width 100mm</code> (the extension picks the type;
+<code>--format pdf</code> for many files; <code>--width</code> in <code>in</code> or <code>mm</code>)</p>
 <h3>Updates</h3>
 <p>Once a day, a few seconds after it starts, KanzonasSVG asks GitHub whether a newer version is
 out (<i>Help &gt; Check for updates automatically</i>, on at first; it sends nothing about you
@@ -587,6 +616,23 @@ class Loader(QThread):
             self.failed.emit(self.number, str(e) or e.__class__.__name__)
 
 
+class Saver(QThread):
+    """Writes a PDF, EPS or DXF in the background."""
+
+    done = Signal(object, str)  # the Saver, the error ("" if saved)
+
+    def __init__(self, path, svg, fmt, size):
+        super().__init__()
+        self.path, self.svg, self.fmt, self.size = path, svg, fmt, size
+
+    def run(self):
+        try:
+            export.write(self.path, self.svg, self.fmt, self.size)
+            self.done.emit(self, "")
+        except Exception as e:
+            self.done.emit(self, str(e) or e.__class__.__name__)
+
+
 class Job:
     def __init__(self, number, img, options, enlarge, want_preview, auto=False):
         self.number = number
@@ -676,6 +722,7 @@ class Settings(QScrollArea):
     """The settings panel."""
 
     changed = Signal()
+    size_changed = Signal()     # the saved size (nothing to trace again)
 
     def __init__(self):
         super().__init__()
@@ -770,6 +817,23 @@ class Settings(QScrollArea):
         self.enlarge.addItem("4 times", 4)
         self.enlarge.setToolTip("Trace small pictures bigger, for smoother curves (the SVG keeps the picture's size)")
         f.addRow("Enlarge first", self.enlarge)
+        # the size it's saved at (SVG, PDF, EPS, DXF): changes only the file, not the trace
+        self.size_unit = QComboBox()
+        self.size_unit.addItem("Picture's pixels", export.PX)
+        self.size_unit.addItem("Inches", export.IN)
+        self.size_unit.addItem("Millimeters", export.MM)
+        self.size_unit.setToolTip("The width it's saved at; the height follows. Picture's pixels: the picture's own "
+                                  "size, 96 pixels to the inch (as browsers, Inkscape and Illustrator count them)")
+        self.size_width = QDoubleSpinBox(minimum=0.01, maximum=100000.0, decimals=2, value=4.0)
+        self.size_width.setToolTip("The saved width, in the unit beside it (the height follows the picture)")
+        self.size_info = QLabel()
+        self.size_info.setWordWrap(True)
+        row = QHBoxLayout()
+        row.addWidget(self.size_width, 1)
+        row.addWidget(self.size_unit, 1)
+        f.addRow("Saved width", row)
+        f.addRow(self.size_info)
+        self.picture_px = None      # the picture's width in pixels (MainWindow sets it): for the first width
         lay.addWidget(g)
 
         self.reset = QPushButton("Reset settings")
@@ -789,8 +853,12 @@ class Settings(QScrollArea):
         for w in (self.smooth, self.stack, self.invert, self.optimize, self.width):
             w.toggled.connect(self._changed)
         self.reset.clicked.connect(self.reset_all)
+        self._unit = export.PX
+        self.size_unit.currentIndexChanged.connect(self._unit_changed)
+        self.size_width.valueChanged.connect(lambda _v: self.size_changed.emit())
+        self.size_width.setVisible(False)
         self._update_visible()
-        # The panel's width never changes: its scroll bar is always there (greyed when there's
+        # The panel's width never changes: its scroll bar is always there (grayed when there's
         # nothing to scroll). Coming and going (more colors, more rows of swatches) it made the
         # panel narrower and moved the settings under the mouse (the Colors arrows) sideways;
         # keeping room for it instead missed by a few pixels on some systems (its width depends
@@ -872,6 +940,42 @@ class Settings(QScrollArea):
     def enlarge_setting(self):
         return self.enlarge.currentData()
 
+    # the saved size
+
+    def saved_size(self):
+        unit = self.size_unit.currentData()
+        return export.Size(unit, self.size_width.value()) if unit != export.PX else export.PIXELS
+
+    def set_saved_size(self, size):
+        self.size_unit.blockSignals(True)
+        self.size_width.blockSignals(True)
+        self.size_unit.setCurrentIndex(max(0, self.size_unit.findData(size.unit)))
+        if size.unit != export.PX:
+            self.size_width.setValue(size.width)
+        self._unit = size.unit
+        self.size_width.setVisible(size.unit != export.PX)
+        self.size_unit.blockSignals(False)
+        self.size_width.blockSignals(False)
+        self.size_changed.emit()
+
+    def _unit_changed(self):
+        """The same size in the new unit (from pixels: the picture's size at 96 to the inch)."""
+        unit = self.size_unit.currentData()
+        inches = None
+        if self._unit == export.PX and self.picture_px:
+            inches = self.picture_px / export.PX_PER_IN
+        elif self._unit == export.IN:
+            inches = self.size_width.value()
+        elif self._unit == export.MM:
+            inches = self.size_width.value() / export.MM_PER_IN
+        if unit != export.PX and inches is not None:
+            self.size_width.blockSignals(True)
+            self.size_width.setValue(round(inches * (export.MM_PER_IN if unit == export.MM else 1.0), 2))
+            self.size_width.blockSignals(False)
+        self._unit = unit
+        self.size_width.setVisible(unit != export.PX)
+        self.size_changed.emit()
+
     # saved between runs
     _SAVED = ["mode", "scans", "smooth", "stack", "remove_bg", "threshold", "invert", "speckles", "corners",
               "optimize", "tolerance", "error", "filters", "width", "enlarge"]
@@ -891,6 +995,9 @@ class Settings(QScrollArea):
                     else self.threshold.value())
         qs.setValue("settings/bw_threshold", self._bw if self.current_mode() != engine.BRIGHTNESS
                     else self.threshold.value())
+        size = self.saved_size()
+        qs.setValue("save/unit", size.unit)
+        qs.setValue("save/width", self.size_width.value())
 
     def load(self, qs):
         for name, w in self._widgets():
@@ -920,6 +1027,15 @@ class Settings(QScrollArea):
         self._last_mode = self.current_mode()
         self.tolerance.setEnabled(self.optimize.isChecked())
         self._update_visible()
+        try:
+            unit = str(qs.value("save/unit", export.PX))
+            width = float(qs.value("save/width", 4.0))
+            self.size_width.blockSignals(True)
+            self.size_width.setValue(width)     # (also kept while the unit is pixels)
+            self.size_width.blockSignals(False)
+            self.set_saved_size(export.Size(unit, width) if unit != export.PX else export.PIXELS)
+        except (TypeError, ValueError):
+            self.set_saved_size(export.PIXELS)
 
     # for Undo: every setting as it is, and put back
 
@@ -1024,6 +1140,7 @@ class MainWindow(QMainWindow):
         self.history_at = -1
         self.source_path = None
         self.save_path = None
+        self.savers = []  # Saver threads still writing
         self.result = None  # tracing.Result
         self.preview = None  # QImage
         self.job_number = 0
@@ -1066,6 +1183,7 @@ class MainWindow(QMainWindow):
         self.timer = QTimer(self, singleShot=True, interval=150)
         self.timer.timeout.connect(self.start_trace)
         self.settings.changed.connect(self.settings_changed)
+        self.settings.size_changed.connect(self._show_saved_size)
         self.settings.auto.clicked.connect(self.auto_settings)
         self.settings.load(self.qs)
 
@@ -1098,8 +1216,8 @@ class MainWindow(QMainWindow):
         self._action(m, "Open picture...", self.open_dialog, QKeySequence.StandardKey.Open)
         self.a_paste = self._action(m, "Paste picture", self.paste, QKeySequence.StandardKey.Paste)
         m.addSeparator()
-        self.a_save = self._action(m, "Save SVG...", self.save, QKeySequence.StandardKey.Save)
-        self.a_save_as = self._action(m, "Save SVG as...", self.save_as, "Ctrl+Shift+S")
+        self.a_save = self._action(m, "Save...", self.save, QKeySequence.StandardKey.Save)
+        self.a_save_as = self._action(m, "Save as...", self.save_as, "Ctrl+Shift+S")
         self.a_copy = self._action(m, "Copy SVG", self.copy_svg, "Ctrl+Shift+C")
         m.addSeparator()
         self._action(m, "Quit", self.close, QKeySequence.StandardKey.Quit)
@@ -1460,10 +1578,13 @@ class MainWindow(QMainWindow):
             self.left.set_picture(self.preview)
         size = len(result.svg.encode("utf-8"))
         # (the size Save writes: the same bytes)
-        self.right.title = "SVG: %s, %d shapes" % (_size_text(size), result.shapes)
+        self.right.title = "SVG: %s, %d shapes, %s nodes" % (_size_text(size), result.shapes,
+                                                            "{:,}".format(result.nodes))
         self.right.update()
+        self._show_saved_size()
         self.remember()
-        text = "%d shapes, %s, traced in %.2f s" % (result.shapes, _size_text(size), result.seconds)
+        text = "%d shapes, %s nodes, %s, traced in %.2f s" % (result.shapes, "{:,}".format(result.nodes),
+                                                              _size_text(size), result.seconds)
         if result.factor != 1:
             text += " (at %d times the size)" % result.factor
         if self.crop is not None:
@@ -1515,10 +1636,20 @@ class MainWindow(QMainWindow):
 
     # saving
 
+    def _show_saved_size(self):
+        """Under Saved width: the size the files are saved at."""
+        if self.result is None:
+            self.settings.size_info.setText("")
+            return
+        self.settings.picture_px = export.svg_size(self.result.svg)[0]
+        self.settings.size_info.setText("Saved at " + export.size_text(self.result.svg, self.settings.saved_size()))
+
     def default_name(self):
+        fmt = self.qs.value("paths/format", "svg")
+        fmt = fmt if fmt in export.FORMATS else "svg"
         if self.source_path:
-            return os.path.splitext(self.source_path)[0] + ".svg"
-        return os.path.join(self.qs.value("paths/save", os.path.expanduser("~")), "picture.svg")
+            return os.path.splitext(self.source_path)[0] + "." + fmt
+        return os.path.join(self.qs.value("paths/save", os.path.expanduser("~")), "picture." + fmt)
 
     def save(self):
         if self.save_path:
@@ -1528,42 +1659,74 @@ class MainWindow(QMainWindow):
     def save_as(self):
         if self.result is None:
             return False
-        path, _ = QFileDialog.getSaveFileName(self, "Save SVG", self.save_path or self.default_name(),
-                                              "SVG files (*.svg)")
+        start = self.save_path or self.default_name()
+        fmt = export.format_of(start)
+        filters = [export.FILTERS[f] for f in export.FORMATS]
+        path, chosen = QFileDialog.getSaveFileName(self, "Save as", start, ";;".join(filters),
+                                                   export.FILTERS[fmt])
         if not path:
             return False
-        if not path.lower().endswith(".svg"):
-            path += ".svg"
+        ext = os.path.splitext(path)[1].lower().lstrip(".")
+        if ext not in export.FORMATS:
+            # no type typed: the one chosen in the dialog's list
+            picked = [f for f in export.FORMATS if export.FILTERS[f] == chosen]
+            path += "." + (picked[0] if picked else "svg")
         return self.write(path)
 
     def write(self, path):
+        """Save the trace to path, in the format its extension names (SVG, PDF, EPS or DXF) at
+        the saved size. An SVG is written at once; the others in the background (a detailed
+        picture's DXF takes a second): wait_saved() waits for them."""
         if self.result is None:
             return False
-        tmp = path + ".part"
-        try:
-            with open(tmp, "w", encoding="utf-8", newline="\n") as f:
-                f.write(self.result.svg)
-            os.replace(tmp, path)
-        except OSError as e:
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
-            QMessageBox.warning(self, APP_NAME, "Couldn't save %s:\n%s" % (path, e))
-            return False
+        fmt = export.format_of(path)
+        size = self.settings.saved_size()
         self.save_path = path
         self.qs.setValue("paths/save", os.path.dirname(path))
-        self.status.setText("Saved %s" % path)
+        self.qs.setValue("paths/format", fmt)
+        if fmt == "svg":
+            try:
+                export.write(path, self.result.svg, fmt, size)
+            except OSError as e:
+                QMessageBox.warning(self, APP_NAME, "Couldn't save %s:\n%s" % (path, e))
+                return False
+            self.status.setText("Saved %s" % path)
+            return True
+        t = Saver(path, self.result.svg, fmt, size)
+        t.done.connect(self._saved)
+        self.savers.append(t)
+        self.status.setText("Saving %s..." % path)
+        t.start()
         return True
+
+    def _saved(self, saver, error):
+        if saver in self.savers:
+            self.savers.remove(saver)
+        saver.wait()
+        if error:
+            if not self.closing:
+                QMessageBox.warning(self, APP_NAME, "Couldn't save %s:\n%s" % (saver.path, error))
+        elif not self.closing:
+            self.status.setText("Saved %s" % saver.path)
+
+    def wait_saved(self):
+        """Wait until every file being saved is written (for quitting, and the tests)."""
+        while self.savers:
+            t = self.savers[0]
+            t.wait()
+            QApplication.processEvents()
+            if self.savers and self.savers[0] is t:
+                self.savers.pop(0)
 
     def copy_svg(self):
         if self.result is None:
             return
         md = QMimeData()
-        data = QByteArray(self.result.svg.encode("utf-8"))
+        svg = export.sized_svg(self.result.svg, self.settings.saved_size())
+        data = QByteArray(svg.encode("utf-8"))
         md.setData("image/svg+xml", data)
         md.setData(OURS, b"1")
-        md.setText(self.result.svg)
+        md.setText(svg)
         QGuiApplication.clipboard().setMimeData(md)
         _hook_clipboard_release()
         self.status.setText("SVG copied: paste it into Inkscape, Illustrator or another program.")
@@ -1820,6 +1983,8 @@ class MainWindow(QMainWindow):
         if self.worker is not None:
             self.job.cancelled = True
             self.worker.wait()
+        for t in list(self.savers):     # (a file being saved is finished first)
+            t.wait()
         for t in self.old_loaders + ([self.loader] if self.loader is not None else []):
             t.wait()
         self.left.stop()

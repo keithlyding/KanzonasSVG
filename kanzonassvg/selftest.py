@@ -164,6 +164,29 @@ def run(argv):
         assert out.pixelColor(50, 80).name() == "#00a000", out.pixelColor(50, 80).name()
         return "%d colors; recolored and left out" % len(cols)
 
+    def saving():
+        # SVG, PDF, EPS and DXF at a size (zlib and the rest in the program), and the color groups
+        from kanzonassvg import export
+        svg = tracing.trace_image(img, engine.Options(smooth=False, scans=3), 1).svg
+        assert svg.count('inkscape:groupmode="layer"') == 3, svg[:600]
+        size = export.Size(export.MM, 100)
+        sized = export.render(svg, "svg", size).decode()
+        assert 'width="100mm" height="66.6667mm"' in sized, sized[:400]
+        pdf = export.render(svg, "pdf", size)
+        start = int(pdf.rsplit(b"startxref\n", 1)[1].split()[0])
+        assert pdf.startswith(b"%PDF-1.4") and pdf[start:start + 4] == b"xref", pdf[-80:]
+        import re
+        import zlib
+        stream = re.search(rb"stream\n(.*)\nendstream", pdf, re.S).group(1)
+        ops = zlib.decompress(stream).decode()
+        assert ops.count(" rg") == 3 and ops.rstrip().endswith("Q"), ops[:200]
+        eps = export.render(svg, "eps", size).decode()
+        assert eps.startswith("%!PS-Adobe-3.0 EPSF-3.0") and "%%BoundingBox: 0 0 284 189" in eps, eps[:200]
+        dxf = export.render(svg, "dxf", size).decode()
+        assert dxf.count("\nPOLYLINE\n") == dxf.count("\nSEQEND\n") > 3 and dxf.endswith("EOF\n"), dxf[-60:]
+        assert "COLOR_B2002D" in dxf and "COLOR_1D3F8F" in dxf
+        return "SVG, PDF, EPS, DXF; %d nodes" % export.node_count(svg)
+
     def update_check():
         # the update check reaches GitHub over TLS (Qt's network backend in the program), and
         # its pieces work in the finished program
@@ -198,7 +221,7 @@ def run(argv):
     for name, fn in [("engine loads", engine_loads), ("exact colors and holes", colors_exact),
                      ("logo and icon", logo_and_icon), ("auto settings", auto_settings), ("drawing SVGs", drawing), ("every mode", every_mode), ("reads pictures", reads_pictures),
                      ("big picture speed", big_picture), ("window opens and traces", window_opens),
-                     ("command line", command_line), ("color edits", color_edits),
+                     ("command line", command_line), ("color edits", color_edits), ("saving", saving),
                      ("update check", update_check)]:
         check(name, fn)
 

@@ -439,7 +439,9 @@ class TestWindow(unittest.TestCase):
 
     def test_the_svg_size_shown(self):
         size = len(self.w.result.svg.encode("utf-8"))
-        self.assertEqual(self.w.right.title, "SVG: %s, %d shapes" % (app._size_text(size), self.w.result.shapes))
+        self.assertEqual(self.w.right.title, "SVG: %s, %d shapes, %s nodes" % (
+            app._size_text(size), self.w.result.shapes, "{:,}".format(self.w.result.nodes)))
+        self.assertGreater(self.w.result.nodes, self.w.result.shapes)
         path = os.path.join(self.tmp.name, "out.svg")
         self.assertTrue(self.w.write(path))
         self.assertEqual(os.path.getsize(path), size, "the size shown isn't the size saved")
