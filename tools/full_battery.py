@@ -114,7 +114,10 @@ def main():
     report += ["", "## By hand (not automatic)", "",
                "- [ ] The installed Windows program, used for a while: open, paste, every mode, zoom, save,",
                "      Copy SVG into Inkscape, quit.",
-               "- [ ] The AppImage on a Linux desktop: the same.", "", "## Details", ""]
+               "- [ ] The AppImage on a Linux desktop: the same.",
+               "- [ ] A PDF, an EPS and a DXF saved at a width in mm, opened in the programs people use "
+               "them in (Inkscape, Illustrator or a PDF reader; LightBurn, LibreCAD or another CAD or laser "
+               "program for the DXF): the right size, colors and layers.", "", "## Details", ""]
     for r in results:
         report += ["### %s" % r["name"], "", "`%s`" % r["cmd"], "", "```", r["tail"], "```", ""]
     path = os.path.join(ROOT, "docs", "test-reports", "%s%s.md" % (version, "-quick" if quick else ""))
