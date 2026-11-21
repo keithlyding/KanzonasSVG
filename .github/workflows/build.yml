@@ -299,6 +299,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write          # (the attestations' signing identity)
+      attestations: write      # (and storing them)
     env:
       VERSION: ${{ needs.windows.outputs.version }}
     steps:
@@ -367,6 +369,21 @@ jobs:
             echo '```'
           } >> notes.md
           cat notes.md
+
+      # Build provenance: a signed record that each file was built by this workflow, in this
+      # repository, from this commit. Anyone can check a download with
+      #   gh attestation verify <file> --owner keithlyding
+      # Only new releases from main get them (this job runs for nothing else), and only the
+      # files about to be uploaded. (Pinned to v4.2.2's commit: it vouches for the downloads.)
+      - name: Attest the release files
+        if: steps.rel.outputs.new == 'true'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: |
+            SHA256SUMS.txt
+            release/KanzonasSVG-v${{ env.VERSION }}-setup.exe
+            release/KanzonasSVG-windows.zip
+            release/KanzonasSVG-x86_64.AppImage
 
       - name: Publish release
         if: steps.rel.outputs.new == 'true'

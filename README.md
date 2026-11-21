@@ -39,6 +39,18 @@ From [Releases](https://github.com/keithlyding/KanzonasSVG/releases):
 - **Linux (64-bit; Ubuntu 22.04, Debian 12, Fedora 36 or newer):** `KanzonasSVG-x86_64.AppImage`.
   Make it executable (`chmod +x KanzonasSVG-x86_64.AppImage`) and run it.
 
+**Checking a download** (from 1.3 on): each release file comes with a signed record from
+GitHub that it was built by this repository's own build workflow, from a given commit. With
+the [GitHub command line](https://cli.github.com/) installed, check a file you downloaded:
+
+```
+gh attestation verify KanzonasSVG-x86_64.AppImage --owner keithlyding
+```
+
+(the same for the setup, the zip and `SHA256SUMS.txt`; the records are also listed under the
+repository's Actions > Attestations). It proves the file is genuine; Windows may still warn
+about the installer, which isn't code-signed.
+
 **Updates** (from 1.1 on): once a day KanzonasSVG asks GitHub whether a newer version is out
 (*Help > Check for updates automatically*; nothing about you or your pictures is sent) and says so
 in the status bar, with what's new since your version. **Update now** downloads it, checks it
