@@ -16,6 +16,7 @@
 #include <atomic>
 #include <chrono>
 #include <array>
+#include <map>
 #include <cstdio>
 #include <cmath>
 #include <cstddef>
@@ -26,6 +27,7 @@
 #include <exception>
 #include <memory>
 #include <optional>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -293,11 +295,30 @@ std::string to_svg(Shapes const &shapes, int width, int height, int *npaths)
                       "<!-- Created with KanzonasSVG " +
                       std::string(VERSION) +
                       " -->\n"
-                      "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"" +
+                      "<svg xmlns=\"http://www.w3.org/2000/svg\" "
+                      "xmlns:inkscape=\"http://www.inkscape.org/namespaces/inkscape\" version=\"1.1\" width=\"" +
                       std::to_string(width) + "\" height=\"" + std::to_string(height) + "\" viewBox=\"0 0 " +
                       std::to_string(width) + " " + std::to_string(height) + "\">\n";
     int count = 0;
+    // One group for each color (shapes next to each other in the same color: all of a color's
+    // in the layered modes), named by its color, an Inkscape layer: a cutting machine's or a
+    // vector editor's layers list shows the colors, not hundreds of loose paths. (A color that
+    // comes back above another gets a second group, "-2": the order of the shapes is kept.)
+    std::map<std::string, int> seen;
+    std::string open_style;
     for (auto const &s : shapes) {
+        if (s.style != open_style) {
+            if (!open_style.empty()) {
+                out += "</g>\n";
+            }
+            open_style = s.style;
+            size_t at = s.style.find('#');
+            std::string hex = at == std::string::npos ? "000000" : s.style.substr(at + 1, 6);
+            int n = ++seen[hex];
+            std::string name = "color-" + hex + (n > 1 ? "-" + std::to_string(n) : "");
+            out += "<g id=\"" + name + "\" inkscape:groupmode=\"layer\" inkscape:label=\"#" + hex +
+                   (n > 1 ? " (" + std::to_string(n) + ")" : "") + "\">\n";
+        }
         size_t k = 0;
         while (k < s.paths.size()) {
             out += "<path style=\"" + s.style + "\" d=\"";
@@ -310,6 +331,9 @@ std::string to_svg(Shapes const &shapes, int width, int height, int *npaths)
             out += "\"/>\n";
             count++;
         }
+    }
+    if (!open_style.empty()) {
+        out += "</g>\n";
     }
     out += "</svg>\n";
     if (npaths) {

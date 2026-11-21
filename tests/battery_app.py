@@ -39,7 +39,7 @@ if __name__ == "__main__":
     APP.setOrganizationName("Kanzonas")
     APP.setApplicationName("KanzonasSVG-battery")
 
-from kanzonassvg import app, cli, engine, image, tracing  # noqa: E402
+from kanzonassvg import app, cli, engine, export, image, tracing  # noqa: E402
 
 ERRORS = []
 
@@ -336,7 +336,8 @@ def check_window(steps, seed, fails):
             before = len(ERRORS)
             action = rng.choice(["open", "open", "paste", "setting", "setting", "setting", "setting", "auto",
                                  "update", "colors", "zoom", "move", "fit", "save", "copy", "reopen", "auto_new",
-                                 "events", "new_version", "crop", "uncrop", "colors", "colors", "pick", "undo", "undo", "redo"])
+                                 "events", "new_version", "crop", "uncrop", "colors", "colors", "pick", "undo", "undo", "redo",
+                                 "save", "saved_width"])
             try:
                 if action == "open":
                     w.open_path(rng.choice(pics))
@@ -360,9 +361,28 @@ def check_window(steps, seed, fails):
                     w.view.fit(w.left.size())
                 elif action == "save":
                     if w.result is not None:
-                        path = os.path.join(folder, "out.svg")
-                        if not w.write(path) or not os.path.exists(path):
+                        # in any format, at the saved size: the file is the SVG shown, converted
+                        fmt = rng.choice(export.FORMATS)
+                        path = os.path.join(folder, "out." + fmt)
+                        svg, size = w.result.svg, w.settings.saved_size()
+                        if not w.write(path):
                             fails.append("window seed %d step %d: save failed" % (seed, step))
+                        w.wait_saved()
+                        with open(path, "rb") as f:
+                            if f.read() != export.render(svg, fmt, size):
+                                fails.append("window seed %d step %d: the %s saved isn't the SVG shown at %s"
+                                             % (seed, step, fmt, size))
+                        if w.savers:
+                            fails.append("window seed %d step %d: a save never finished" % (seed, step))
+                elif action == "saved_width":
+                    # another unit or width: nothing traced again
+                    number, s = w.job_number, w.settings
+                    if rng.random() < 0.5:
+                        s.size_unit.setCurrentIndex(rng.randrange(s.size_unit.count()))
+                    else:
+                        s.size_width.setValue(rng.choice([0.01, 1, 4.5, 100, 2000, 100000]))
+                    if w.job_number != number:
+                        fails.append("window seed %d step %d: the saved width traced again" % (seed, step))
                 elif action == "copy":
                     w.copy_svg()
                 elif action == "reopen":

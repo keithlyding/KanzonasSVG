@@ -1,11 +1,11 @@
-"""The command line: trace one or many pictures into SVG files."""
+"""The command line: trace one or many pictures into SVG (or PDF, EPS, DXF) files."""
 
 import argparse
 import glob
 import os
 import sys
 
-from kanzonassvg import APP_NAME, __version__, engine, image, tracing
+from kanzonassvg import APP_NAME, __version__, engine, export, image, tracing
 
 MODE_HELP = (
     "colors (default), grays, steps (brightness steps), bw (black and white), edges, "
@@ -16,17 +16,25 @@ MODE_HELP = (
 def parser():
     p = argparse.ArgumentParser(
         prog="kanzonassvg-cli" if sys.platform == "win32" else "kanzonassvg",
-        description="Turn pictures (PNG, JPEG, BMP, GIF, WebP, TIFF...) into SVG files.",
+        description="Turn pictures (PNG, JPEG, BMP, GIF, WebP, TIFF...) into SVG files (or PDF, EPS, DXF).",
         epilog="Examples:\n"
         "  kanzonassvg logo.png                  -> logo.svg, settings picked for it\n"
         "  kanzonassvg --colors 4 *.png -o out   -> out/<name>.svg for each\n"
-        "  kanzonassvg --mode bw scan.jpg -o scan.svg",
+        "  kanzonassvg --mode bw scan.jpg -o scan.svg\n"
+        "  kanzonassvg logo.png -o logo.dxf --width 100mm   -> a DXF 100 mm wide\n"
+        "  kanzonassvg --format pdf *.png -o pdfs",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("inputs", nargs="+", metavar="PICTURE", help="pictures to trace (wildcards work)")
     p.add_argument("-o", "--output", metavar="PATH",
-                   help="the SVG file (one picture), or a folder for them (default: next to each picture)")
-    p.add_argument("-f", "--force", action="store_true", help="replace SVG files that are already there")
+                   help="the file (one picture: its extension, .svg, .pdf, .eps or .dxf, picks the format), "
+                   "or a folder for them (default: next to each picture)")
+    p.add_argument("--format", choices=export.FORMATS, default=None,
+                   help="save as this (default: the -o file's extension, or svg)")
+    p.add_argument("--width", default=None, metavar="SIZE", type=width_size,
+                   help="the saved width, like 4in or 100mm (the height follows; default: the picture's "
+                   "pixels, 96 to the inch). A DXF is in mm, or in inches with an in width")
+    p.add_argument("-f", "--force", action="store_true", help="replace files that are already there")
     p.add_argument("--no-auto", action="store_true",
                    help="don't pick settings for each picture: use the defaults (8 colors, smoothed) and "
                    "the options given. Without it, each picture gets the settings that suit it (mode, "
@@ -120,8 +128,8 @@ def expand(inputs):
     return files
 
 
-def output_path(src, output, many):
-    base = os.path.splitext(os.path.basename(src))[0] + ".svg"
+def output_path(src, output, many, fmt="svg"):
+    base = os.path.splitext(os.path.basename(src))[0] + "." + fmt
     if not output:
         return os.path.join(os.path.dirname(os.path.abspath(src)), base)
     if many or os.path.isdir(output) or output.endswith(("/", "\\")):
@@ -159,6 +167,18 @@ def recolor_pair(text):
         raise argparse.ArgumentTypeError("--recolor takes FROM=TO, like #b2002d=#00a000")
     a, b = text.split("=", 1)
     return rgb_color(a), rgb_color(b)
+
+
+def width_size(text):
+    """'4in', '100mm', '2.5 in' -> export.Size."""
+    t = text.strip().lower().replace(" ", "")
+    for unit in (export.IN, export.MM):
+        if t.endswith(unit):
+            try:
+                return export.Size(unit, float(t[:-len(unit)]))
+            except ValueError:
+                break
+    raise argparse.ArgumentTypeError("--width takes a width with in or mm, like 4in or 100mm")
 
 
 def crop_box(text):
@@ -207,6 +227,11 @@ def run(argv):
     if not files:
         return 2
     many = len(files) > 1
+    fmt = args.format
+    if fmt is None:
+        one_file = args.output and not many and not os.path.isdir(args.output) and not args.output.endswith(("/", "\\"))
+        fmt = export.format_of(args.output) if one_file else "svg"
+    size = args.width or export.PIXELS
     if many and args.output and not os.path.isdir(args.output):
         if os.path.exists(args.output):
             print("%s isn't a folder: with several pictures, -o names a folder." % args.output, file=sys.stderr)
@@ -214,7 +239,7 @@ def run(argv):
         os.makedirs(args.output)
     failed = 0
     for src in files:
-        dst = output_path(src, args.output, many)
+        dst = output_path(src, args.output, many, fmt)
         try:
             if os.path.exists(dst) and not args.force:
                 raise image.ImageError("%s is already there (use -f to replace it)" % dst)
@@ -236,13 +261,11 @@ def run(argv):
                 list_colors(src, img, options, enlarge_this)
                 continue
             res = tracing.trace_image(img, options, enlarge_this)
-            tmp = dst + ".part"
-            with open(tmp, "w", encoding="utf-8", newline="\n") as f:
-                f.write(res.svg)
-            os.replace(tmp, dst)
+            export.write(dst, res.svg, fmt, size)
             if not args.quiet:
-                print("%s -> %s (%d shapes, %.0f KB, %.2f s%s%s)" % (
-                    src, dst, res.shapes, len(res.svg.encode()) / 1024, res.seconds, note,
+                print("%s -> %s (%d shapes, %d nodes, %.0f KB, %s, %.2f s%s%s)" % (
+                    src, dst, res.shapes, res.nodes, os.path.getsize(dst) / 1024,
+                    export.size_text(res.svg, size), res.seconds, note,
                     ", traced at %dx" % res.factor if res.factor != 1 else ""))
         except (image.ImageError, engine.TraceError, OSError) as e:
             failed += 1

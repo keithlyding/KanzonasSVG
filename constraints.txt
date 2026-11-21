@@ -5,3 +5,8 @@ pyinstaller==6.22.3           # GPL-2.0-or-later with an exception for the progr
 pyinstaller-hooks-contrib==2026.10  # Apache-2.0 / GPL-2.0 (build only)
 altgraph==0.17.5              # MIT (build only)
 numpy==2.5.3                  # BSD-3-Clause (tests and tools only: tests/test_quality.py, tools/)
+pymupdf==2.1                  # AGPL-3.0 (tests only: draws the PDFs saved, tests/test_export.py)
+ezdxf==1.4.5                  # MIT (tests only: reads the DXFs saved)
+pyparsing==3.1.1              # MIT (tests only, for ezdxf)
+typing_extensions==4.16.0     # PSF-2.0 (tests only, for ezdxf)
+fonttools==4.68.0             # MIT (tests only, for ezdxf)
