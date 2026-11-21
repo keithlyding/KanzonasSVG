@@ -1,5 +1,5 @@
 """View > Show outlines (the engine's outline drawing), File > Open recent, and Trace > Erase on
-the picture (1.6)."""
+the picture (1.4)."""
 
 import os
 import tempfile

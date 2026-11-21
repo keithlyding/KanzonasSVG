@@ -1,4 +1,4 @@
 """KanzonasSVG: turn pictures (logos, drawings, scans) into SVG files."""
 
-__version__ = "1.7"
+__version__ = "1.4"
 APP_NAME = "KanzonasSVG"

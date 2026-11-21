@@ -203,7 +203,7 @@ kz_options make_options(Rng &r)
     o.error_threshold = rnd(r, 0, 9) == 0 ? rndf(r, -10, 1e9) : rndf(r, 0.5, 4);
     o.filter_iterations = rnd(r, 0, 9) == 0 ? rnd(r, -10, 1000) : rnd(r, 0, 8);
     o.preserve_width = rnd(r, 0, 1);
-    // snap shapes (1.5): all, any of them, off, or a wrong value (a caller's mistake)
+    // snap shapes (1.4): all, any of them, off, or a wrong value (a caller's mistake)
     o.snap = rnd(r, 0, 9) == 0 ? rnd(r, -5, 300) : rnd(r, 0, 1) ? 7 : rnd(r, 0, 7);
     if (rnd(r, 0, 9) == 0) {
         o.threshold = NAN;
@@ -426,7 +426,7 @@ int main(int argc, char **argv)
                 }
                 eff.scans = std::max(2, std::min(256, eff.scans));
                 check_svg(svg, p, n, eff, errs);
-                // drawn as the window draws it, filled and as outlines (1.6), at any size and
+                // drawn as the window draws it, filled and as outlines (1.4), at any size and
                 // place (off the buffer, zoomed far in): within the buffer, never past it
                 if (rnd(r, 0, 2) == 0) {
                     void *d = kz_drawing_open(svg);

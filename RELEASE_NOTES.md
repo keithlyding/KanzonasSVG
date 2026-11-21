@@ -2,31 +2,6 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
-## 1.7
-
-New:
-- **KanzonasSVG in Spanish** (View > Language: Automatic, English or Español): menus, settings,
-  messages and the help. It switches the next time KanzonasSVG starts.
-
-## 1.6
-
-New:
-- **Show outlines** (View menu, Ctrl+L): see the SVG as its outlines, with its nodes.
-- **Erase on the picture** (Trace menu, Ctrl+E): wipe out parts of the picture (a watermark, a
-  smudge, text beside a logo) before it's traced. Undo takes strokes back; the picture file
-  never changes.
-- **Open recent** (File menu): the last 10 pictures you opened.
-- The help (F1) is in numbered chapters, with a list to jump to them and a search box that
-  marks every match. It can stay open while you work.
-
-## 1.5
-
-New:
-- **Snap shapes** (under Curves): edges that are almost straight come out straight, nearly
-  level or upright lines exactly level or upright, and round shapes perfect circles and
-  ellipses. Square corners stay square, and files get smaller, for cutting machines, lasers,
-  CAD and clean logos. It's off at first; Auto leaves it as you set it.
-
 ## 1.4
 
 New:
@@ -34,6 +9,19 @@ New:
   folder, in one go, each with Auto settings or all with the settings shown, and save them as
   SVG, PDF, EPS or DXF next to each picture or in one folder. Picking or dragging several
   pictures into the window opens it too.
+- **Snap shapes** (under Curves): edges that are almost straight come out straight, nearly
+  level or upright lines exactly level or upright, and round shapes perfect circles and
+  ellipses. Square corners stay square, and files get smaller, for cutting machines, lasers,
+  CAD and clean logos. It's off at first; Auto leaves it as you set it.
+- **Show outlines** (View menu, Ctrl+L): see the SVG as its outlines, with its nodes.
+- **Erase on the picture** (Trace menu, Ctrl+E): wipe out parts of the picture (a watermark, a
+  smudge, text beside a logo) before it's traced. Undo takes strokes back; the picture file
+  never changes.
+- **Open recent** (File menu): the last 10 pictures you opened.
+- The help (F1) is in numbered chapters, with a list to jump to them and a search box that
+  marks every match. It can stay open while you work.
+- **KanzonasSVG in Spanish** (View > Language: Automatic, English or Español): menus, settings,
+  messages and the help. It switches the next time KanzonasSVG starts.
 
 ## 1.3
 

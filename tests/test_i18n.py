@@ -1,4 +1,4 @@
-"""KanzonasSVG in Spanish (1.7): every text translated with the same %s and %d, the window and
+"""KanzonasSVG in Spanish (1.4): every text translated with the same %s and %d, the window and
 the help in Spanish, View > Language, the command line in English, Qt's own Spanish."""
 
 import io

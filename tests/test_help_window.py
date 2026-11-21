@@ -1,4 +1,4 @@
-"""Help > How to use KanzonasSVG (1.6): numbered chapters, the chapter list, the search."""
+"""Help > How to use KanzonasSVG (1.4): numbered chapters, the chapter list, the search."""
 
 import re
 import unittest

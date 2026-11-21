@@ -74,7 +74,7 @@ typedef struct kz_options {
     int preserve_width;     /* Autotrace centerline: keep line widths (1/0) */
     int nedits;             /* colors, grays, Autotrace colors: how many color edits in <edits> */
     const kz_color_edit *edits;
-    int snap;               /* Potrace: snap outlines to what they were drawn as (since 1.5): 1 straight
+    int snap;               /* Potrace: snap outlines to what they were drawn as (since 1.4): 1 straight
                                lines, 2 level and upright lines, 4 ellipses and circles; 7 all; 0 off */
 } kz_options;
 
@@ -146,7 +146,7 @@ KZ_API int kz_auto(const unsigned char *rgba, int width, int height, int stride,
 KZ_API void *kz_drawing_open(const char *svg);
 KZ_API int kz_drawing_render(void *drawing, unsigned char *out, int width, int height, int stride, double left,
                              double top, double target_width, double target_height);
-/* The same place drawn as outlines (View > Show outlines, since 1.6): each shape's outline one
+/* The same place drawn as outlines (View > Show outlines, since 1.4): each shape's outline one
  * pixel wide in dark gray over what's in <out>, and with <nodes> the points the paths go
  * through as small blue squares. */
 KZ_API int kz_drawing_render_outlines(void *drawing, unsigned char *out, int width, int height, int stride,
