@@ -138,6 +138,30 @@ public:
         }
     };
 
+    // Whether to stop, for code that only asks that (Autotrace's test_cancel): it asks the
+    // caller's callback (at most every 50 ms) even when the fraction done hasn't moved. Only
+    // asking report() missed a cancel for as long as no progress was reported: Autotrace's
+    // centerline thinning, 20 s and more on a big picture, went on after Cancel, and the next
+    // trace (and closing the window) waited for it.
+    bool poll()
+    {
+        if (stopped) {
+            return true;
+        }
+        if (cancel && *cancel) {
+            stopped = true;
+        } else if (func) {
+            auto now = std::chrono::steady_clock::now();
+            if (now - last_poll >= std::chrono::milliseconds(50)) {
+                last_poll = now;
+                if (func(std::max(last, from), data)) {
+                    stopped = true;
+                }
+            }
+        }
+        return stopped;
+    }
+
     bool stopped = false;
     std::atomic<bool> const *cancel = nullptr; // a layer's: stop when the whole trace stops
 
@@ -145,6 +169,7 @@ private:
     kz_progress_func func;
     void *data;
     double from = 0.0, span = 1.0, last = -1.0;
+    std::chrono::steady_clock::time_point last_poll{};
 };
 
 /*
@@ -1252,7 +1277,7 @@ Shapes trace_autotrace(RgbMap const &map, kz_options const &o, Progress &progres
                 } catch (Cancelled const &) {
                 }
             },
-            &progress, [](gpointer data) -> gboolean { return static_cast<Progress *>(data)->stopped; }, &progress));
+            &progress, [](gpointer data) -> gboolean { return static_cast<Progress *>(data)->poll(); }, &progress));
     }
     opts->background_color = nullptr; // not Autotrace's to free
     if (progress.stopped) {

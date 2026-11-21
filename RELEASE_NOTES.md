@@ -23,6 +23,11 @@ New:
 - **KanzonasSVG in Spanish** (View > Language: Automatic, English or Español): menus, settings,
   messages and the help. It switches the next time KanzonasSVG starts.
 
+Fixed:
+- **Centerline** on a big picture is much faster (a scanned page: 22 seconds before, 5 now;
+  big solid areas took minutes), and changing a setting while it traces no longer waits for it
+  to finish. KanzonasSVG could look frozen, and closing it waited too.
+
 ## 1.3
 
 New:
