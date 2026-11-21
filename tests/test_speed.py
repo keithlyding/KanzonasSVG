@@ -9,6 +9,8 @@ in 0.33 s; the window's longest freeze 0.02-0.1 s; a photo's SVG drawn in 0.02-0
 
 import os
 import random
+import subprocess
+import sys
 import time
 import unittest
 
@@ -47,30 +49,49 @@ class TestSpeed(unittest.TestCase):
         cls.big = photo(3000, 2000)  # 6 megapixels
 
     def test_trace_and_retrace(self):
-        # its own copy, one pixel different: the first trace really is a first (the engine keeps
-        # the smoothed picture and colors of the last pictures by their pixels, and the tests
-        # before this one traced self.big: a partly warm "first" left little for the caches to
-        # save, and the ratios below failed now and then on a slow build machine, 2.90 s of 3.16)
-        img = self.big.copy()
-        img.setPixelColor(0, 0, QColor(1, 2, 3))
-        px = image.pixels(img)
+        px = image.pixels(self.big)
         o = engine.Options(scans=12)
         t = time.perf_counter()
         engine.trace(*px, options=o)
         first = time.perf_counter() - t
-        o.speckles = 6
-        t = time.perf_counter()
-        engine.trace(*px, options=o)
-        again = time.perf_counter() - t
         self.assertLess(first, 6.0 * SLACK, "6-megapixel trace: %.2f s" % first)
-        # another number of colors starts from the kept smoothed picture and histogram
-        o.scans = 9
-        t = time.perf_counter()
-        engine.trace(*px, options=o)
-        colors = time.perf_counter() - t
-        self.assertLess(colors, first * 0.85, "another number of colors: %.2f s (first %.2f s)" % (colors, first))
-        # a setting that doesn't change the colors reuses them
-        self.assertLess(again, first * 0.75, "trace again with other speckles: %.2f s (first %.2f s)" % (again, first))
+
+    def test_settings_reuse_the_colors(self):
+        # The reduced colors are kept by picture and settings (AGENTS.md, "Speed"): a setting that
+        # doesn't change them (Speckles) doesn't work them out again, and another number of
+        # colors starts from the kept smoothed picture and histogram. Checked by the engine's own
+        # report of the steps it runs (KZ_PROFILE, read once per process: so in one of its own).
+        # (This was a timing ratio, retrace < 75% of the first trace: it passed here at 51-55%
+        # but failed on GitHub's Windows machines now and then, a retrace once taking longer
+        # than a whole first trace; the steps run say whether the colors were reused, exactly.)
+        script = (
+            "import sys\n"
+            "from tests import test_speed as ts\n"
+            "from kanzonassvg import engine, image\n"
+            "px = image.pixels(ts.photo(600, 400))\n"
+            "o = engine.Options(scans=12)\n"
+            "for label, name, value in (('first', None, 0), ('speckles', 'speckles', 6), ('colors', 'scans', 9)):\n"
+            "    if name: setattr(o, name, value)\n"
+            "    print('== ' + label, file=sys.stderr, flush=True)\n"
+            "    engine.trace(*px, options=o)\n")
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        env = dict(os.environ, KZ_PROFILE="1", QT_QPA_PLATFORM="offscreen")
+        run = subprocess.run([sys.executable, "-c", script], cwd=root, env=env, capture_output=True, text=True,
+                             timeout=300)
+        self.assertEqual(run.returncode, 0, run.stderr[-2000:])
+        steps, label = {}, None
+        for line in run.stderr.splitlines():
+            if line.startswith("== "):
+                label = line[3:]
+                steps[label] = []
+            elif line.startswith("kz: ") and label:
+                steps[label].append(line[4:].rsplit(None, 2)[0].strip())
+        self.assertIn("smooth", steps["first"], run.stderr)
+        self.assertIn("quantize", steps["first"], run.stderr)
+        self.assertEqual(steps["speckles"], [], "another Speckles worked the colors out again: %s" % steps)
+        self.assertIn("quantize", steps["colors"], run.stderr)
+        self.assertNotIn("smooth", steps["colors"], "another number of colors smoothed again: %s" % steps)
+        self.assertNotIn("histogram", steps["colors"], "another number of colors counted again: %s" % steps)
 
     def test_drawing_an_svg(self):
         svg, _ = engine.trace(*image.pixels(self.big), options=engine.Options(scans=16))
