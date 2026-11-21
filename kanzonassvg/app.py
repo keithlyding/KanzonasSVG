@@ -179,6 +179,24 @@ keeps the picture's own size, 96 pixels to the inch (as browsers, Inkscape and I
 count them), or give a width in <i>Inches</i> or <i>Millimeters</i> and the height follows.
 The line under it shows the size the files get. It changes only what's saved (and copied),
 not the trace, and is kept for next time.</p>
+<h3>Many pictures at once</h3>
+<p><i>File &gt; Convert many pictures...</i> (Ctrl+Shift+O) traces and saves a list of pictures
+in one go. It also opens when you pick several pictures in <i>Open picture</i>, or drag several
+pictures (or a folder) into the window. Add pictures with <b>Add pictures...</b>, <b>Add a
+folder...</b> (the pictures in it, not SVGs) or by dragging them into the list, then choose:</p>
+<ul>
+<li><b>Settings</b>: <i>Auto settings for each picture</i> (each gets the settings that suit it,
+as when you open it), or <i>The settings shown now</i>, the same for all (not the color edits,
+which are for the picture shown, nor its crop).</li>
+<li><b>Save as</b>: SVG, PDF, EPS or DXF, at the <b>Saved width</b> set under Size (every picture
+that wide, or each at its own size in pixels).</li>
+<li><b>Save to</b>: next to each picture, with its name, or in one folder. Files already there
+are skipped unless <b>Replace files that are already there</b> is on.</li>
+</ul>
+<p><b>Convert</b> starts; the list says what happened to each picture (saved, with its shapes
+and nodes; skipped; or why it failed, and the next one is done anyway). <b>Stop</b> stops at once
+(the picture being traced isn't saved, and the rest aren't done). <b>Open the folder</b> shows the files. The window
+stays usable while it works. The command line does the same for scripts.</p>
 <h3>Looking at it</h3>
 <p>Above the SVG: its size, as Save writes an SVG, how many shapes it has, and how many
 <b>nodes</b> (the points its outlines go through; a cutting machine turns at each, and fewer
@@ -191,6 +209,7 @@ size</i> (Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> 
 <h3>Keyboard shortcuts</h3>
 <table cellpadding="2">
 <tr><td>Ctrl+O</td><td>Open picture</td></tr>
+<tr><td>Ctrl+Shift+O</td><td>Convert many pictures</td></tr>
 <tr><td>Ctrl+V</td><td>Paste picture</td></tr>
 <tr><td>Ctrl+S</td><td>Save</td></tr>
 <tr><td>Ctrl+Shift+S</td><td>Save as</td></tr>
@@ -1141,6 +1160,7 @@ class MainWindow(QMainWindow):
         self.source_path = None
         self.save_path = None
         self.savers = []  # Saver threads still writing
+        self.batch = None  # the Convert many pictures dialog, once opened
         self.result = None  # tracing.Result
         self.preview = None  # QImage
         self.job_number = 0
@@ -1214,6 +1234,7 @@ class MainWindow(QMainWindow):
         mb = self.menuBar()
         m = mb.addMenu("&File")
         self._action(m, "Open picture...", self.open_dialog, QKeySequence.StandardKey.Open)
+        self._action(m, "Convert many pictures...", lambda: self.convert_many(), "Ctrl+Shift+O")
         self.a_paste = self._action(m, "Paste picture", self.paste, QKeySequence.StandardKey.Paste)
         m.addSeparator()
         self.a_save = self._action(m, "Save...", self.save, QKeySequence.StandardKey.Save)
@@ -1274,9 +1295,24 @@ class MainWindow(QMainWindow):
 
     def open_dialog(self):
         start = self.qs.value("paths/open", os.path.expanduser("~"))
-        path, _ = QFileDialog.getOpenFileName(self, "Open picture", start, PICTURE_FILTER)
-        if path:
-            self.open_path(path)
+        paths, _ = QFileDialog.getOpenFileNames(self, "Open picture", start, PICTURE_FILTER)
+        if len(paths) == 1:
+            self.open_path(paths[0])
+        elif paths:
+            self.qs.setValue("paths/open", os.path.dirname(os.path.abspath(paths[0])))
+            self.convert_many(paths)        # (several: to convert them all)
+
+    def convert_many(self, files=()):
+        """File > Convert many pictures...: the dialog (one; more pictures are added to it)."""
+        from kanzonassvg.batch import BatchDialog
+        if self.batch is None:
+            self.batch = BatchDialog(self, files)
+        else:
+            self.batch.add_files(files)
+        self.batch.show()
+        self.batch.raise_()
+        self.batch.activateWindow()
+        return self.batch
 
     def open_path(self, path):
         """Open a picture: the quick checks now (a message at once if it can't be read), the
@@ -1482,10 +1518,13 @@ class MainWindow(QMainWindow):
 
     def dropEvent(self, e):
         md = e.mimeData()
-        for url in md.urls():
-            if url.isLocalFile():
-                self.open_path(url.toLocalFile())
-                return
+        local = [u.toLocalFile() for u in md.urls() if u.isLocalFile()]
+        if len(local) > 1 or (local and os.path.isdir(local[0])):
+            self.convert_many(local)        # (several pictures, or a folder: to convert them all)
+            return
+        if local:
+            self.open_path(local[0])
+            return
         if md.hasImage():
             img = QImage(md.imageData())
             if not img.isNull():
@@ -1985,6 +2024,8 @@ class MainWindow(QMainWindow):
             self.worker.wait()
         for t in list(self.savers):     # (a file being saved is finished first)
             t.wait()
+        if self.batch is not None:
+            self.batch.close()          # (stops converting: a picture half done isn't saved)
         for t in self.old_loaders + ([self.loader] if self.loader is not None else []):
             t.wait()
         self.left.stop()

@@ -187,6 +187,18 @@ def run(argv):
         assert "COLOR_B2002D" in dxf and "COLOR_1D3F8F" in dxf
         return "SVG, PDF, EPS, DXF; %d nodes" % export.node_count(svg)
 
+    def converting_many():
+        # File > Convert many pictures: its module in the program, and a picture through it
+        from kanzonassvg import batch, export
+        with tempfile.TemporaryDirectory() as d:
+            src = os.path.join(d, "a.png")
+            assert img.save(src)
+            for fmt in export.FORMATS:
+                res = batch.convert(src, batch.output_path(src, d, fmt), fmt, export.Size(export.IN, 2))
+                assert os.path.getsize(os.path.join(d, "a." + fmt)) > 100, fmt
+            assert batch.picture_files(d) == [src], batch.picture_files(d)
+        return "%d shapes, each format" % res.shapes
+
     def update_check():
         # the update check reaches GitHub over TLS (Qt's network backend in the program), and
         # its pieces work in the finished program
@@ -222,6 +234,7 @@ def run(argv):
                      ("logo and icon", logo_and_icon), ("auto settings", auto_settings), ("drawing SVGs", drawing), ("every mode", every_mode), ("reads pictures", reads_pictures),
                      ("big picture speed", big_picture), ("window opens and traces", window_opens),
                      ("command line", command_line), ("color edits", color_edits), ("saving", saving),
+                     ("converting many", converting_many),
                      ("update check", update_check)]:
         check(name, fn)
 

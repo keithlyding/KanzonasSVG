@@ -2,6 +2,14 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.4
+
+New:
+- **Convert many pictures** (File menu, Ctrl+Shift+O): trace a whole list of pictures, or a
+  folder, in one go, each with Auto settings or all with the settings shown, and save them as
+  SVG, PDF, EPS or DXF next to each picture or in one folder. Picking or dragging several
+  pictures into the window opens it too.
+
 ## 1.3
 
 New:

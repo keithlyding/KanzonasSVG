@@ -39,7 +39,7 @@ if __name__ == "__main__":
     APP.setOrganizationName("Kanzonas")
     APP.setApplicationName("KanzonasSVG-battery")
 
-from kanzonassvg import app, cli, engine, export, image, tracing  # noqa: E402
+from kanzonassvg import app, batch, cli, engine, export, image, tracing  # noqa: E402
 
 ERRORS = []
 
@@ -337,7 +337,7 @@ def check_window(steps, seed, fails):
             action = rng.choice(["open", "open", "paste", "setting", "setting", "setting", "setting", "auto",
                                  "update", "colors", "zoom", "move", "fit", "save", "copy", "reopen", "auto_new",
                                  "events", "new_version", "crop", "uncrop", "colors", "colors", "pick", "undo", "undo", "redo",
-                                 "save", "saved_width"])
+                                 "save", "saved_width", "many"])
             try:
                 if action == "open":
                     w.open_path(rng.choice(pics))
@@ -374,6 +374,32 @@ def check_window(steps, seed, fails):
                                              % (seed, step, fmt, size))
                         if w.savers:
                             fails.append("window seed %d step %d: a save never finished" % (seed, step))
+                elif action == "many":
+                    # Convert many pictures: a few of the pictures, any settings, format and place
+                    d = w.convert_many()
+                    d.clear()
+                    chosen = rng.sample(pics, rng.randrange(1, 4))
+                    d.add_files(chosen)
+                    (d.r_auto if rng.random() < 0.5 else d.r_shown).setChecked(True)
+                    d.format.setCurrentIndex(rng.randrange(d.format.count()))
+                    d.where.setCurrentIndex(1)
+                    out = os.path.join(folder, "many%d" % rng.randrange(3))
+                    d.folder.setText(out)
+                    d.replace.setChecked(rng.random() < 0.7)
+                    d.start()
+                    if rng.random() < 0.2:
+                        d.stop()
+                    d.wait()
+                    stopped = "stopped" in d.summary.text()
+                    fmt = d.format.currentData()
+                    for row, src in enumerate(chosen):
+                        ok, text = d.results.get(row, (False, "not done"))
+                        dst = batch.output_path(src, out, fmt)
+                        if ok and not os.path.isfile(dst):
+                            fails.append("window seed %d step %d: converted but no %s" % (seed, step, dst))
+                        if not ok and not stopped and not text.startswith("skipped"):
+                            fails.append("window seed %d step %d: %s: %s (%s)" % (seed, step, src, text, d.summary.text()))
+                    d.close()
                 elif action == "saved_width":
                     # another unit or width: nothing traced again
                     number, s = w.job_number, w.settings

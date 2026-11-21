@@ -68,6 +68,11 @@ installed until you click it. (1.0.x doesn't have this: install 1.1 by hand once
 5. *File > Save...* (Ctrl+S) as SVG, PDF, EPS or DXF (pick the type when saving), or
    *File > Copy SVG* (Ctrl+Shift+C) to paste it into Inkscape or another program.
 
+**Many pictures at once**: *File > Convert many pictures...* (Ctrl+Shift+O), or pick or drag
+in several pictures (or a folder). Each is traced with Auto settings for it, or with the settings
+shown, and saved as SVG, PDF, EPS or DXF next to it or in one folder; the list says what happened
+to each. It works in the background: the window stays usable.
+
 **For cutting machines and lasers** (Cricut, Silhouette, LightBurn, CNC): each color is a group
 of its own, named by its color (a layer in Inkscape, and in the DXF), so programs that show
 groups list the colors instead of hundreds of loose shapes. **Saved width** (under Size) saves it at a width in
@@ -150,7 +155,7 @@ What each does:
 | Leaving the background out | Remove background (the bottom layer) | The color around the edge, around the picture or everywhere, or the transparent part |
 | Tracing part of a picture | | Crop |
 | The result while you set it up | A small preview | The SVG beside the picture, zooming together |
-| Many files at once | | The command line |
+| Many files at once | | *Convert many pictures* in the window, and the command line |
 | Saving as | SVG, PDF, EPS, DXF and more (it's a vector editor) | SVG, PDF, EPS, DXF, at a width in inches or mm, one group per color |
 | Editing the SVG afterwards | Yes: it's a vector editor | No: open the SVG in Inkscape, Illustrator or another editor |
 | Pixel art (Depixelize), selecting the foreground (SIOX) | Yes | No |
