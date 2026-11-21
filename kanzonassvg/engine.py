@@ -69,8 +69,12 @@ class _Options(ctypes.Structure):
         ("preserve_width", ctypes.c_int),
         ("nedits", ctypes.c_int),
         ("edits", ctypes.POINTER(_ColorEdit)),
+        ("snap", ctypes.c_int),
     ]
 
+
+SNAP_LINES, SNAP_RIGHT_ANGLES, SNAP_CIRCLES = 1, 2, 4
+SNAP_ALL = 7
 
 EDIT_MATCH = 24  # KZ_EDIT_MATCH: an edit applies to the palette color within this many levels
 # kz_edit_where: which areas an edit is for (the background: the background color's area reaching
@@ -121,6 +125,9 @@ class Options:
     # color edits: ((r, g, b) of a palette color, (r, g, b) to trace it as or None: leave it out,
     # and optionally where: EVERYWHERE, INSIDE or BACKGROUND)
     edits: tuple = ()
+    # Potrace: snap outlines to straight lines (SNAP_LINES), level and upright lines
+    # (SNAP_RIGHT_ANGLES) and ellipses and circles (SNAP_CIRCLES); SNAP_ALL, or 0 (off)
+    snap: int = 0
 
     def _struct(self):
         s = _Options()

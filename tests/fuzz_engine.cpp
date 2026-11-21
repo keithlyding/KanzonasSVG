@@ -32,6 +32,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     o.optimize_tolerance = data[9] / 40.0;
     o.error_threshold = data[10] / 20.0;
     o.filter_iterations = data[11] % 24;
+    o.snap = data[11] >> 5;     // (snap shapes: any of the 3)
     data += 12;
     size -= 12;
     int stride = w * 4 + pad;

@@ -63,7 +63,7 @@ background) it keeps the lines' own colors, leaves <b>Smooth</b> off (it would w
 out) and sets <b>Enlarge first</b> to 4 times, so lines a pixel or two wide trace as solid
 shapes. It also puts the curve settings (<b>Speckles</b>, <b>Smooth corners</b>,
 <b>Optimize</b>, <b>Tolerance</b>) back to the values that suit the picture: Auto sets every
-setting. The status bar says what it picked. Change anything after: Auto doesn't change it
+setting but <b>Snap shapes</b>, which stays as you set it. The status bar says what it picked. Change anything after: Auto doesn't change it
 back.</p>
 <p><i>Trace &gt; Auto settings for new pictures</i> (on at first) does this for every picture you
 open or paste; turn it off to keep your own settings for each new picture.</p>
@@ -98,6 +98,12 @@ always leaves out white, or with Remove, the background color, everywhere.)</li>
 <li><b>Smooth corners</b>: 0 keeps every corner sharp; higher rounds them off.</li>
 <li><b>Optimize</b>: joins curve segments (smaller files); <b>Tolerance</b> is how far that may
 move the curve.</li>
+<li><b>Snap shapes</b> (off at first): edges that are all but straight become straight lines,
+lines within 1.5 degrees of level or upright become exactly level or upright, and round shapes
+within half a pixel of a circle or an ellipse (with level axes) become perfect ones. For
+cutting machines, lasers, CAD and clean logos: fewer nodes, square corners stay square. It can
+move an edge by up to half a pixel, and evens out art that was a little uneven on purpose, so
+it's yours to turn on (Auto leaves it as it is). Not in the Autotrace modes.</li>
 <li><b>Error threshold</b> and <b>Filter passes</b> (Autotrace): how closely curves follow
 the outline, and how much outlines are smoothed first.</li>
 <li><b>Keep line widths</b> (centerline): gives each line its width in the picture.</li>
@@ -186,7 +192,7 @@ pictures (or a folder) into the window. Add pictures with <b>Add pictures...</b>
 folder...</b> (the pictures in it, not SVGs) or by dragging them into the list, then choose:</p>
 <ul>
 <li><b>Settings</b>: <i>Auto settings for each picture</i> (each gets the settings that suit it,
-as when you open it), or <i>The settings shown now</i>, the same for all (not the color edits,
+as when you open it, with <b>Snap shapes</b> as you set it), or <i>The settings shown now</i>, the same for all (not the color edits,
 which are for the picture shown, nor its crop).</li>
 <li><b>Save as</b>: SVG, PDF, EPS or DXF, at the <b>Saved width</b> set under Size (every picture
 that wide, or each at its own size in pixels).</li>
@@ -717,7 +723,9 @@ def auto_options(img, current):
     # the trace was made with another threshold than the one the panel keeps)
     threshold = picked.threshold if picked.mode == engine.BRIGHTNESS else current.threshold
     # (the color edits stay: they're the user's, for this picture)
-    return replace(picked, threshold=threshold, stack=True, invert=False, edits=current.edits), info
+    # (Snap shapes stays as it is: it's a choice about the result, not something a picture needs)
+    return replace(picked, threshold=threshold, stack=True, invert=False, edits=current.edits,
+                   snap=current.snap), info
 
 
 def describe_auto(options, info):
@@ -813,6 +821,11 @@ class Settings(QScrollArea):
         f.addRow("Smooth corners", self.corners)
         f.addRow(self.optimize)
         f.addRow("Tolerance", self.tolerance)
+        self.snap = QCheckBox("Snap shapes")
+        self.snap.setToolTip("Make (all but) straight edges straight, level and upright ones exactly level and "
+                             "upright, and round shapes perfect circles and ellipses: for cutting, CAD and clean "
+                             "logos (it can move an edge up to half a pixel)")
+        f.addRow(self.snap)
         lay.addWidget(self.g_potrace)
 
         self.g_auto = QGroupBox("Autotrace")
@@ -869,7 +882,7 @@ class Settings(QScrollArea):
             w.valueChanged.connect(self._changed)
         for w in (self.threshold, self.corners, self.tolerance, self.error):
             w.valueChanged.connect(self._changed)
-        for w in (self.smooth, self.stack, self.invert, self.optimize, self.width):
+        for w in (self.smooth, self.stack, self.invert, self.optimize, self.width, self.snap):
             w.toggled.connect(self._changed)
         self.reset.clicked.connect(self.reset_all)
         self._unit = export.PX
@@ -954,6 +967,7 @@ class Settings(QScrollArea):
             filter_iterations=self.filters.value(),
             preserve_width=self.width.isChecked(),
             edits=self.colors.edits_tuple(),
+            snap=engine.SNAP_ALL if self.snap.isChecked() else 0,
         )
 
     def enlarge_setting(self):
@@ -997,7 +1011,7 @@ class Settings(QScrollArea):
 
     # saved between runs
     _SAVED = ["mode", "scans", "smooth", "stack", "remove_bg", "threshold", "invert", "speckles", "corners",
-              "optimize", "tolerance", "error", "filters", "width", "enlarge"]
+              "optimize", "tolerance", "error", "filters", "width", "enlarge", "snap"]
 
     def _widgets(self):
         return [(name, getattr(self, name)) for name in self._SAVED]
@@ -1139,6 +1153,7 @@ class Settings(QScrollArea):
         self.filters.setValue(4)
         self.width.setChecked(True)
         self.enlarge.setCurrentIndex(0)
+        self.snap.setChecked(False)
         for w in widgets:
             w.blockSignals(False)
         self._edge, self._bw, self._last_mode = 0.65, 0.45, engine.COLORS

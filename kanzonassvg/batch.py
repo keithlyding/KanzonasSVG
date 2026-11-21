@@ -17,10 +17,12 @@ from kanzonassvg import engine, export, image, tracing
 NEXT_TO_EACH = ""        # (the folder setting: next to each picture)
 
 
-def picked_options(img):
-    """The settings Auto picks for img, and Enlarge first (tracing.AUTO or a factor)."""
+def picked_options(img, snap=0):
+    """The settings Auto picks for img (with Snap shapes as given: Auto leaves it as it is),
+    and Enlarge first (tracing.AUTO or a factor)."""
+    from dataclasses import replace
     picked, info = engine.auto(*image.pixels(img))
-    return picked, info.enlarge or tracing.AUTO
+    return replace(picked, snap=snap), info.enlarge or tracing.AUTO
 
 
 def output_path(src, folder, fmt):
@@ -28,12 +30,12 @@ def output_path(src, folder, fmt):
     return os.path.join(folder or os.path.dirname(os.path.abspath(src)), name)
 
 
-def convert(src, dst, fmt, size, options=None, enlarge=tracing.AUTO, progress=None):
-    """Trace the picture src (options None: Auto settings for it) and save it to dst.
-    Returns the tracing.Result."""
+def convert(src, dst, fmt, size, options=None, enlarge=tracing.AUTO, progress=None, snap=0):
+    """Trace the picture src (options None: Auto settings for it, with <snap>) and save it to
+    dst. Returns the tracing.Result."""
     img = image.load(src)
     if options is None:
-        options, enlarge = picked_options(img)
+        options, enlarge = picked_options(img, snap)
     res = tracing.trace_image(img, options, enlarge, progress)
     export.write(dst, res.svg, fmt, size)
     return res
@@ -57,10 +59,10 @@ class BatchWorker(QThread):
     started_item = Signal(int)
     item_done = Signal(int, bool, str)
 
-    def __init__(self, files, folder, fmt, size, options, enlarge, replace):
+    def __init__(self, files, folder, fmt, size, options, enlarge, replace, snap=0):
         super().__init__()
         self.files, self.folder, self.fmt, self.size = files, folder, fmt, size
-        self.options, self.enlarge, self.replace = options, enlarge, replace
+        self.options, self.enlarge, self.replace, self.snap = options, enlarge, replace, snap
         self.cancelled = False
 
     def run(self):
@@ -74,7 +76,7 @@ class BatchWorker(QThread):
                 continue
             try:
                 res = convert(src, dst, self.fmt, self.size, self.options, self.enlarge,
-                              lambda _f: self.cancelled)
+                              lambda _f: self.cancelled, self.snap)
                 self.item_done.emit(row, True, "saved %s: %d shapes, %s nodes" % (
                     os.path.basename(dst), res.shapes, "{:,}".format(res.nodes)))
             except engine.Cancelled:
@@ -302,7 +304,7 @@ class BatchDialog(QDialog):
         self.bar.setRange(0, len(files))
         self.bar.setValue(0)
         self.worker = BatchWorker(files, folder, fmt, self.window.settings.saved_size(), options, enlarge,
-                                  self.replace.isChecked())
+                                  self.replace.isChecked(), self.window.settings.options().snap)
         self.worker.started_item.connect(self._started_item)
         self.worker.item_done.connect(self._item_done)
         self.worker.finished.connect(self._finished)

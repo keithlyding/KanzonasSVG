@@ -9,6 +9,7 @@
  * no GTK, GLib or 2geom, SVG path data written directly. Released under GNU GPL v2+.
  */
 #include "kzsvg.h"
+#include "snap.h"
 
 #include <algorithm>
 #include <thread>
@@ -376,10 +377,11 @@ struct PointHash
 using PointSet = std::unordered_set<std::pair<double, double>, PointHash>;
 
 // Write Potrace's path tree; <points> leaves out paths already written (as Inkscape does).
-void write_paths(potrace_path_t *paths, PathData &out, PointSet &points);
+// <snap>: kz_options.snap (snap.h).
+void write_paths(potrace_path_t *paths, PathData &out, PointSet &points, int snap);
 
 // One outline, then the outlines inside it (its holes, and the shapes in those).
-void write_path(potrace_path_t *path, PathData &out, PointSet &points)
+void write_path(potrace_path_t *path, PathData &out, PointSet &points, int snap)
 {
     {
         auto const &curve = path->curve;
@@ -390,27 +392,57 @@ void write_path(potrace_path_t *path, PathData &out, PointSet &points)
         if (!points.emplace(last.x, last.y).second) {
             return;
         }
-        out.move(last.x, last.y);
-        for (int i = 0; i < curve.n; i++) {
-            auto const *seg = curve.c[i];
-            if (curve.tag[i] == POTRACE_CORNER) {
-                out.line(seg[1].x, seg[1].y);
-                out.line(seg[2].x, seg[2].y);
-            } else if (curve.tag[i] == POTRACE_CURVETO) {
-                out.curve(seg[0].x, seg[0].y, seg[1].x, seg[1].y, seg[2].x, seg[2].y);
+        if (!snap) {
+            out.move(last.x, last.y);
+            for (int i = 0; i < curve.n; i++) {
+                auto const *seg = curve.c[i];
+                if (curve.tag[i] == POTRACE_CORNER) {
+                    out.line(seg[1].x, seg[1].y);
+                    out.line(seg[2].x, seg[2].y);
+                } else if (curve.tag[i] == POTRACE_CURVETO) {
+                    out.curve(seg[0].x, seg[0].y, seg[1].x, seg[1].y, seg[2].x, seg[2].y);
+                }
+            }
+        } else {
+            std::vector<kzsnap::Seg> segs;
+            segs.reserve(curve.n * 2);
+            kzsnap::Pt at{last.x, last.y};
+            for (int i = 0; i < curve.n; i++) {
+                auto const *seg = curve.c[i];
+                if (curve.tag[i] == POTRACE_CORNER) {
+                    kzsnap::Pt v{seg[1].x, seg[1].y}, e{seg[2].x, seg[2].y};
+                    segs.push_back({false, at, at, v, v});
+                    segs.push_back({false, v, v, e, e});
+                    at = e;
+                } else if (curve.tag[i] == POTRACE_CURVETO) {
+                    kzsnap::Pt e{seg[2].x, seg[2].y};
+                    segs.push_back({true, at, {seg[0].x, seg[0].y}, {seg[1].x, seg[1].y}, e});
+                    at = e;
+                }
+            }
+            kzsnap::snap(segs, snap);
+            if (!segs.empty()) {
+                out.move(segs[0].p0.x, segs[0].p0.y);
+                for (auto const &s : segs) {
+                    if (s.curve) {
+                        out.curve(s.c1.x, s.c1.y, s.c2.x, s.c2.y, s.p1.x, s.p1.y);
+                    } else {
+                        out.line(s.p1.x, s.p1.y);
+                    }
+                }
             }
         }
         out.close();
         for (auto child = path->childlist; child; child = child->sibling) {
-            write_paths(child, out, points);
+            write_paths(child, out, points, snap);
         }
     }
 }
 
-void write_paths(potrace_path_t *paths, PathData &out, PointSet &points)
+void write_paths(potrace_path_t *paths, PathData &out, PointSet &points, int snap)
 {
     for (auto path = paths; path; path = path->sibling) {
-        write_path(path, out, points);
+        write_path(path, out, points, snap);
     }
 }
 
@@ -448,7 +480,7 @@ Paths trace_bitmap(BitmapPtr bitmap, kz_options const &o, Progress &progress)
     PointSet points;
     for (auto path = state->plist; path; path = path->sibling) {
         PathData group;
-        write_path(path, group, points);
+        write_path(path, group, points, o.snap);
         if (!group.empty()) {
             out.push_back(std::move(group));
         }
@@ -1373,6 +1405,7 @@ kz_options checked(kz_options const *in)
         o.edits = nullptr;
     }
     o.remove_background = std::clamp(o.remove_background, 0, 2);
+    o.snap &= kzsnap::ALL;
     o.threshold = std::clamp(o.threshold, 0.0, 1.0);
     o.speckles = std::clamp(o.speckles, 0, 100000);
     o.smooth_corners = std::clamp(o.smooth_corners, 0.0, 1.34);

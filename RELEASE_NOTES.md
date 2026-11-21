@@ -2,6 +2,14 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.5
+
+New:
+- **Snap shapes** (under Curves): edges that are almost straight come out straight, nearly
+  level or upright lines exactly level or upright, and round shapes perfect circles and
+  ellipses. Square corners stay square, and files get smaller, for cutting machines, lasers,
+  CAD and clean logos. It's off at first; Auto leaves it as you set it.
+
 ## 1.4
 
 New:

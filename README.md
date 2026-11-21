@@ -78,7 +78,10 @@ of its own, named by its color (a layer in Inkscape, and in the DXF), so program
 groups list the colors instead of hundreds of loose shapes. **Saved width** (under Size) saves it at a width in
 inches or millimeters (the height follows; otherwise the picture's pixels, 96 to the inch).
 The node count above the SVG tells you how much a blade or laser has to turn: fewer nodes cut
-cleaner. A DXF holds outlines only (one layer per color), curves as short straight pieces
+cleaner. **Snap shapes** (under Curves) straightens edges that are all but straight, makes nearly
+level or upright lines exactly so, and round shapes perfect circles and ellipses: square corners
+come out square and the files get smaller (the flat illustration in the screenshots: 4,452 nodes
+without, 2,663 with). A DXF holds outlines only (one layer per color), curves as short straight pieces
 within 0.025 mm, in millimeters (in inches when the width is in inches).
 
 **Background**: *Remove* makes the picture's background (the color around its edge, light or
@@ -106,6 +109,7 @@ kanzonassvg-cli --background remove logo.jpg  a see-through background
 kanzonassvg-cli --mode bw scan.jpg -o scan.svg
 kanzonassvg-cli logo.png -o logo.dxf --width 100mm   a DXF 100 mm wide (the extension picks the type)
 kanzonassvg-cli --format pdf *.png -o pdfs    every PNG as a PDF
+kanzonassvg-cli --snap logo.png               straight lines, square corners, perfect circles
 kanzonassvg-cli --help                        every option
 ```
 
@@ -156,6 +160,7 @@ What each does:
 | Tracing part of a picture | | Crop |
 | The result while you set it up | A small preview | The SVG beside the picture, zooming together |
 | Many files at once | | *Convert many pictures* in the window, and the command line |
+| Snapping to straight lines, right angles, circles | | Snap shapes |
 | Saving as | SVG, PDF, EPS, DXF and more (it's a vector editor) | SVG, PDF, EPS, DXF, at a width in inches or mm, one group per color |
 | Editing the SVG afterwards | Yes: it's a vector editor | No: open the SVG in Inkscape, Illustrator or another editor |
 | Pixel art (Depixelize), selecting the foreground (SIOX) | Yes | No |
