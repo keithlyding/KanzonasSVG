@@ -334,6 +334,8 @@ class TestWindow(unittest.TestCase):
 
     def tearDown(self):
         self.w.close()
+        self.w.deleteLater()
+        QApplication.processEvents()
         self.tmp.cleanup()
 
     def traced(self):
@@ -409,6 +411,7 @@ class TestWindow(unittest.TestCase):
         finally:
             w2.qs = QSettings(os.path.join(self.tmp.name, "other.ini"), QSettings.Format.IniFormat)
             w2.close()
+            w2.deleteLater()
 
     def test_title_and_status_say_the_nodes(self):
         n = "{:,}".format(self.w.result.nodes)
