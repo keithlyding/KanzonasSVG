@@ -68,6 +68,11 @@ installed until you click it. (1.0.x doesn't have this: install 1.1 by hand once
 5. *File > Save...* (Ctrl+S) as SVG, PDF, EPS or DXF (pick the type when saving), or
    *File > Copy SVG* (Ctrl+Shift+C) to paste it into Inkscape or another program.
 
+**Seeing and fixing**: *View > Show outlines* (Ctrl+L) shows the SVG as its outlines and
+nodes; *Trace > Erase on the picture* (Ctrl+E) wipes out parts of the picture before tracing
+(a watermark, a smudge, text beside a logo), with Undo; *File > Open recent* lists the last 10
+pictures. The help (F1) is in chapters, with a search.
+
 **Many pictures at once**: *File > Convert many pictures...* (Ctrl+Shift+O), or pick or drag
 in several pictures (or a folder). Each is traced with Auto settings for it, or with the settings
 shown, and saved as SVG, PDF, EPS or DXF next to it or in one folder; the list says what happened

@@ -337,7 +337,7 @@ def check_window(steps, seed, fails):
             action = rng.choice(["open", "open", "paste", "setting", "setting", "setting", "setting", "auto",
                                  "update", "colors", "zoom", "move", "fit", "save", "copy", "reopen", "auto_new",
                                  "events", "new_version", "crop", "uncrop", "colors", "colors", "pick", "undo", "undo", "redo",
-                                 "save", "saved_width", "many"])
+                                 "save", "saved_width", "many", "erase", "erase", "outlines", "recent"])
             try:
                 if action == "open":
                     w.open_path(rng.choice(pics))
@@ -400,6 +400,25 @@ def check_window(steps, seed, fails):
                         if not ok and not stopped and not text.startswith("skipped"):
                             fails.append("window seed %d step %d: %s: %s (%s)" % (seed, step, src, text, d.summary.text()))
                     d.close()
+                elif action == "erase":
+                    # a stroke anywhere (partly or wholly off the picture), any size; or all back
+                    if w.img is not None:
+                        if rng.random() < 0.15:
+                            w.restore_picture()
+                        else:
+                            w.start_erasing(rng.random() < 0.8)
+                            iw, ih = w.img.width(), w.img.height()
+                            pts = [QPointF(rng.uniform(-0.2, 1.2) * iw, rng.uniform(-0.2, 1.2) * ih)
+                                   for _ in range(rng.randrange(1, 6))]
+                            w.on_erased(rng.choice([0.5, 2, 10, 60]), pts)
+                elif action == "outlines":
+                    w.a_outlines.trigger()
+                elif action == "recent":
+                    files = w.recent_files()
+                    if files:
+                        w.open_recent(rng.choice(files))
+                    if len(w.recent_files()) > 10:
+                        fails.append("window seed %d step %d: %d recent files" % (seed, step, len(w.recent_files())))
                 elif action == "saved_width":
                     # another unit or width: nothing traced again
                     number, s = w.job_number, w.settings
@@ -491,6 +510,9 @@ def check_window(steps, seed, fails):
                     if "Couldn't trace" not in w.right.message:
                         fails.append("window seed %d step %d: no SVG and no message" % (seed, step))
                     continue
+                if w.full_img is not None and w.img != w.picture_now():
+                    fails.append("window seed %d step %d: the picture traced isn't the one opened with its erasing "
+                                 "and crop" % (seed, step))
                 if w.history and w.history[w.history_at] != w._state():
                     fails.append("window seed %d step %d: Undo's place isn't what's shown" % (seed, step))
                 if w.job.options != w.settings.options():

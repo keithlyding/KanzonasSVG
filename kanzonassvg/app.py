@@ -39,10 +39,16 @@ HELP_HTML = """
 <p>KanzonasSVG turns a picture (a logo, a drawing, a scan) into an SVG file: shapes
 instead of pixels, sharp at any size. Edit the SVG afterwards in Inkscape, Illustrator
 or another vector editor.</p>
+<p>This help is in chapters: click one in the list to go to it. Type in the box at the top
+(Ctrl+F) to search: every match is marked, the chapters that have them show how many, and
+Enter (or F3) goes to the next one, Shift+Enter to the one before. The help can stay open
+while you work.</p>
 <h3>Making an SVG</h3>
 <ol>
 <li><b>Open a picture</b>: <i>File &gt; Open picture...</i> (Ctrl+O), drag a file into the
-window, or copy a picture and use <i>File &gt; Paste picture</i> (Ctrl+V).</li>
+window, or copy a picture and use <i>File &gt; Paste picture</i> (Ctrl+V).
+<i>File &gt; Open recent</i> lists the last 10 pictures opened (<i>Clear the list</i> empties
+it).</li>
 <li><b>Check the settings</b> on the right. When you open a picture, KanzonasSVG picks the
 settings that suit it (see <b>Auto settings</b> below) and traces it. Change any setting and
 the SVG on the right side of the window updates (unless <i>Trace &gt; Update automatically</i>
@@ -185,6 +191,17 @@ keeps the picture's own size, 96 pixels to the inch (as browsers, Inkscape and I
 count them), or give a width in <i>Inches</i> or <i>Millimeters</i> and the height follows.
 The line under it shows the size the files get. It changes only what's saved (and copied),
 not the trace, and is kept for next time.</p>
+<h3>Erasing parts of the picture</h3>
+<p>To leave something out of the trace (a watermark, a smudge, text next to a logo, a stray
+mark), use <i>Trace &gt; Erase on the picture</i> (Ctrl+E) and drag across it on the left
+side: what you drag over becomes see-through, as a transparent picture's background is, and
+the SVG updates when you let go. (With <b>Background: Remove</b> it's left out; with
+<b>Keep</b>, a see-through part is traced as white.) <i>Trace &gt; Smaller eraser</i> ([) and
+<i>Trace &gt; Bigger eraser</i> (]) change its size; the middle mouse button still moves the
+picture. Ctrl+E again or Esc stops erasing. <i>Edit &gt; Undo</i> takes strokes back one by one,
+and <i>Trace &gt; Restore the picture</i> (Ctrl+Shift+E) brings back everything erased. The
+picture file itself never changes; a new picture starts with nothing erased. Erasing works
+with a crop too (it's kept when you crop or remove the crop).</p>
 <h3>Many pictures at once</h3>
 <p><i>File &gt; Convert many pictures...</i> (Ctrl+Shift+O) traces and saves a list of pictures
 in one go. It also opens when you pick several pictures in <i>Open picture</i>, or drag several
@@ -209,7 +226,10 @@ stays usable while it works. The command line does the same for scripts.</p>
 cut cleaner: raise <b>Tolerance</b>, <b>Smooth corners</b> or <b>Speckles</b>, or use fewer
 colors, for fewer). The status bar says the same.</p>
 <p>The left side shows the picture; <i>View &gt; Show colors to trace</i> (Ctrl+T) shows it
-with its colors reduced, as it will be traced. Both sides zoom and move together: turn the
+with its colors reduced, as it will be traced. <i>View &gt; Show outlines</i> (Ctrl+L) shows
+the SVG as its outlines, thin dark lines, with its nodes as small blue squares (when zoomed
+to 150% or more, or when there are no more than 3,000 of them): to see where a cutting
+machine will go, and what Snap shapes, Tolerance and Speckles change. Both sides zoom and move together: turn the
 mouse wheel to zoom, drag to move. <i>View &gt; Zoom to fit</i> (Ctrl+0), <i>View &gt; Actual
 size</i> (Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> (Ctrl+-).</p>
 <h3>Keyboard shortcuts</h3>
@@ -226,6 +246,9 @@ size</i> (Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> 
 <tr><td>Ctrl+click</td><td>Select more colors (a swatch, the picture or the SVG)</td></tr>
 <tr><td>Ctrl+R / Ctrl+Shift+R</td><td>Crop picture / Remove crop</td></tr>
 <tr><td>Ctrl+T</td><td>Show colors to trace</td></tr>
+<tr><td>Ctrl+L</td><td>Show outlines</td></tr>
+<tr><td>Ctrl+E / Ctrl+Shift+E</td><td>Erase on the picture / Restore the picture</td></tr>
+<tr><td>[ / ]</td><td>Smaller eraser / Bigger eraser</td></tr>
 <tr><td>Ctrl+0 / Ctrl+1</td><td>Zoom to fit / Actual size</td></tr>
 <tr><td>Ctrl++ / Ctrl+-</td><td>Zoom in / Zoom out</td></tr>
 <tr><td>F1</td><td>How to use KanzonasSVG</td></tr>
@@ -401,17 +424,24 @@ class RenderThread(QThread):
         p = QPainter(img)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        if kind == "svg":
+        if kind in ("svg", "outlines"):
             # drawn by the engine (through ctypes: Python's lock is let go, so the window keeps
             # going; Qt's SVG renderer held it all along, 0.3 s for a photo's SVG)
+            svg, nodes = content if kind == "outlines" else (content, False)
+            if kind == "outlines":
+                p.fillRect(target, Qt.GlobalColor.white)
             p.end()
             if self._svg_id != content_id:
                 if self._renderer is not None:
                     self._renderer.close()
-                self._renderer = engine.Drawing(content)  # parsed once, used only in this thread
+                self._renderer = engine.Drawing(svg)  # parsed once, used only in this thread
                 self._svg_id = content_id
-            self._renderer.render_image(img, target.left() * dpr, target.top() * dpr,
-                                        target.width() * dpr, target.height() * dpr)
+            if kind == "outlines":
+                self._renderer.render_outlines_image(img, target.left() * dpr, target.top() * dpr,
+                                                     target.width() * dpr, target.height() * dpr, nodes)
+            else:
+                self._renderer.render_image(img, target.left() * dpr, target.top() * dpr,
+                                            target.width() * dpr, target.height() * dpr)
             return img
         else:
             # only the part of the picture that shows, scaled (zoomed in on a 12-megapixel
@@ -426,6 +456,23 @@ class RenderThread(QThread):
                 p.drawImage(visible, content, src)
         p.end()
         return img
+
+
+def erase(img, strokes):
+    """A copy of img with the strokes (radius, points) made see-through."""
+    out = img.copy()
+    p = QPainter(out)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
+    for radius, pts in strokes:
+        p.setPen(QPen(Qt.GlobalColor.black, 2 * radius, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap,
+                      Qt.PenJoinStyle.RoundJoin))
+        if len(pts) == 1:
+            p.drawPoint(QPointF(*pts[0]))
+        else:
+            p.drawPolyline([QPointF(x, y) for x, y in pts])
+    p.end()
+    return out
 
 
 def _checker_brush():
@@ -447,14 +494,21 @@ class Canvas(QWidget):
     cropped = Signal(QRectF)  # (Crop picture) the rectangle dragged, in picture pixels
     clicked = Signal(QPointF, bool)  # a click (no drag), in picture pixels, and whether Ctrl was held
 
+    erased = Signal(float, list)  # (Erase on the picture) a stroke: its radius and points, in picture pixels
+
     def __init__(self, view, title):
         super().__init__()
         self.crop_mode = False
+        self.erase_mode = False
+        self.eraser = 12  # the eraser's radius, in screen pixels
+        self.stroke = None  # the points of the stroke being dragged, in widget coordinates
         self.band = None  # [start, end] of the rectangle being dragged, in widget coordinates
         self.view = view
         self.title = title
         self.picture = None  # QImage
         self.svg = None  # SVG text
+        self.outlines = False  # View > Show outlines (the SVG side)
+        self.nodes = 0  # the SVG's node count (for whether to show its nodes)
         self.content_id = 0
         self.message = ""
         self.cache = None  # (key, QImage, scale, cx, cy) of the last drawing
@@ -495,16 +549,31 @@ class Canvas(QWidget):
         self.message = text
         self.update()
 
+    def set_outlines(self, on):
+        """View > Show outlines: the SVG drawn as its outlines and nodes."""
+        if on != self.outlines:
+            self.outlines = on
+            self.redraw()
+
+    # nodes shown when they can be told apart: at 150% zoom or more, or when there are few
+    NODES_ZOOM, NODES_FEW = 1.5, 3000
+
+    def show_nodes(self):
+        return self.view.scale >= self.NODES_ZOOM or self.nodes <= self.NODES_FEW
+
     def _key(self):
         return (self.content_id, self.view.scale, self.view.cx, self.view.cy, self.width(), self.height(),
-                self.devicePixelRatioF())
+                self.devicePixelRatioF(), bool(self.svg) and self.outlines, bool(self.svg) and self.show_nodes())
 
     def redraw(self):
         self.update()
         if not self.has_content() or not self.view.width:
             return
         self.number += 1
-        kind, content = ("svg", self.svg) if self.svg else ("picture", self.picture)
+        if self.svg and self.outlines:
+            kind, content = "outlines", (self.svg, self.show_nodes())
+        else:
+            kind, content = ("svg", self.svg) if self.svg else ("picture", self.picture)
         self.thread.request(self.number, kind, self.content_id, content, self._key(),
                             self.view.target(self.size()), self.size(), self.devicePixelRatioF())
 
@@ -525,6 +594,8 @@ class Canvas(QWidget):
             key, img, scale, cx, cy = self.cache
             if key[1:] == self._key()[1:]:
                 p.drawImage(0, 0, img)
+            elif key[7] != self._key()[7]:
+                pass        # (fills shown, outlines asked for, or the other way: wait for it)
             else:
                 # moved or zoomed since it was drawn: show it moved and scaled to match
                 f = self.view.scale / scale
@@ -548,6 +619,17 @@ class Canvas(QWidget):
             pen.setDashOffset(4)
             p.setPen(pen)
             p.drawRect(r)
+        if self.stroke is not None:
+            # the stroke being dragged: where it erases (done when the button is let go)
+            pen = QPen(QColor(220, 40, 40, 120), 2 * self.eraser, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap,
+                       Qt.PenJoinStyle.RoundJoin)
+            p.setPen(pen)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            if len(self.stroke) == 1:
+                p.drawPoint(self.stroke[0])
+            else:
+                p.drawPolyline(self.stroke)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         if self.message:
             p.setPen(self.palette().color(QPalette.ColorRole.Text))
             p.drawText(self.rect().adjusted(20, 20, -20, -20), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap,
@@ -561,7 +643,21 @@ class Canvas(QWidget):
         if steps:
             self.view.zoom(1.25 ** steps, e.position(), self.size())
 
+    def set_erase_mode(self, on):
+        self.erase_mode = on
+        self.stroke = None
+        if on:
+            self.crop_mode = False
+            self.band = None
+            self.setCursor(Qt.CursorShape.CrossCursor)
+        else:
+            self.unsetCursor()
+        self.update()
+
     def set_crop_mode(self, on):
+        if on:
+            self.erase_mode = False
+            self.stroke = None
         self.crop_mode = on
         self.band = None
         if on:
@@ -576,6 +672,10 @@ class Canvas(QWidget):
         return QPointF((point.x() - t.x()) / self.view.scale, (point.y() - t.y()) / self.view.scale)
 
     def mousePressEvent(self, e):
+        if self.erase_mode and e.button() == Qt.MouseButton.LeftButton and self.has_content():
+            self.stroke = [e.position()]
+            self.update()
+            return
         if self.crop_mode and e.button() == Qt.MouseButton.LeftButton and self.has_content():
             self.band = [e.position(), e.position()]
             self.update()
@@ -586,6 +686,10 @@ class Canvas(QWidget):
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
 
     def mouseMoveEvent(self, e):
+        if self.stroke is not None:
+            self.stroke.append(e.position())
+            self.update()
+            return
         if self.band is not None:
             self.band[1] = e.position()
             self.update()
@@ -596,6 +700,11 @@ class Canvas(QWidget):
             self.view.move(d.x(), d.y())
 
     def mouseReleaseEvent(self, e):
+        if self.stroke is not None:
+            stroke, self.stroke = self.stroke, None
+            self.update()
+            self.erased.emit(self.eraser / self.view.scale, [self.to_picture(q) for q in stroke])
+            return
         press, self.press = getattr(self, "press", None), None
         if press is not None and self.band is None and (e.position() - press).manhattanLength() < 4 \
                 and self.has_content():
@@ -1170,12 +1279,14 @@ class MainWindow(QMainWindow):
         self.img = None  # QImage, RGBA8888: the picture traced (cropped, if it is)
         self.full_img = None  # the whole picture opened
         self.crop = None  # QRect of full_img that img is, or None
+        self.erased = ()  # (Erase on the picture) strokes: (radius, ((x, y), ...)) in full_img's pixels
         self.history = []  # Undo: (settings, crop) of each SVG traced for this picture
         self.history_at = -1
         self.source_path = None
         self.save_path = None
         self.savers = []  # Saver threads still writing
         self.batch = None  # the Convert many pictures dialog, once opened
+        self.help = None  # the help window, once opened
         self.result = None  # tracing.Result
         self.preview = None  # QImage
         self.job_number = 0
@@ -1193,6 +1304,7 @@ class MainWindow(QMainWindow):
         self.left = Canvas(self.view, "Picture")
         self.left.cropped.connect(self.on_cropped)
         self.left.clicked.connect(self.on_picture_clicked)
+        self.left.erased.connect(self.on_erased)
         self.right = Canvas(self.view, "SVG")
         self.right.clicked.connect(self.on_picture_clicked)    # (the SVG: the same place in the picture)
         self.left.set_message("Open a picture (Ctrl+O), drag one here, or paste one (Ctrl+V).")
@@ -1249,6 +1361,9 @@ class MainWindow(QMainWindow):
         mb = self.menuBar()
         m = mb.addMenu("&File")
         self._action(m, "Open picture...", self.open_dialog, QKeySequence.StandardKey.Open)
+        self.m_recent = m.addMenu("Open recent")
+        self.m_recent.aboutToShow.connect(self._fill_recent)
+        self._fill_recent()
         self._action(m, "Convert many pictures...", lambda: self.convert_many(), "Ctrl+Shift+O")
         self.a_paste = self._action(m, "Paste picture", self.paste, QKeySequence.StandardKey.Paste)
         m.addSeparator()
@@ -1264,6 +1379,10 @@ class MainWindow(QMainWindow):
 
         m = mb.addMenu("&View")
         self.a_colors = self._action(m, "Show colors to trace", self.show_colors_changed, "Ctrl+T", True)
+        self.a_outlines = self._action(m, "Show outlines", self.show_outlines_changed, "Ctrl+L", True)
+        if int(self.qs.value("view/outlines", 0)):
+            self.a_outlines.setChecked(True)
+            self.right.set_outlines(True)
         m.addSeparator()
         self._action(m, "Zoom in", lambda: self.view.zoom(1.25), QKeySequence.StandardKey.ZoomIn)
         self._action(m, "Zoom out", lambda: self.view.zoom(0.8), QKeySequence.StandardKey.ZoomOut)
@@ -1282,6 +1401,11 @@ class MainWindow(QMainWindow):
         m.addSeparator()
         self.a_crop = self._action(m, "Crop picture", self.start_crop, "Ctrl+R")
         self.a_uncrop = self._action(m, "Remove crop", self.remove_crop, "Ctrl+Shift+R")
+        m.addSeparator()
+        self.a_erase = self._action(m, "Erase on the picture", lambda on: self.start_erasing(on), "Ctrl+E", True)
+        self._action(m, "Smaller eraser", lambda: self.eraser_size(1 / 1.5), "[")
+        self._action(m, "Bigger eraser", lambda: self.eraser_size(1.5), "]")
+        self.a_unerase = self._action(m, "Restore the picture", self.restore_picture, "Ctrl+Shift+E")
 
         m = mb.addMenu("&Help")
         self._action(m, "How to use KanzonasSVG", self.show_help, QKeySequence.StandardKey.HelpContents)
@@ -1301,6 +1425,8 @@ class MainWindow(QMainWindow):
         self.a_undo.setEnabled(self.history_at > 0)
         self.a_redo.setEnabled(self.history_at + 1 < len(self.history))
         self.a_uncrop.setEnabled(self.crop is not None)
+        self.a_erase.setEnabled(self.img is not None)
+        self.a_unerase.setEnabled(bool(self.erased))
 
     def _update_title(self):
         name = os.path.basename(self.source_path) if self.source_path else None
@@ -1355,6 +1481,49 @@ class MainWindow(QMainWindow):
     def on_loaded(self, number, img, path):
         if number == self.load_number and not self.closing:
             self.set_image(img, path)
+            self.remember_recent(path)
+
+    # File > Open recent: the last pictures opened, newest first
+
+    RECENT = 10
+
+    def recent_files(self):
+        v = self.qs.value("recent/files", [])
+        if isinstance(v, str):          # (QSettings gives one item back as a string)
+            v = [v]
+        return [str(p) for p in (v or []) if p][:self.RECENT]
+
+    def remember_recent(self, path):
+        path = os.path.abspath(path)
+        files = [path] + [p for p in self.recent_files() if os.path.normcase(p) != os.path.normcase(path)]
+        self.qs.setValue("recent/files", files[:self.RECENT])
+
+    def _fill_recent(self):
+        self.m_recent.clear()
+        files = self.recent_files()
+        for i, path in enumerate(files):
+            # (an & in a name would underline the next letter: doubled)
+            a = self.m_recent.addAction("&%d %s" % ((i + 1) % 10, os.path.basename(path).replace("&", "&&")))
+            a.setToolTip(path)
+            a.setStatusTip(path)
+            a.triggered.connect(lambda _c=False, p=path: self.open_recent(p))
+        if files:
+            self.m_recent.addSeparator()
+            self.m_recent.addAction("Clear the list", self.clear_recent)
+        else:
+            self.m_recent.addAction("No pictures yet").setEnabled(False)
+        self.m_recent.menuAction().setEnabled(True)
+
+    def open_recent(self, path):
+        if not os.path.isfile(path):
+            self.qs.setValue("recent/files", [p for p in self.recent_files() if p != path])
+            QMessageBox.warning(self, APP_NAME, "%s isn't there any more (it was moved, renamed or deleted); "
+                                "it's off the list now." % path)
+            return False
+        return self.open_path(path)
+
+    def clear_recent(self):
+        self.qs.setValue("recent/files", [])
 
     def on_load_failed(self, number, message):
         if number == self.load_number and not self.closing:
@@ -1388,6 +1557,7 @@ class MainWindow(QMainWindow):
         """A new picture: opened, pasted or dropped."""
         self.full_img = img
         self.crop = None
+        self.erased = ()
         self.history, self.history_at = [], -1     # (Undo is for this picture)
         self.settings.colors.clear()    # (color edits are for the picture they were made on)
         self.source_path = path
@@ -1416,7 +1586,7 @@ class MainWindow(QMainWindow):
 
     def _state(self):
         c = self.crop
-        return (self.settings.snapshot(), None if c is None else (c.x(), c.y(), c.width(), c.height()))
+        return (self.settings.snapshot(), None if c is None else (c.x(), c.y(), c.width(), c.height()), self.erased)
 
     def remember(self):
         """The SVG shown is done: remember how it was made (unless more changes are on their way,
@@ -1437,7 +1607,7 @@ class MainWindow(QMainWindow):
         if not (0 <= at < len(self.history)) or self.full_img is None:
             return
         self.history_at = at
-        snap, crop = self.history[at]
+        snap, crop, erased = self.history[at]
         self.cancel_crop()
         self.restoring = True
         try:
@@ -1445,8 +1615,11 @@ class MainWindow(QMainWindow):
             self.settings.save(self.qs)
             new_crop = None if crop is None else QRect(*crop)
             if new_crop != self.crop:
-                self.crop = new_crop
-                self._show_picture(self.full_img if new_crop is None else self.full_img.copy(new_crop), auto=False)
+                self.crop, self.erased = new_crop, erased
+                self._show_picture(self.picture_now(), auto=False)
+            elif erased != self.erased:
+                self.erased = erased
+                self._update_picture(self.picture_now())
             else:
                 self.start_trace()
         finally:
@@ -1487,6 +1660,7 @@ class MainWindow(QMainWindow):
     def start_crop(self):
         if self.img is None:
             return
+        self.a_erase.setChecked(False)
         self.left.set_crop_mode(True)
         self.status.setText("Drag across the picture on the left to crop it (Esc: cancel).")
 
@@ -1498,6 +1672,10 @@ class MainWindow(QMainWindow):
 
     def keyPressEvent(self, e):
         if e.key() == Qt.Key.Key_Escape and self.cancel_crop():
+            self.status.setText("")
+            return
+        if e.key() == Qt.Key.Key_Escape and self.left.erase_mode:
+            self.start_erasing(False)
             self.status.setText("")
             return
         super().keyPressEvent(e)
@@ -1518,14 +1696,61 @@ class MainWindow(QMainWindow):
         if self.crop is not None:
             r = r.translated(self.crop.topLeft())
         self.crop = r
-        self._show_picture(self.full_img.copy(r))
+        self._show_picture(self.picture_now())
 
     def remove_crop(self):
         if self.crop is None or self.full_img is None:
             return
         self.cancel_crop()
         self.crop = None
-        self._show_picture(self.full_img)
+        self._show_picture(self.picture_now())
+
+    # erasing parts of the picture (they're traced as see-through, as a transparent picture's are)
+
+    def picture_now(self):
+        """The picture as it's traced: the one opened, with the parts erased see-through, cropped."""
+        img = self.full_img
+        if self.erased:
+            img = erase(img, self.erased)
+        return img if self.crop is None else img.copy(self.crop)
+
+    def _update_picture(self, img):
+        """The same picture, changed (erased): traced again, the view as it is."""
+        self.img = img
+        self.preview = None
+        self.left.set_picture(img)
+        self.start_trace(auto=False)
+
+    def start_erasing(self, on=True):
+        if self.img is None:
+            on = False
+        self.a_erase.setChecked(on)
+        self.left.set_erase_mode(on)
+        if on:
+            self.cancel_crop()
+            self.status.setText("Drag across the picture on the left to erase (the eraser: [ smaller, ] bigger, "
+                                "%d pixels across on the screen). Esc or Ctrl+E: stop erasing." % (2 * self.left.eraser))
+
+    def eraser_size(self, factor):
+        self.left.eraser = max(2, min(200, round(self.left.eraser * factor)))
+        if self.left.erase_mode:
+            self.start_erasing(True)
+
+    def on_erased(self, radius, points):
+        """A stroke dragged on the picture shown: erase it (in the opened picture's pixels)."""
+        if self.full_img is None or not points:
+            return
+        dx, dy = (self.crop.x(), self.crop.y()) if self.crop is not None else (0, 0)
+        stroke = (round(radius, 2), tuple((round(q.x() + dx, 2), round(q.y() + dy, 2)) for q in points))
+        self.erased = self.erased + (stroke,)
+        self._update_picture(self.picture_now())
+
+    def restore_picture(self):
+        """Trace > Restore the picture: nothing erased any more."""
+        if not self.erased:
+            return
+        self.erased = ()
+        self._update_picture(self.picture_now())
 
     def dragEnterEvent(self, e):
         if e.mimeData().hasUrls() or e.mimeData().hasImage():
@@ -1627,6 +1852,7 @@ class MainWindow(QMainWindow):
             self.preview = preview
         self.settings.colors.set_palette(result.palette)
         self.right.set_message("")
+        self.right.nodes = result.nodes
         self.right.set_svg(result.svg)
         if self.a_colors.isChecked() and self.preview is not None:
             self.left.set_picture(self.preview)
@@ -1668,6 +1894,11 @@ class MainWindow(QMainWindow):
         self.bar.hide()
         if self.pending:
             self.start_trace()
+
+    def show_outlines_changed(self, on):
+        """View > Show outlines: the SVG as its outlines, with its nodes (kept for next time)."""
+        self.qs.setValue("view/outlines", int(bool(on)))
+        self.right.set_outlines(bool(on))
 
     def show_colors_changed(self, on):
         if self.img is None:
@@ -1788,17 +2019,14 @@ class MainWindow(QMainWindow):
     # help
 
     def show_help(self):
-        d = QDialog(self)
-        d.setWindowTitle("How to use KanzonasSVG")
-        lay = QVBoxLayout(d)
-        t = QTextBrowser()
-        t.setHtml(HELP_HTML)
-        lay.addWidget(t)
-        b = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        b.rejected.connect(d.reject)
-        lay.addWidget(b)
-        d.resize(640, 700)
-        d.exec()
+        """Help > How to use KanzonasSVG: in chapters, with a search; open beside the window."""
+        from kanzonassvg.help_window import HelpWindow
+        if self.help is None:
+            self.help = HelpWindow(self, HELP_HTML, "How to use KanzonasSVG")
+        self.help.show()
+        self.help.raise_()
+        self.help.activateWindow()
+        return self.help
 
     def about(self):
         try:

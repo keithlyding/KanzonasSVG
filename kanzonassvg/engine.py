@@ -250,6 +250,10 @@ def library():
     lib.kz_drawing_render.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int,
                                       ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
     lib.kz_drawing_render.restype = ctypes.c_int
+    lib.kz_drawing_render_outlines.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
+                                               ctypes.c_int, ctypes.c_double, ctypes.c_double, ctypes.c_double,
+                                               ctypes.c_double, ctypes.c_int]
+    lib.kz_drawing_render_outlines.restype = ctypes.c_int
     lib.kz_drawing_close.argtypes = [ctypes.c_void_p]
     lib.kz_drawing_close.restype = None
     lib.kz_free.argtypes = [ctypes.c_void_p]
@@ -392,6 +396,16 @@ class Drawing:
         buf = (ctypes.c_char * len(bits)).from_buffer(bits)
         self.render(ctypes.addressof(buf), img.width(), img.height(), img.bytesPerLine(), left, top,
                     target_width, target_height)
+
+    def render_outlines_image(self, img, left, top, target_width, target_height, nodes=True):
+        """Draw its outlines (and nodes) into a QImage (Format_ARGB32_Premultiplied), over
+        what's in it."""
+        bits = img.bits()
+        buf = (ctypes.c_char * len(bits)).from_buffer(bits)
+        if self._lib.kz_drawing_render_outlines(self._handle, ctypes.addressof(buf), img.width(), img.height(),
+                                                img.bytesPerLine(), left, top, target_width, target_height,
+                                                int(bool(nodes))) != OK:
+            raise TraceError("Couldn't draw the SVG.")
 
     def close(self):
         if self._handle:

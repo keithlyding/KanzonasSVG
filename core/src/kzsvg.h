@@ -146,6 +146,11 @@ KZ_API int kz_auto(const unsigned char *rgba, int width, int height, int stride,
 KZ_API void *kz_drawing_open(const char *svg);
 KZ_API int kz_drawing_render(void *drawing, unsigned char *out, int width, int height, int stride, double left,
                              double top, double target_width, double target_height);
+/* The same place drawn as outlines (View > Show outlines, since 1.6): each shape's outline one
+ * pixel wide in dark gray over what's in <out>, and with <nodes> the points the paths go
+ * through as small blue squares. */
+KZ_API int kz_drawing_render_outlines(void *drawing, unsigned char *out, int width, int height, int stride,
+                                      double left, double top, double target_width, double target_height, int nodes);
 KZ_API void kz_drawing_close(void *drawing);
 
 KZ_API void kz_free(void *p);

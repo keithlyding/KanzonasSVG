@@ -426,6 +426,34 @@ int main(int argc, char **argv)
                 }
                 eff.scans = std::max(2, std::min(256, eff.scans));
                 check_svg(svg, p, n, eff, errs);
+                // drawn as the window draws it, filled and as outlines (1.6), at any size and
+                // place (off the buffer, zoomed far in): within the buffer, never past it
+                if (rnd(r, 0, 2) == 0) {
+                    void *d = kz_drawing_open(svg);
+                    if (!d) errs.push_back("the engine's own SVG didn't open for drawing");
+                    else {
+                        int bw = rnd(r, 1, 300), bh = rnd(r, 1, 300), bs = bw * 4 + 4 * rnd(r, 0, 3);
+                        std::vector<unsigned char> buf((size_t)bs * bh + 64, 0xAB);
+                        double scale = rnd(r, 0, 4) == 0 ? rndf(r, 0.001, 64) : rndf(r, 0.2, 3);
+                        double left = rndf(r, -400, 400), top = rndf(r, -400, 400);
+                        int a = kz_drawing_render(d, buf.data(), bw, bh, bs, left, top, p.w * scale, p.h * scale);
+                        int b = kz_drawing_render_outlines(d, buf.data(), bw, bh, bs, left, top, p.w * scale,
+                                                           p.h * scale, rnd(r, 0, 1));
+                        if (a != KZ_OK || b != KZ_OK) errs.push_back("drawing failed");
+                        for (size_t i = (size_t)bs * bh; i < buf.size(); i++)
+                            if (buf[i] != 0xAB) {
+                                errs.push_back("drawing wrote past the buffer");
+                                break;
+                            }
+                        // nonsense: refused, not drawn
+                        if (kz_drawing_render_outlines(d, buf.data(), bw, bh, bw * 4 - 1, 0, 0, 10, 10, 1) !=
+                                KZ_ERROR ||
+                            kz_drawing_render_outlines(d, buf.data(), bw, bh, bs, 0, 0, -1, 10, 1) != KZ_ERROR ||
+                            kz_drawing_render_outlines(nullptr, buf.data(), bw, bh, bs, 0, 0, 10, 10, 1) != KZ_ERROR)
+                            errs.push_back("drawing took nonsense");
+                        kz_drawing_close(d);
+                    }
+                }
                 // the same again (only without cancelling): the same SVG
                 if (cancel.after < 0 && rnd(r, 0, 3) == 0) {
                     char *svg2 = nullptr, *err2 = nullptr;

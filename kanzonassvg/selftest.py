@@ -199,6 +199,19 @@ def run(argv):
             assert batch.picture_files(d) == [src], batch.picture_files(d)
         return "%d shapes, each format" % res.shapes
 
+    def outlines_and_erasing():
+        # View > Show outlines (the engine's outline drawing) and Erase on the picture
+        from kanzonassvg import app as window
+        svg = tracing.trace_image(img, engine.Options(smooth=False, scans=3), 1).svg
+        out = QImage(240, 160, QImage.Format.Format_ARGB32_Premultiplied)
+        out.fill(Qt.GlobalColor.white)
+        engine.Drawing(svg).render_outlines_image(out, 0, 0, 240, 160, True)
+        dark = sum(1 for y in range(0, 160, 2) for x in range(0, 240, 2) if out.pixelColor(x, y).lightness() < 128)
+        assert 20 < dark < 2000, dark                      # (lines, not filled shapes)
+        erased = window.erase(img, ((10.0, ((55.0, 80.0),)),))
+        assert erased.pixelColor(55, 80).alpha() == 0 and img.pixelColor(55, 80).alpha() == 255
+        return "%d outline pixels (of 9600 looked at)" % dark
+
     def update_check():
         # the update check reaches GitHub over TLS (Qt's network backend in the program), and
         # its pieces work in the finished program
@@ -234,7 +247,7 @@ def run(argv):
                      ("logo and icon", logo_and_icon), ("auto settings", auto_settings), ("drawing SVGs", drawing), ("every mode", every_mode), ("reads pictures", reads_pictures),
                      ("big picture speed", big_picture), ("window opens and traces", window_opens),
                      ("command line", command_line), ("color edits", color_edits), ("saving", saving),
-                     ("converting many", converting_many),
+                     ("converting many", converting_many), ("outlines and erasing", outlines_and_erasing),
                      ("update check", update_check)]:
         check(name, fn)
 
