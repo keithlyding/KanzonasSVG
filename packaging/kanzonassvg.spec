@@ -23,8 +23,11 @@ a = Analysis(
     pathex=[ROOT],
     binaries=[(engine, "kanzonassvg/lib")],
     datas=[(os.path.join(ROOT, "kanzonassvg", "icon.png"), "kanzonassvg"),
-           (os.path.join(ROOT, "kanzonassvg", "logo.png"), "kanzonassvg")],
-    hiddenimports=["kanzonassvg.app", "kanzonassvg.cli", "kanzonassvg.selftest", "PySide6.QtSvg", "PySide6.QtNetwork", "kanzonassvg.updates"],
+           (os.path.join(ROOT, "kanzonassvg", "logo.png"), "kanzonassvg"),
+           (os.path.join(ROOT, "kanzonassvg", "locale", "es.po"), "kanzonassvg/locale")],
+    hiddenimports=["kanzonassvg.app", "kanzonassvg.cli", "kanzonassvg.selftest", "PySide6.QtSvg", "PySide6.QtNetwork",
+                   "kanzonassvg.updates", "kanzonassvg.batch", "kanzonassvg.help_window", "kanzonassvg.help_es",
+                   "kanzonassvg.export"],
     excludes=EXCLUDES,
     runtime_hooks=runtime_hooks,
 )

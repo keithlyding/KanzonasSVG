@@ -28,6 +28,10 @@ def run(argv):
             log("FAIL %-28s\n%s" % (name, traceback.format_exc()))
 
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    # (it checks the English words; the Spanish window is checked by "Spanish" below)
+    os.environ["KANZONASSVG_LANG"] = "en"
+    from kanzonassvg import i18n
+    i18n.use("en")
     from PySide6.QtCore import QByteArray, QPointF, QRectF, Qt
     from PySide6.QtGui import QColor, QImage, QPainter, QPen
     from PySide6.QtSvg import QSvgRenderer
@@ -212,6 +216,25 @@ def run(argv):
         assert erased.pixelColor(55, 80).alpha() == 0 and img.pixelColor(55, 80).alpha() == 255
         return "%d outline pixels (of 9600 looked at)" % dark
 
+    def spanish():
+        # View > Language: Español: the catalog and the help in the program, every text
+        # translated, and Qt's own Spanish (its buttons and dialogs) found
+        from kanzonassvg import i18n
+        from kanzonassvg.help_es import HELP_HTML_ES
+        try:
+            i18n.use("es")
+            assert i18n.tr("Open picture...") == "Abrir imagen...", i18n.tr("Open picture...")
+            # (from the sources, when they're there: the finished program has none to read)
+            missing, fields = i18n.untranslated("es")
+            assert not missing and not fields, (missing[:3], fields[:3])
+            t = i18n.install_qt(app)
+            assert t is not None, "Qt's Spanish (qtbase_es.qm) isn't in the program"
+            app.removeTranslator(t)
+            assert HELP_HTML_ES.count("<h3>") >= 15
+        finally:
+            i18n.use("en")
+        return "%d texts in Spanish; Qt's own Spanish found" % len(i18n.load("es"))
+
     def update_check():
         # the update check reaches GitHub over TLS (Qt's network backend in the program), and
         # its pieces work in the finished program
@@ -248,6 +271,7 @@ def run(argv):
                      ("big picture speed", big_picture), ("window opens and traces", window_opens),
                      ("command line", command_line), ("color edits", color_edits), ("saving", saving),
                      ("converting many", converting_many), ("outlines and erasing", outlines_and_erasing),
+                     ("Spanish", spanish),
                      ("update check", update_check)]:
         check(name, fn)
 

@@ -4,6 +4,7 @@ import atexit
 import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ["KANZONASSVG_LANG"] = "en"   # (the tests read the window's English; tests/test_i18n.py checks Spanish)
 
 from PySide6.QtWidgets import QApplication  # noqa: E402
 

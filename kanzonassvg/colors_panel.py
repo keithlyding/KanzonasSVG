@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QApplication, QColorDialog, QGridLayout, QGroupBox
     QPushButton, QToolButton, QVBoxLayout, QWidget
 
 from kanzonassvg import engine
+from kanzonassvg.i18n import tr
 
 COLUMNS = 6
 SWATCH = 30
@@ -76,15 +77,15 @@ class ColorsPanel(QGroupBox):
     changed = Signal()
 
     def __init__(self):
-        super().__init__("Colors")
+        super().__init__(tr("Colors"))
         self.palette = []           # [((r, g, b), pixels, is_background)] of the last trace, before edits
         self.edits = []             # [((r, g, b), (r, g, b) or None, where)]
         self.groups = []
         self.buttons = []
         self.selected = set()       # the selected swatches' members: (original color, where)
         lay = QVBoxLayout(self)
-        self.hint = QLabel("Click a color to select it, Ctrl+click to select more (here, on the picture "
-                           "or on the SVG), then change, merge or leave them out.")
+        self.hint = QLabel(tr("Click a color to select it, Ctrl+click to select more (here, on the picture "
+                           "or on the SVG), then change, merge or leave them out."))
         self.hint.setWordWrap(True)
         lay.addWidget(self.hint)
         self.grid_box = QWidget()
@@ -103,14 +104,14 @@ class ColorsPanel(QGroupBox):
         self.note.hide()
         lay.addWidget(self.note)
         row1, row2 = QHBoxLayout(), QHBoxLayout()
-        self.b_change = QPushButton("Change color...")
-        self.b_change.setToolTip("Trace the selected colors as another color")
-        self.b_merge = QPushButton("Merge")
-        self.b_merge.setToolTip("Trace the selected colors as one color, picked from them (or another)")
-        self.b_out = QPushButton("Leave out")
-        self.b_out.setToolTip("Leave the selected colors out: the SVG is see-through there (again: put them back)")
-        self.b_reset = QPushButton("Reset colors")
-        self.b_reset.setToolTip("Undo the edits of the selected colors (none selected: of all)")
+        self.b_change = QPushButton(tr("Change color..."))
+        self.b_change.setToolTip(tr("Trace the selected colors as another color"))
+        self.b_merge = QPushButton(tr("Merge"))
+        self.b_merge.setToolTip(tr("Trace the selected colors as one color, picked from them (or another)"))
+        self.b_out = QPushButton(tr("Leave out"))
+        self.b_out.setToolTip(tr("Leave the selected colors out: the SVG is see-through there (again: put them back)"))
+        self.b_reset = QPushButton(tr("Reset colors"))
+        self.b_reset.setToolTip(tr("Undo the edits of the selected colors (none selected: of all)"))
         row1.addWidget(self.b_change)
         row1.addWidget(self.b_merge)
         row2.addWidget(self.b_out)
@@ -224,16 +225,16 @@ class ColorsPanel(QGroupBox):
             share = 100.0 * g.count / total
             first = g.members[0][0]
             if g.left_out:
-                tip = "%s, left out (%.1f%% of the picture)" % (hex_of(first), share)
+                tip = tr("%s, left out (%.1f%% of the picture)") % (hex_of(first), share)
             elif len(g.members) > 1:
-                tip = "%s: %d colors merged (%s), %.1f%% of the picture" % (
+                tip = tr("%s: %d colors merged (%s), %.1f%% of the picture") % (
                     hex_of(g.color), len(g.members), ", ".join(hex_of(m) for m, _w in g.members), share)
             elif first != g.color:
-                tip = "%s, traced as %s (%.1f%% of the picture)" % (hex_of(first), hex_of(g.color), share)
+                tip = tr("%s, traced as %s (%.1f%% of the picture)") % (hex_of(first), hex_of(g.color), share)
             else:
-                tip = "%s (%.1f%% of the picture)" % (hex_of(g.color), share)
+                tip = tr("%s (%.1f%% of the picture)") % (hex_of(g.color), share)
             if g.background:
-                tip = "The background: " + tip + ". The same color inside the picture is a swatch of its own."
+                tip = tr("The background: %s. The same color inside the picture is a swatch of its own.") % tip
             b.setToolTip(tip)
             b.clicked.connect(lambda _checked=False, g=g: self.click_group(g, ctrl_held()))
             self.grid.addWidget(b, i // COLUMNS, i % COLUMNS)
@@ -250,9 +251,12 @@ class ColorsPanel(QGroupBox):
         used = {id(engine.edit_for(c, self.edits, w)) for c, w in self.entries()}
         unused = [e for e in self.edits if id(e) not in used]
         if unused and self.entries():
-            self.note.setText("%d color edit%s match%s no color now (they apply again if the color comes "
-                              "back; Reset colors clears them)." % (
-                                  len(unused), "" if len(unused) == 1 else "s", "es" if len(unused) == 1 else ""))
+            if len(unused) == 1:
+                self.note.setText(tr("1 color edit matches no color now (it applies again if the color comes "
+                                     "back; Reset colors clears it)."))
+            else:
+                self.note.setText(tr("%d color edits match no color now (they apply again if the colors come "
+                                     "back; Reset colors clears them).") % len(unused))
             self.note.show()
         else:
             self.note.hide()
@@ -284,7 +288,7 @@ class ColorsPanel(QGroupBox):
         self.b_change.setEnabled(bool(kept))
         self.b_merge.setEnabled(len(kept) >= 2)
         self.b_out.setEnabled(bool(sel))
-        self.b_out.setText("Put back" if sel and all(g.left_out for g in sel) else "Leave out")
+        self.b_out.setText(tr("Put back") if sel and all(g.left_out for g in sel) else tr("Leave out"))
         self.b_reset.setEnabled(bool(self.edits))
 
     def select_at(self, color, add=False, background=False):
@@ -349,7 +353,7 @@ class ColorsPanel(QGroupBox):
         if not kept:
             return
         if color is None:
-            picked = QColorDialog.getColor(QColor(*kept[0].color), self, "Trace the selected colors as")
+            picked = QColorDialog.getColor(QColor(*kept[0].color), self, tr("Trace the selected colors as"))
             if not picked.isValid():
                 return
             color = (picked.red(), picked.green(), picked.blue())
@@ -377,19 +381,19 @@ class ColorsPanel(QGroupBox):
         """The list Merge opens: each selected color (biggest first), and Another color..."""
         total = self.total()
         menu = QMenu(self)
-        menu.addSection("Merge into")
+        menu.addSection(tr("Merge into"))
         for g in sorted(kept, key=lambda g: -g.count):
             a = menu.addAction(swatch_icon(g.color, background=g.background), "%s  (%.1f%%)%s" % (
-                hex_of(g.color), 100.0 * g.count / total, "  background" if g.background else ""))
+                hex_of(g.color), 100.0 * g.count / total, "  " + tr("background") if g.background else ""))
             a.setData(list(g.color))       # (the color on the action: wrappers of it compare unequal)
         menu.addSeparator()
-        other = menu.addAction("Another color...")
+        other = menu.addAction(tr("Another color..."))
         other.setData("other")
         chosen = self.open_menu(menu, self.b_merge.mapToGlobal(self.b_merge.rect().bottomLeft()))
         if chosen is None:
             return None
         if chosen.data() == "other":
-            picked = QColorDialog.getColor(QColor(*kept[0].color), self, "Merge the selected colors into")
+            picked = QColorDialog.getColor(QColor(*kept[0].color), self, tr("Merge the selected colors into"))
             return (picked.red(), picked.green(), picked.blue()) if picked.isValid() else None
         return tuple(chosen.data())
 

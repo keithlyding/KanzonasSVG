@@ -224,6 +224,8 @@ def list_colors(src, img, options, enlarge):
 
 
 def run(argv):
+    from kanzonassvg import i18n
+    i18n.use("en")          # (the command line is in English, whatever the window's language)
     args = parser().parse_args(argv)
     qt_app()
     enlarge = tracing.AUTO if args.enlarge == "auto" else int(args.enlarge)

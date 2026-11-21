@@ -12,7 +12,8 @@ from PySide6.QtWidgets import QAbstractItemView, QButtonGroup, QCheckBox, QCombo
     QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QProgressBar, QPushButton, \
     QRadioButton, QVBoxLayout
 
-from kanzonassvg import engine, export, image, tracing
+from kanzonassvg import engine, export, i18n, image, tracing
+from kanzonassvg.i18n import tr
 
 NEXT_TO_EACH = ""        # (the folder setting: next to each picture)
 
@@ -72,18 +73,18 @@ class BatchWorker(QThread):
             self.started_item.emit(row)
             dst = output_path(src, self.folder, self.fmt)
             if os.path.exists(dst) and not self.replace:
-                self.item_done.emit(row, False, "skipped: %s is already there" % os.path.basename(dst))
+                self.item_done.emit(row, False, tr("skipped: %s is already there") % os.path.basename(dst))
                 continue
             try:
                 res = convert(src, dst, self.fmt, self.size, self.options, self.enlarge,
                               lambda _f: self.cancelled, self.snap)
-                self.item_done.emit(row, True, "saved %s: %d shapes, %s nodes" % (
-                    os.path.basename(dst), res.shapes, "{:,}".format(res.nodes)))
+                self.item_done.emit(row, True, tr("saved %s: %d shapes, %s nodes") % (
+                    os.path.basename(dst), res.shapes, i18n.whole(res.nodes)))
             except engine.Cancelled:
-                self.item_done.emit(row, False, "stopped")
+                self.item_done.emit(row, False, tr("stopped"))
                 return
             except Exception as e:      # (a picture that can't be read or saved: said, and on to the next)
-                self.item_done.emit(row, False, "failed: %s" % (str(e) or e.__class__.__name__))
+                self.item_done.emit(row, False, tr("failed: %s") % (str(e) or e.__class__.__name__))
 
 
 class BatchDialog(QDialog):
@@ -95,28 +96,28 @@ class BatchDialog(QDialog):
         self.qs = window.qs
         self.worker = None
         self.results = {}           # row: (ok, text)
-        self.setWindowTitle("Convert many pictures")
+        self.setWindowTitle(tr("Convert many pictures"))
         self.resize(720, 560)
         self.setAcceptDrops(True)
         lay = QVBoxLayout(self)
 
-        lay.addWidget(QLabel("Pictures (drag more in, or add them):"))
+        lay.addWidget(QLabel(tr("Pictures (drag more in, or add them):")))
         self.list = QListWidget()
         self.list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         lay.addWidget(self.list, 1)
         row = QHBoxLayout()
-        self.b_add = QPushButton("Add pictures...")
-        self.b_folder = QPushButton("Add a folder...")
-        self.b_remove = QPushButton("Remove")
-        self.b_clear = QPushButton("Clear")
+        self.b_add = QPushButton(tr("Add pictures..."))
+        self.b_folder = QPushButton(tr("Add a folder..."))
+        self.b_remove = QPushButton(tr("Remove"))
+        self.b_clear = QPushButton(tr("Clear"))
         for b in (self.b_add, self.b_folder, self.b_remove, self.b_clear):
             row.addWidget(b)
         row.addStretch(1)
         lay.addLayout(row)
 
         form = QFormLayout()
-        self.r_auto = QRadioButton("Auto settings for each picture")
-        self.r_shown = QRadioButton("The settings shown now (the same for all; not the color edits)")
+        self.r_auto = QRadioButton(tr("Auto settings for each picture"))
+        self.r_shown = QRadioButton(tr("The settings shown now (the same for all; not the color edits)"))
         self.r_auto.setChecked(int(self.qs.value("batch/auto", 1)) != 0)
         self.r_shown.setChecked(not self.r_auto.isChecked())
         group = QButtonGroup(self)
@@ -125,27 +126,27 @@ class BatchDialog(QDialog):
         how = QVBoxLayout()
         how.addWidget(self.r_auto)
         how.addWidget(self.r_shown)
-        form.addRow("Settings", how)
+        form.addRow(tr("Settings"), how)
         self.format = QComboBox()
         for f in export.FORMATS:
-            self.format.addItem(export.FILTERS[f], f)
+            self.format.addItem(export.filter_text(f), f)
         last = self.qs.value("batch/format", self.qs.value("paths/format", "svg"))
         self.format.setCurrentIndex(max(0, self.format.findData(last)))
-        form.addRow("Save as", self.format)
+        form.addRow(tr("Save as"), self.format)
         self.size_label = QLabel()
-        form.addRow("Width", self.size_label)
+        form.addRow(tr("Width"), self.size_label)
         where = QHBoxLayout()
         self.where = QComboBox()
-        self.where.addItem("Next to each picture", NEXT_TO_EACH)
-        self.where.addItem("In this folder:", "folder")
+        self.where.addItem(tr("Next to each picture"), NEXT_TO_EACH)
+        self.where.addItem(tr("In this folder:"), "folder")
         self.folder = QLineEdit(self.qs.value("batch/folder", ""))
-        self.b_browse = QPushButton("Browse...")
+        self.b_browse = QPushButton(tr("Browse..."))
         where.addWidget(self.where)
         where.addWidget(self.folder, 1)
         where.addWidget(self.b_browse)
         self.where.setCurrentIndex(1 if self.qs.value("batch/where", "") == "folder" else 0)
-        form.addRow("Save to", where)
-        self.replace = QCheckBox("Replace files that are already there")
+        form.addRow(tr("Save to"), where)
+        self.replace = QCheckBox(tr("Replace files that are already there"))
         form.addRow("", self.replace)
         lay.addLayout(form)
 
@@ -156,11 +157,11 @@ class BatchDialog(QDialog):
         self.summary.setWordWrap(True)
         lay.addWidget(self.summary)
         row = QHBoxLayout()
-        self.b_open = QPushButton("Open the folder")
-        self.b_start = QPushButton("Convert")
+        self.b_open = QPushButton(tr("Open the folder"))
+        self.b_start = QPushButton(tr("Convert"))
         self.b_start.setDefault(True)
-        self.b_stop = QPushButton("Stop")
-        self.b_close = QPushButton("Close")
+        self.b_stop = QPushButton(tr("Stop"))
+        self.b_close = QPushButton(tr("Close"))
         row.addWidget(self.b_open)
         row.addStretch(1)
         for b in (self.b_start, self.b_stop, self.b_close):
@@ -201,15 +202,15 @@ class BatchDialog(QDialog):
         self._list_changed()
 
     def add_dialog(self):
-        from kanzonassvg.app import PICTURE_FILTER
+        from kanzonassvg.app import picture_filter
         start = self.qs.value("paths/open", os.path.expanduser("~"))
-        paths, _ = QFileDialog.getOpenFileNames(self, "Add pictures", start, PICTURE_FILTER)
+        paths, _ = QFileDialog.getOpenFileNames(self, tr("Add pictures"), start, picture_filter())
         if paths:
             self.qs.setValue("paths/open", os.path.dirname(paths[0]))
             self.add_files(paths)
 
     def add_folder_dialog(self):
-        folder = QFileDialog.getExistingDirectory(self, "Add the pictures in a folder",
+        folder = QFileDialog.getExistingDirectory(self, tr("Add the pictures in a folder"),
                                                   self.qs.value("paths/open", os.path.expanduser("~")))
         if folder:
             self.add_files([folder])
@@ -224,7 +225,7 @@ class BatchDialog(QDialog):
         self._list_changed()
 
     def browse(self):
-        folder = QFileDialog.getExistingDirectory(self, "Save the files in", self.folder.text()
+        folder = QFileDialog.getExistingDirectory(self, tr("Save the files in"), self.folder.text()
                                                   or os.path.expanduser("~"))
         if folder:
             self.folder.setText(folder)
@@ -258,10 +259,10 @@ class BatchDialog(QDialog):
         self.b_open.setEnabled(bool(self.results) and (not in_folder or os.path.isdir(self.target_folder())))
         size = self.window.settings.saved_size()
         if size.unit == export.PX:
-            self.size_label.setText("Each picture's own size in pixels (96 to the inch): set Saved width "
-                                    "under Size to save them at a width")
+            self.size_label.setText(tr("Each picture's own size in pixels (96 to the inch): set Saved width "
+                                    "under Size to save them at a width"))
         else:
-            self.size_label.setText("%s %s wide (Saved width, under Size), the height following each picture"
+            self.size_label.setText(tr("%s %s wide (Saved width, under Size), the height following each picture")
                                     % (("%.2f" % size.width).rstrip("0").rstrip("."), size.unit))
 
     def _list_changed(self):
@@ -271,7 +272,7 @@ class BatchDialog(QDialog):
         self._show_results()
         self.bar.setRange(0, max(1, n))
         self.bar.setValue(0)
-        self.summary.setText("%d picture%s" % (n, "" if n == 1 else "s") if n else "No pictures yet.")
+        self.summary.setText(tr("No pictures yet.") if not n else tr("1 picture") if n == 1 else tr("%d pictures") % n)
         self._update()
 
     def start(self):
@@ -281,12 +282,12 @@ class BatchDialog(QDialog):
         folder = self.target_folder()
         if self.where.currentData() == "folder":
             if not folder:
-                self.summary.setText("Choose the folder to save them in (Browse...).")
+                self.summary.setText(tr("Choose the folder to save them in (Browse...)."))
                 return
             try:
                 os.makedirs(folder, exist_ok=True)
             except OSError as e:
-                self.summary.setText("Can't use that folder: %s" % e)
+                self.summary.setText(tr("Can't use that folder: %s") % e)
                 return
         fmt = self.format.currentData()
         if self.r_auto.isChecked():
@@ -314,11 +315,11 @@ class BatchDialog(QDialog):
     def stop(self):
         if self.worker is not None:
             self.worker.cancelled = True
-            self.summary.setText("Stopping...")
+            self.summary.setText(tr("Stopping..."))
 
     def _started_item(self, row):
         self.list.setCurrentRow(row)
-        self.summary.setText("Converting %d of %d: %s" % (row + 1, self.list.count(),
+        self.summary.setText(tr("Converting %d of %d: %s") % (row + 1, self.list.count(),
                                                           os.path.basename(self.files()[row])))
 
     def _item_done(self, row, ok, text):
@@ -343,11 +344,11 @@ class BatchDialog(QDialog):
         w.wait()
         saved = sum(1 for ok, _t in self.results.values() if ok)
         others = len(self.results) - saved
-        text = "Saved %d of %d" % (saved, self.list.count())
+        text = tr("Saved %d of %d") % (saved, self.list.count())
         if others:
-            text += "; %d not (see the list)" % others
+            text += tr("; %d not (see the list)") % others
         if w.cancelled:
-            text += "; stopped"
+            text += tr("; stopped")
         self.summary.setText(text + ".")
         self._update()
 

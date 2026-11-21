@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QKeySequence, QShortcut, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit, QListWidget, \
     QListWidgetItem, QPushButton, QSplitter, QTextBrowser, QTextEdit, QVBoxLayout
+from kanzonassvg.i18n import tr
 
 _H3 = re.compile(r"<h3>(.*?)</h3>", re.S)
 
@@ -34,11 +35,11 @@ class HelpWindow(QDialog):
 
         top = QHBoxLayout()
         self.search = QLineEdit()
-        self.search.setPlaceholderText("Search the help (Ctrl+F)")
+        self.search.setPlaceholderText(tr("Search the help (Ctrl+F)"))
         self.search.setClearButtonEnabled(True)
         self.found = QLabel()
-        self.b_prev = QPushButton("Previous")
-        self.b_next = QPushButton("Next")
+        self.b_prev = QPushButton(tr("Previous"))
+        self.b_next = QPushButton(tr("Next"))
         top.addWidget(self.search, 1)
         top.addWidget(self.found)
         top.addWidget(self.b_prev)
@@ -109,12 +110,12 @@ class HelpWindow(QDialog):
     def _follow(self):
         """The chapter at the top of the text, selected in the list (as you scroll)."""
         bar = self.text.verticalScrollBar()
-        # (scrolled to the end: the last chapters are short and all in sight; the last one)
-        corner = self.text.viewport().rect().bottomLeft() if bar.value() >= bar.maximum() > 0 \
-            else self.text.viewport().rect().topLeft()
-        pos = self.text.cursorForPosition(corner).position()
+        if bar.value() >= bar.maximum() > 0:
+            row = len(self.titles) - 1      # (scrolled to the end: the last chapters are short and all in sight)
+        else:
+            row = self.chapter_at(self.text.cursorForPosition(self.text.viewport().rect().topLeft()).position())
         self._following = True
-        self.list.setCurrentRow(self.chapter_at(pos))
+        self.list.setCurrentRow(row)
         self._following = False
 
     # searching
@@ -150,7 +151,7 @@ class HelpWindow(QDialog):
         if not text:
             self.found.setText("")
         elif not self.matches:
-            self.found.setText("No matches")
+            self.found.setText(tr("No matches"))
         self.current = -1
         if self.matches:
             self.next_match()
@@ -168,7 +169,7 @@ class HelpWindow(QDialog):
             self._show_current()
 
     def _show_current(self):
-        self.found.setText("%d of %d" % (self.current + 1, len(self.matches)))
+        self.found.setText(tr("%d of %d") % (self.current + 1, len(self.matches)))
         c = QTextCursor(self.matches[self.current])
         self.text.setTextCursor(c)
         # a third of the way down, with what comes before it in sight (not at the very edge)

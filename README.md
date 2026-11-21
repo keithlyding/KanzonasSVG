@@ -3,7 +3,7 @@
 ![KanzonasSVG](assets/kanzonassvg-logo.png)
 
 Turn pictures (logos, drawings, scans) into SVG files, on Windows and Linux. Or into PDF, EPS
-and DXF, for printers, cutting machines and lasers.
+and DXF, for printers, cutting machines and lasers. In English or Spanish (*View > Language*).
 
 ![The KanzonasSVG window: on the left, a picture of a yellow sunflower with a brown center on a dark green cactus; on the right, its SVG traced in 6 flat colors with Auto settings, petals, center and cactus matching the picture, its size above it (161 KB, 6 shapes, 4,079 nodes); the settings panel on the right shows Colors mode, 6 colors, Background: Remove, the Colors box with the six colors traced and a dashed swatch for the see-through background, and Saved width: Picture's pixels, 239 x 292 pixels (2.49 x 3.04 in)](docs/screenshot.png)
 

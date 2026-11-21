@@ -2,6 +2,12 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.7
+
+New:
+- **KanzonasSVG in Spanish** (View > Language: Automatic, English or Español): menus, settings,
+  messages and the help. It switches the next time KanzonasSVG starts.
+
 ## 1.6
 
 New:

@@ -28,6 +28,7 @@ import traceback
 import zlib
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ["KANZONASSVG_LANG"] = "en"   # (in English, whatever this computer's language)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PySide6.QtCore import QPointF, QRectF, QSettings, Qt  # noqa: E402

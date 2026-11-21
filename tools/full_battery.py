@@ -36,6 +36,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ["KANZONASSVG_LANG"] = "en"   # (in English, whatever this computer's language)
 
 
 def run(name, cmd, env=None, timeout=4 * 3600):

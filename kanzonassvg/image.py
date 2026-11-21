@@ -5,6 +5,7 @@ import os
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QImageReader
+from kanzonassvg.i18n import tr
 
 # The engine's limit is 400 megapixels; this keeps memory reasonable (an image of
 # 100 megapixels needs about 2 GB while tracing).
@@ -23,35 +24,35 @@ def check(path):
     """The quick checks before reading a picture (it exists, Qt can read its kind, its size is
     within the limit), without decoding it: raises ImageError."""
     if not os.path.isfile(path):
-        raise ImageError("File not found: %s" % path)
+        raise ImageError(tr("File not found: %s") % path)
     reader = QImageReader(path)
     if not reader.canRead():
-        raise ImageError("Can't read %s: %s" % (os.path.basename(path), reader.errorString()))
+        raise ImageError(tr("Can't read %s: %s") % (os.path.basename(path), reader.errorString()))
     size = reader.size()
     if size.isValid() and size.width() * size.height() > MAX_PIXELS:
-        raise ImageError("The picture is too big (%d x %d pixels; the limit is %d megapixels)."
+        raise ImageError(tr("The picture is too big (%d x %d pixels; the limit is %d megapixels).")
                          % (size.width(), size.height(), MAX_PIXELS // 1_000_000))
 
 
 def load(path):
     """Read <path> as a QImage in RGBA8888 (not premultiplied)."""
     if not os.path.isfile(path):
-        raise ImageError("File not found: %s" % path)
+        raise ImageError(tr("File not found: %s") % path)
     reader = QImageReader(path)
     reader.setAutoTransform(True)  # photos taken sideways
     size = reader.size()
     if size.isValid() and size.width() * size.height() > MAX_PIXELS:
-        raise ImageError("The picture is too big (%d x %d pixels; the limit is %d megapixels)."
+        raise ImageError(tr("The picture is too big (%d x %d pixels; the limit is %d megapixels).")
                          % (size.width(), size.height(), MAX_PIXELS // 1_000_000))
     img = reader.read()
     if img.isNull():
-        raise ImageError("Can't read %s: %s" % (os.path.basename(path), reader.errorString()))
+        raise ImageError(tr("Can't read %s: %s") % (os.path.basename(path), reader.errorString()))
     return to_rgba(img)
 
 
 def to_rgba(img):
     if img.width() * img.height() > MAX_PIXELS:
-        raise ImageError("The picture is too big (%d x %d pixels; the limit is %d megapixels)."
+        raise ImageError(tr("The picture is too big (%d x %d pixels; the limit is %d megapixels).")
                          % (img.width(), img.height(), MAX_PIXELS // 1_000_000))
     if img.format() != QImage.Format.Format_RGBA8888:
         img = img.convertToFormat(QImage.Format.Format_RGBA8888)

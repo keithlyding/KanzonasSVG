@@ -19,6 +19,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ["KANZONASSVG_LANG"] = "en"   # (in English, whatever this computer's language)
 
 from PySide6.QtCore import QPointF, QRectF, QSettings, Qt  # noqa: E402
 from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPolygonF  # noqa: E402
