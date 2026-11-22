@@ -2,6 +2,12 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.5.1
+
+Fixed:
+- The setup (installing or updating) shows KanzonasSVG's orange icon at the top right of its
+  window, next to its own blue icon at the top left. It showed the blue one in both places.
+
 ## 1.5
 
 New:

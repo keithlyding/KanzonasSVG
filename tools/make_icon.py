@@ -14,7 +14,7 @@ letters still orange.
 
 Outputs: assets/kanzonassvg.png (256 px), assets/kanzonassvg.ico (app, 16-256 px),
 assets/kanzonassvg-setup.ico (installer), assets/wizard-large.bmp and wizard-small.bmp (the
-installer's pages), kanzonassvg/icon.png (the window's icon, 256 px).
+installer's pages, with the orange icon), kanzonassvg/icon.png (the window's icon, 256 px).
 
 This is an icon, not a logo: Kanzonas logos (the wordmark) come only from the Kanzonas-Site
 repository's brand/ folder.
@@ -379,8 +379,10 @@ def main():
     setup_big, setup_small = to_pil(big_icon()), to_pil(small_icon())
     TILE[:] = [ORANGE_TOP, ORANGE_BOTTOM]
     write("kanzonassvg-setup.ico", setup_big, setup_small, sizes)
-    on_white(setup_big, 164, 314, 150, (7, 80)).save(os.path.join(ROOT, "assets", "wizard-large.bmp"))
-    on_white(setup_big, 55, 55, 51, (2, 2)).save(os.path.join(ROOT, "assets", "wizard-small.bmp"))
+    # the setup's pages show the program's own orange icon (top right, and on the first and last
+    # pages); only the setup's window and file icon is the blue one, as in KanzonasPDF
+    on_white(big, 164, 314, 150, (7, 80)).save(os.path.join(ROOT, "assets", "wizard-large.bmp"))
+    on_white(big, 55, 55, 51, (2, 2)).save(os.path.join(ROOT, "assets", "wizard-small.bmp"))
     print("icons written")
 
 
