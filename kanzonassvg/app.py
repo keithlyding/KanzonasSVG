@@ -1690,8 +1690,10 @@ class MainWindow(QMainWindow):
             (tr("File"), "large", [self.b_open, Stack([self.a_paste, self.a_many])]),
             (tr("Save"), "large", [self.a_save, save_as, Stack([self.a_copy])]),
             (tr("Edit"), "small", [self.a_undo, self.a_redo]),
-            (tr("Trace"), "large", [self.a_auto_settings, Stack([self.a_update, self.a_auto]),
-                                    Stack([self.a_auto_new, self.a_reset])]),
+            # (the switches used less often under the group's arrow: in Spanish, with the wider
+            # fonts of GitHub's Linux machine, the tab needed 1,439 pixels of the 1,366)
+            (tr("Trace"), "large", [self.a_auto_settings, Stack([self.a_update])],
+             [self.a_auto, self.a_auto_new, self.a_reset]),
             (tr("Tools"), "large", [self.a_select, self.a_crop, self.a_erase]),
         ])
         r.add_tab(tr("Picture"), [
