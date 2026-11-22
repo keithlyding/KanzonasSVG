@@ -806,15 +806,28 @@ void refinePalette(RgbMap const &original, IndexedMap &imap)
         return true;
     };
 
-    // Means, and the candidate for the majority color of each (Boyer-Moore vote).
+    // Means, and the candidate for the majority color of each (Boyer-Moore vote), over its
+    // insides and over all its pixels (a color with no inside pixel: a shape a pixel or two
+    // across, or a picture one pixel wide, took the mean of all its pixels, though it said it
+    // took the color most of them have: two colors merged as nearly the same came out as
+    // their mix, a color of neither; the engine battery found it)
     std::vector<Sum> inner(n), all(n);
-    std::vector<unsigned> candidate(n, 0), votes(n, 0);
+    std::vector<unsigned> candidate(n, 0), votes(n, 0), candidate_all(n, 0), votes_all(n, 0);
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             size_t i = (size_t)y * width + x;
             unsigned k = imap.pixels[i];
             auto c = original.pixels[i];
             all[k].add(c);
+            {
+                unsigned v = pack(c);
+                if (votes_all[k] == 0) {
+                    candidate_all[k] = v;
+                    votes_all[k] = 1;
+                } else {
+                    votes_all[k] += candidate_all[k] == v ? 1 : -1;
+                }
+            }
             if (is_interior(x, y, k)) {
                 inner[k].add(c);
                 unsigned v = pack(c);
@@ -829,12 +842,16 @@ void refinePalette(RgbMap const &original, IndexedMap &imap)
     }
 
     // Is the candidate really over half of them?
-    std::vector<uint64_t> exact(n, 0);
-    for (int y = 1; y + 1 < height; y++) {
-        for (int x = 1; x + 1 < width; x++) {
+    std::vector<uint64_t> exact(n, 0), exact_all(n, 0);
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
             size_t i = (size_t)y * width + x;
             unsigned k = imap.pixels[i];
-            if (votes[k] && pack(original.pixels[i]) == candidate[k] && is_interior(x, y, k)) {
+            unsigned v = pack(original.pixels[i]);
+            if (votes_all[k] && v == candidate_all[k]) {
+                exact_all[k]++;
+            }
+            if (votes[k] && v == candidate[k] && is_interior(x, y, k)) {
                 exact[k]++;
             }
         }
@@ -843,6 +860,11 @@ void refinePalette(RgbMap const &original, IndexedMap &imap)
     for (int k = 0; k < n; k++) {
         if (inner[k].count && exact[k] * 2 > inner[k].count) {
             unsigned v = candidate[k];
+            imap.clut[k] = {(unsigned char)(v >> 16), (unsigned char)(v >> 8 & 255), (unsigned char)(v & 255)};
+            continue;
+        }
+        if (!inner[k].count && all[k].count && exact_all[k] * 2 > all[k].count) {
+            unsigned v = candidate_all[k];
             imap.clut[k] = {(unsigned char)(v >> 16), (unsigned char)(v >> 8 & 255), (unsigned char)(v & 255)};
             continue;
         }

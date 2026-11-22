@@ -26,6 +26,7 @@ Changed:
 
 Fixed:
 - The settings panel no longer shifts sideways now and then when the number of colors changes.
+- Tiny shapes (a pixel or two across) keep their exact color instead of a mix of two close colors.
 
 ## 1.4
 
