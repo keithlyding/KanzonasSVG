@@ -6,13 +6,16 @@ finished program (the same steps as kanzonassvg/app.py's Update now, after the d
         with a downloaded zip (updates.unpack, updates.swap_script); the program is closed as
         Update now closes it, and the script must copy the new files in (removing files the new
         version doesn't have), remove _update and start KanzonasSVG again.
-    python tools/test_windows_update.py installer SETUP.exe FOLDER
+    python tools/test_windows_update.py installer SETUP.exe FOLDER [PICTURE.png]
         with KanzonasSVG installed in FOLDER and running, runs the setup exactly as Update now
         does (updates.installer_command): it must close the running program, install over it
-        (same folder) and start it again (/RELAUNCH).
+        (same folder) and start it again (/RELAUNCH). While it runs, its window (the progress
+        window people see while updating) is captured: the blue setup icon must be at its top
+        left and the orange program icon at its top right (the picture is kept in PICTURE.png).
 Exit 1 with a message if anything didn't happen.
 """
 
+import ctypes
 import os
 import subprocess
 import sys
@@ -94,15 +97,148 @@ def portable(zip_path, root):
     print("portable update: the files swapped, _update removed, KanzonasSVG started again")
 
 
-def installer(setup, folder):
+def setup_windows():
+    """The setup's wizard windows on the screen (Inno Setup's TWizardForm; the setup runs it
+    from a second process, so they're found by their class, not the setup's process)."""
+    from ctypes import wintypes
+    user32 = ctypes.windll.user32
+    found = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def each(hwnd, _):
+        name = ctypes.create_unicode_buffer(64)
+        user32.GetClassNameW(hwnd, name, 64)
+        if name.value == "TWizardForm" and user32.IsWindowVisible(hwnd):
+            found.append(hwnd)
+        return True
+
+    user32.EnumWindows(each, 0)
+    return found
+
+
+def capture(hwnd):
+    """The window as drawn (its title bar too), and where its inside starts and how wide it is:
+    (QImage, x, y, width)."""
+    from ctypes import wintypes
+    from PySide6.QtGui import QImage
+    user32, gdi32 = ctypes.windll.user32, ctypes.windll.gdi32
+    H = ctypes.c_void_p
+    user32.GetWindowDC.restype = H
+    user32.GetWindowDC.argtypes = [H]
+    user32.ReleaseDC.argtypes = [H, H]
+    user32.PrintWindow.argtypes = [H, H, wintypes.UINT]
+    user32.GetWindowRect.argtypes = [H, ctypes.POINTER(wintypes.RECT)]
+    user32.GetClientRect.argtypes = [H, ctypes.POINTER(wintypes.RECT)]
+    user32.ClientToScreen.argtypes = [H, ctypes.POINTER(wintypes.POINT)]
+    gdi32.CreateCompatibleDC.restype = H
+    gdi32.CreateCompatibleDC.argtypes = [H]
+    gdi32.CreateCompatibleBitmap.restype = H
+    gdi32.CreateCompatibleBitmap.argtypes = [H, ctypes.c_int, ctypes.c_int]
+    gdi32.SelectObject.restype = H
+    gdi32.SelectObject.argtypes = [H, H]
+    gdi32.GetDIBits.argtypes = [H, H, wintypes.UINT, wintypes.UINT, ctypes.c_void_p, ctypes.c_void_p, wintypes.UINT]
+    gdi32.DeleteObject.argtypes = [H]
+    gdi32.DeleteDC.argtypes = [H]
+
+    box, inside, origin = wintypes.RECT(), wintypes.RECT(), wintypes.POINT(0, 0)
+    user32.GetWindowRect(hwnd, ctypes.byref(box))
+    user32.GetClientRect(hwnd, ctypes.byref(inside))
+    user32.ClientToScreen(hwnd, ctypes.byref(origin))
+    w, h = box.right - box.left, box.bottom - box.top
+    if w <= 0 or h <= 0:
+        return None
+    dc = user32.GetWindowDC(hwnd)
+    mem = gdi32.CreateCompatibleDC(dc)
+    bmp = gdi32.CreateCompatibleBitmap(dc, w, h)
+    old = gdi32.SelectObject(mem, bmp)
+    user32.PrintWindow(hwnd, mem, 2)                 # PW_RENDERFULLCONTENT
+
+    class BITMAPINFOHEADER(ctypes.Structure):
+        _fields_ = [("biSize", wintypes.DWORD), ("biWidth", wintypes.LONG), ("biHeight", wintypes.LONG),
+                    ("biPlanes", wintypes.WORD), ("biBitCount", wintypes.WORD),
+                    ("biCompression", wintypes.DWORD), ("biSizeImage", wintypes.DWORD),
+                    ("biXPelsPerMeter", wintypes.LONG), ("biYPelsPerMeter", wintypes.LONG),
+                    ("biClrUsed", wintypes.DWORD), ("biClrImportant", wintypes.DWORD)]
+
+    head = BITMAPINFOHEADER(ctypes.sizeof(BITMAPINFOHEADER), w, -h, 1, 32, 0, 0, 0, 0, 0, 0)
+    pixels = ctypes.create_string_buffer(w * h * 4)
+    gdi32.SelectObject(mem, old)
+    got = gdi32.GetDIBits(mem, bmp, 0, h, pixels, ctypes.byref(head), 0)
+    gdi32.DeleteObject(bmp)
+    gdi32.DeleteDC(mem)
+    user32.ReleaseDC(hwnd, dc)
+    if got != h:
+        return None
+    img = QImage(pixels.raw, w, h, w * 4, QImage.Format.Format_RGB32).copy()
+    return img, origin.x - box.left, origin.y - box.top, inside.right - inside.left
+
+
+def blue_and_orange(img, x0, y0, x1, y1):
+    """Clearly blue and clearly orange pixels in img between (x0, y0) and (x1, y1)."""
+    blue = orange = 0
+    for y in range(max(0, y0), min(img.height(), y1)):
+        for x in range(max(0, x0), min(img.width(), x1)):
+            c = img.pixelColor(x, y)
+            r, g, b = c.red(), c.green(), c.blue()
+            if b > 150 and b > r + 60:
+                blue += 1
+            elif r > 180 and r > b + 80 and g > 60:
+                orange += 1
+    return blue, orange
+
+
+def icons_shown(shot):
+    """What's wrong with the setup window's icons in a capture, or "" when they're right:
+    the blue setup icon at the top left (in the title bar), the orange program icon at the
+    top right (the wizard's small picture, in the band across the top of the inside)."""
+    img, cx, cy, cw = shot
+    s = max(1.0, img.devicePixelRatio())
+    left_blue, _ = blue_and_orange(img, 0, 0, cx + int(48 * s), cy)
+    mid_blue, _ = blue_and_orange(img, img.width() // 3, 0, 2 * img.width() // 3, cy)
+    right_blue, right_orange = blue_and_orange(img, cx + cw - int(140 * s), cy, cx + cw, cy + int(100 * s))
+    if mid_blue:
+        return "the title bar is blue itself: the setup icon can't be told apart"
+    if left_blue < 15:
+        return "no blue setup icon at the top left (%d blue pixels)" % left_blue
+    if right_blue > 5:
+        return "the top right shows blue (%d pixels): the blue setup icon, not the orange one" % right_blue
+    if right_orange < 200:
+        return "no orange program icon at the top right (%d orange pixels)" % right_orange
+    return ""
+
+
+def installer(setup, folder, picture=None):
     if not os.path.exists(os.path.join(folder, "unins000.exe")):
         sys.exit("FAILED: not installed in " + folder)
     old = start(folder)
     cmd = updates.installer_command(os.path.abspath(setup), folder)
     print("running", " ".join(cmd), flush=True)
-    r = subprocess.run(cmd, timeout=600)
-    if r.returncode != 0:
-        sys.exit("FAILED: the setup ended with %d" % r.returncode)
+    run = subprocess.Popen(cmd)
+    shots, end = [], time.time() + 600
+    while run.poll() is None and time.time() < end:  # its window, as people updating see it
+        for hwnd in setup_windows():
+            time.sleep(0.3)                          # (drawn)
+            shot = capture(hwnd)
+            if shot:
+                shots.append(shot)
+        time.sleep(0.1)
+    if run.poll() is None:
+        run.kill()
+        sys.exit("FAILED: the setup didn't finish in 10 minutes")
+    if run.returncode != 0:
+        sys.exit("FAILED: the setup ended with %d" % run.returncode)
+    if not shots:
+        sys.exit("FAILED: the setup's window never showed (Update now runs it with a progress window)")
+    found = [icons_shown(s) for s in shots]
+    best = shots[found.index("")] if "" in found else shots[len(shots) // 2]
+    if picture:
+        best[0].save(picture)
+        print("the setup's window: %s" % picture)
+    wrong = [f for f in found if f.startswith("the top right shows blue")]
+    if wrong or "" not in found:
+        sys.exit("FAILED: the setup's window icons (%d captures): %s" % (len(shots), (wrong or found)[0]))
+    print("the setup's window: blue setup icon at the top left, orange program icon at the top right "
+          "(%d captures)" % len(shots))
     if old.poll() is None:
         old.kill()
         sys.exit("FAILED: the setup didn't close the running KanzonasSVG")
@@ -116,7 +252,7 @@ def main():
     if kind == "portable":
         portable(src, folder)
     else:
-        installer(src, folder)
+        installer(src, folder, sys.argv[4] if len(sys.argv) > 4 else None)
     return 0
 
 

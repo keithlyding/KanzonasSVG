@@ -5,19 +5,20 @@ and on the first and last pages), as KanzonasPDF's setup does with its red one."
 import os
 import unittest
 
-from PIL import Image
+from PySide6.QtGui import QImage, QImageReader
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(ROOT, "assets")
 
 
 def blue_and_orange(img):
-    """How many clearly blue and clearly orange pixels img has (a tile's colors)."""
-    img = img.convert("RGBA")
+    """How many clearly blue and clearly orange pixels img (a QImage) has: a tile's colors."""
+    img = img.convertToFormat(QImage.Format.Format_ARGB32)
     blue = orange = 0
-    for y in range(img.height):
-        for x in range(img.width):
-            r, g, b, a = img.getpixel((x, y))
+    for y in range(img.height()):
+        for x in range(img.width()):
+            c = img.pixelColor(x, y)
+            r, g, b, a = c.red(), c.green(), c.blue(), c.alpha()
             if a <= 128:
                 continue
             if b > 150 and b > r + 60:
@@ -27,10 +28,22 @@ def blue_and_orange(img):
     return blue, orange
 
 
-def ico_frame(name, size):
-    with Image.open(os.path.join(ASSETS, name)) as img:
-        img.size = (size, size)  # Pillow picks the .ico's frame of that size
-        return img.convert("RGBA")
+def ico_frames(name):
+    """The frames of an .ico, by their width."""
+    reader = QImageReader(os.path.join(ASSETS, name))
+    frames = {}
+    for i in range(reader.imageCount()):
+        reader.jumpToImage(i)
+        img = reader.read()
+        if not img.isNull():
+            frames[img.width()] = img
+    return frames
+
+
+def picture(name):
+    img = QImage(os.path.join(ASSETS, name))
+    assert not img.isNull(), name
+    return img
 
 
 class TestInstallerIcons(unittest.TestCase):
@@ -42,20 +55,23 @@ class TestInstallerIcons(unittest.TestCase):
         self.assertRegex(text, r"(?m)^WizardImageFile=\.\.\\assets\\wizard-large\.bmp$")
 
     def test_the_setup_window_icon_is_blue(self):
+        frames = ico_frames("kanzonassvg-setup.ico")
         for size in (16, 32, 48, 256):
-            blue, orange = blue_and_orange(ico_frame("kanzonassvg-setup.ico", size))
+            self.assertIn(size, frames)
+            blue, orange = blue_and_orange(frames[size])
             self.assertGreater(blue, orange, "the setup icon's %d px frame isn't blue" % size)
 
     def test_the_program_icon_is_orange(self):
+        frames = ico_frames("kanzonassvg.ico")
         for size in (16, 32, 48, 256):
-            blue, orange = blue_and_orange(ico_frame("kanzonassvg.ico", size))
+            self.assertIn(size, frames)
+            blue, orange = blue_and_orange(frames[size])
             self.assertEqual(blue, 0, "the program icon's %d px frame has blue in it" % size)
             self.assertGreater(orange, 0)
 
     def test_the_setup_pages_show_the_orange_icon(self):
         for name in ("wizard-small.bmp", "wizard-large.bmp"):
-            with Image.open(os.path.join(ASSETS, name)) as img:
-                blue, orange = blue_and_orange(img)
+            blue, orange = blue_and_orange(picture(name))
             self.assertEqual(blue, 0, "%s shows the blue setup icon, not the orange one" % name)
             self.assertGreater(orange, 300, name)
 
