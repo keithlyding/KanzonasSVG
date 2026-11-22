@@ -102,6 +102,11 @@ class ColorsPanel(QGroupBox):
         # varies): the box (and the panel) as wide with 3 colors as with 40
         for c in range(COLUMNS):
             self.grid.setColumnMinimumWidth(c, self.swatch_width())
+        # and the spacing between them, also when some columns are empty (Qt leaves an empty
+        # column's spacing out: with 3 colors the box needed 6 px less, the panel, which only
+        # ever grows, grew once more colors came, and the Colors arrows moved: GitHub's Windows
+        # machine caught it)
+        self.grid_box.setMinimumWidth(COLUMNS * self.swatch_width() + (COLUMNS - 1) * self.grid.horizontalSpacing())
         lay.addWidget(self.grid_box)
         self.note = QLabel()
         self.note.setWordWrap(True)

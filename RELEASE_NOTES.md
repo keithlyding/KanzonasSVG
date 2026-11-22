@@ -24,6 +24,9 @@ Changed:
   settings panel, the wheel scrolls the panel: a number or a list changes with the wheel only
   after you click into it.
 
+Fixed:
+- The settings panel no longer shifts sideways now and then when the number of colors changes.
+
 ## 1.4
 
 New:
