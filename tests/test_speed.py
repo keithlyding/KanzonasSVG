@@ -158,14 +158,25 @@ class TestSpeed(unittest.TestCase):
         self.assertLess(took, 20.0 * SLACK, "centerline of a solid area at 4 times: %.2f s" % took)
 
     def test_cancelling_centerline(self):
-        # Cancel wasn't noticed while the centerline was being thinned (no progress reported
-        # then): the next trace, and closing the window, waited for it. Stops 0.3 s after today.
-        t = time.perf_counter()
-        with self.assertRaises(engine.Cancelled):
-            tracing.trace_image(self.solid_area(), engine.Options(mode=engine.CENTERLINE), enlarge=4,
-                                progress=lambda f: time.perf_counter() - t > 0.5)
-        took = time.perf_counter() - t - 0.5
-        self.assertLess(took, 1.5 * SLACK, "a cancelled centerline went on for %.2f s" % took)
+        # Cancel wasn't noticed while the centerline was being thinned, nor while the colors were
+        # reduced (any mode: no progress reported then), and once noticed while Autotrace
+        # looked for the lines, it went on to the end of the picture throwing an exception
+        # for every pixel (15 s): the next trace, and closing the window, waited for it. Cancelled
+        # early (colors), while thinning, and while finding the lines: each stops within 0.3 s.
+        img = self.solid_area()
+        for when, at in (("in the colors", 0.1), ("while thinning", 0.5), ("finding the lines", 0.3)):
+            t = time.perf_counter()
+            stop = [None]
+
+            def progress(f, at=at, when=when):
+                if stop[0] is None and (f >= at if when == "finding the lines" else time.perf_counter() - t > at):
+                    stop[0] = time.perf_counter()
+                return stop[0] is not None
+
+            with self.assertRaises(engine.Cancelled):
+                tracing.trace_image(img, engine.Options(mode=engine.CENTERLINE), enlarge=4, progress=progress)
+            took = time.perf_counter() - stop[0]
+            self.assertLess(took, 1.5 * SLACK, "a centerline cancelled %s went on for %.2f s" % (when, took))
 
     def test_window_switching_away_from_centerline(self):
         # A big picture traced as a centerline, then Colors while it was still tracing: the colors

@@ -143,14 +143,15 @@ public:
     // asking report() missed a cancel for as long as no progress was reported: Autotrace's
     // centerline thinning, 20 s and more on a big picture, went on after Cancel, and the next
     // trace (and closing the window) waited for it.
-    bool poll()
+    // (<often>: asked for every pixel, as Autotrace does: the clock read every 256th time)
+    bool poll(bool often = false)
     {
         if (stopped) {
             return true;
         }
         if (cancel && *cancel) {
             stopped = true;
-        } else if (func) {
+        } else if (func && (!often || ++polls % 256 == 0)) {
             auto now = std::chrono::steady_clock::now();
             if (now - last_poll >= std::chrono::milliseconds(50)) {
                 last_poll = now;
@@ -170,6 +171,7 @@ private:
     void *data;
     double from = 0.0, span = 1.0, last = -1.0;
     std::chrono::steady_clock::time_point last_poll{};
+    unsigned polls = 0;
 };
 
 /*
@@ -557,6 +559,13 @@ GrayMap single_scan(RgbMap const &rgb, kz_options const &o, double floor, double
     return map;
 }
 
+// The Progress of the trace this thread runs (kz_trace sets it; none elsewhere, e.g. in
+// kz_palette or the layers' threads). The color steps (smoothing, quantizing...) report no
+// progress: each checks it as it starts, so Cancel is noticed between them. Before, nothing
+// was noticed until all of them were done (a second and more on a big picture, the same for
+// every mode). A step stopped this way throws before its result is cached.
+thread_local Progress *current_progress = nullptr;
+
 // KZ_PROFILE=1 prints how long each step takes (to stderr).
 struct Timer
 {
@@ -564,7 +573,11 @@ struct Timer
     std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
     explicit Timer(const char *w)
         : what(w)
-    {}
+    {
+        if (current_progress && current_progress->poll()) {
+            throw Cancelled();
+        }
+    }
     ~Timer()
     {
         static const bool on = std::getenv("KZ_PROFILE") != nullptr;
@@ -668,7 +681,14 @@ std::shared_ptr<Prepared const> prepared(RgbMap const &map, uint64_t key, bool s
         }
     }
     auto p = std::make_shared<Prepared>();
-    { Timer t("smooth"); p->smoothed = smooth ? rgbMapGaussian(map) : map; }
+    {
+        Timer t("smooth");
+        p->smoothed = smooth ? rgbMapGaussian(map, [] {
+            if (current_progress && current_progress->poll()) {
+                throw Cancelled();
+            }
+        }) : map;
+    }
     { Timer t("histogram"); p->histogram = colorHistogram(p->smoothed); }
     std::lock_guard<std::mutex> lock(prepared_cache.m);
     auto &e = prepared_cache.entries;
@@ -1272,12 +1292,18 @@ Shapes trace_autotrace(RgbMap const &map, kz_options const &o, Progress &progres
         splines.reset(at_splines_new_full(
             &bitmap, opts.get(), nullptr, nullptr,
             [](gfloat f, gpointer data) {
+                // (Autotrace reports for every pixel, and goes on to the end of a row once
+                // stopped: report() would throw, and this catch it, millions of times, 12 s)
+                auto *p = static_cast<Progress *>(data);
+                if (p->stopped) {
+                    return;
+                }
                 try {
-                    static_cast<Progress *>(data)->report(f);
+                    p->report(f);
                 } catch (Cancelled const &) {
                 }
             },
-            &progress, [](gpointer data) -> gboolean { return static_cast<Progress *>(data)->poll(); }, &progress));
+            &progress, [](gpointer data) -> gboolean { return static_cast<Progress *>(data)->poll(true); }, &progress));
     }
     opts->background_color = nullptr; // not Autotrace's to free
     if (progress.stopped) {
@@ -1858,7 +1884,8 @@ int kz_trace(unsigned char const *rgba, int width, int height, int stride, kz_op
         std::atomic<size_t> bytes{0};
         svg_budget = &bytes;
         traced_input = Input{rgba, width, height, stride};
-        struct Reset { ~Reset() { svg_budget = nullptr; traced_input = Input{}; } } reset;
+        current_progress = &progress;
+        struct Reset { ~Reset() { svg_budget = nullptr; traced_input = Input{}; current_progress = nullptr; } } reset;
         Shapes shapes;
         switch (o.mode) {
             case KZ_GRAYS:

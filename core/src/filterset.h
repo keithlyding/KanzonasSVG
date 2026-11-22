@@ -15,6 +15,8 @@
 
 #include "imagemap.h"
 
+#include <functional>
+
 namespace Inkscape {
 namespace Trace {
 
@@ -27,7 +29,7 @@ GrayMap grayMapGaussian(GrayMap const &gmap);
  * Edge-preserving smoothing of an RGB map: a 5x5 Gaussian over the neighbors
  * whose color is close to the pixel's own, so edges stay sharp.
  */
-RgbMap rgbMapGaussian(RgbMap const &rgbmap);
+RgbMap rgbMapGaussian(RgbMap const &rgbmap, std::function<void()> const &between = {});
 
 GrayMap grayMapCanny(GrayMap const &gmap, double lowThreshold, double highThreshold);
 

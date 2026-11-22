@@ -22,6 +22,8 @@ https://github.com/autotrace/autotrace. Changes for KanzonasSVG:
   (`tests/thin_reference.c`). It also stops when `test_cancel` says so (checked every pass;
   `thin_image` takes it, and `autotrace.c` passes it on and checks it after thinning), and the
   background color is passed along instead of kept in a static variable.
+- `pxl-outline.c`: `find_centerline_pixels` checks `test_cancel` at each row (it only did after
+  the whole picture).
 
 Copyright (C) 2000-2002 Martin Weber and the Autotrace authors. GNU GPL version 2 or later
 (COPYING); some files GNU LGPL 2.1 or later, as their headers say (COPYING.LIB).
