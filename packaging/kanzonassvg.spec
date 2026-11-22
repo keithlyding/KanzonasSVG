@@ -24,10 +24,13 @@ a = Analysis(
     binaries=[(engine, "kanzonassvg/lib")],
     datas=[(os.path.join(ROOT, "kanzonassvg", "icon.png"), "kanzonassvg"),
            (os.path.join(ROOT, "kanzonassvg", "logo.png"), "kanzonassvg"),
-           (os.path.join(ROOT, "kanzonassvg", "locale", "es.po"), "kanzonassvg/locale")],
+           (os.path.join(ROOT, "kanzonassvg", "locale", "es.po"), "kanzonassvg/locale"),
+           # the ribbon's icons (kanzonassvg/icons.py), with the font's license
+           (os.path.join(ROOT, "kanzonassvg", "fonts", "materialdesignicons6-webfont-6.9.96.ttf"), "kanzonassvg/fonts"),
+           (os.path.join(ROOT, "kanzonassvg", "fonts", "LICENSE-Apache-2.0.txt"), "kanzonassvg/fonts")],
     hiddenimports=["kanzonassvg.app", "kanzonassvg.cli", "kanzonassvg.selftest", "PySide6.QtSvg", "PySide6.QtNetwork",
                    "kanzonassvg.updates", "kanzonassvg.batch", "kanzonassvg.help_window", "kanzonassvg.help_es",
-                   "kanzonassvg.export"],
+                   "kanzonassvg.export", "kanzonassvg.ribbon", "kanzonassvg.icons"],
     excludes=EXCLUDES,
     runtime_hooks=runtime_hooks,
 )

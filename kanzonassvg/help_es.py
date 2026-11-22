@@ -11,6 +11,13 @@ Illustrator u otro editor vectorial.</p>
 de arriba (Ctrl+F) para buscar: se marcan todas las coincidencias, los capítulos que las tienen
 muestran cuántas, e Intro (o F3) va a la siguiente, Mayús+Intro a la anterior. La ayuda puede
 quedarse abierta mientras trabaja.</p>
+<p>Los comandos están en la <b>cinta</b> de la parte superior de la ventana, en tres pestañas:
+<b>Inicio</b> (abrir, guardar, Deshacer, Ajustes automáticos y las herramientas), <b>Imagen</b>
+(las herramientas, las ediciones de color, el recorte y el borrador) y <b>Ver</b> (zoom, lo que se
+muestra, ayuda). Los mismos comandos están en los menús, con los mismos nombres (los de la cinta
+a veces son más cortos) y sus atajos. Pase el ratón sobre un botón para ver qué hace. Haga doble
+clic en una pestaña, o use <i>Ver &gt; Contraer la cinta</i> (Ctrl+F1), para mostrar solo los
+nombres de las pestañas; haga clic en una pestaña para abrirla de nuevo.</p>
 <h3>Hacer un SVG</h3>
 <ol>
 <li><b>Abra una imagen</b>: <i>Archivo &gt; Abrir imagen...</i> (Ctrl+O), arrastre un archivo a
@@ -21,10 +28,30 @@ lista</i> la vacía).</li>
 que le convienen (vea <b>Ajustes automáticos</b> más abajo) y la traza. Cambie cualquier ajuste
 y el SVG de la derecha se actualiza (salvo que <i>Trazar &gt; Actualizar automáticamente</i> esté
 desactivado: entonces pulse <i>Trazar &gt; Actualizar ahora</i>, F5).</li>
-<li><b>Guarde</b>: <i>Archivo &gt; Guardar...</i> (Ctrl+S) como SVG, o como PDF, EPS o DXF (elija
-el tipo en el cuadro de diálogo; vea <b>Guardar</b> más abajo), o <i>Archivo &gt; Copiar SVG</i>
-(Ctrl+Mayús+C) para pegarlo directamente en Inkscape u otro programa.</li>
+<li><b>Guarde</b>: <i>Archivo &gt; Guardar como SVG...</i> (Ctrl+Mayús+S), <i>Archivo &gt; Guardar
+como PDF...</i>, <i>Archivo &gt; Guardar como EPS...</i> o <i>Archivo &gt; Guardar como DXF...</i>
+(en la cinta, <b>Guardar como</b> y su flecha; vea <b>Guardar</b> más abajo), o <i>Archivo &gt;
+Copiar SVG</i> (Ctrl+Mayús+C) para pegarlo directamente en Inkscape u otro programa.</li>
 </ol>
+<h3>Las herramientas</h3>
+<p>Lo que hace un clic o un arrastre sobre la imagen depende de la herramienta activa: una de
+tres, en la cinta (<b>Herramientas</b>, en las pestañas Inicio e Imagen) y en el menú Trazar. La
+barra encima de la imagen y del SVG dice qué hace la herramienta activa y tiene sus controles.
+Esc vuelve a Seleccionar colores.</p>
+<ul>
+<li><i>Trazar &gt; Seleccionar colores</i> (activa al principio): un clic en la imagen o en el SVG
+selecciona el color trazado ahí, Ctrl+clic selecciona más, y un arrastre mueve la imagen. Los
+colores seleccionados se marcan en el SVG (todo lo demás atenuado) y la barra tiene <b>Cambiar
+color</b>, <b>Combinar</b> y <b>Omitir</b> para ellos (vea <b>Editar colores</b>). Con el ratón
+sobre la imagen, la barra de estado dice qué color selecciona un clic ahí. El clic derecho
+muestra los comandos de color.</li>
+<li><i>Trazar &gt; Recortar imagen</i> (Ctrl+R): arrastre sobre la parte de la imagen que quiere
+trazar (vea <b>Recortar</b>). <b>Cancelar</b> en la barra, o Esc, la detiene.</li>
+<li><i>Trazar &gt; Borrar en la imagen</i> (Ctrl+E): arrastre sobre la imagen para borrar lo que no
+debe trazarse; un círculo muestra el borrador y su tamaño (vea <b>Borrar partes de la
+imagen</b>). La barra tiene un control de <b>Tamaño</b>, <b>Restaurar la imagen</b> y
+<b>Listo</b>.</li>
+</ul>
 <h3>Ajustes automáticos</h3>
 <p>El botón <b>Ajustes automáticos</b> (o <i>Trazar &gt; Ajustes automáticos</i>, Ctrl+Mayús+A)
 elige los ajustes para la imagen: cuántos colores necesita (los mínimos a partir de los cuales
@@ -104,19 +131,25 @@ y <i>Guardar</i> y <i>Copiar SVG</i> esperan al SVG de la imagen entera.</p>
 los colores con los que se traza el SVG, una muestra cada uno. Haga clic en una muestra para
 seleccionar su color, y Ctrl+clic en más para seleccionarlos también (Ctrl+clic en una
 seleccionada la deselecciona). Hacer clic en la imagen o en el SVG hace lo mismo con el color
-trazado ahí. Luego:</p>
+trazado ahí (con la herramienta <b>Seleccionar colores</b> activa): la barra de estado dice qué
+color selecciona un clic antes de hacerlo. Los colores seleccionados se marcan en el SVG: todo lo
+demás se atenúa hasta que no seleccione ninguno (<i>Colores &gt; No seleccionar ningún color</i>, o
+Esc). Luego use los botones del cuadro Colores, de la barra encima de la imagen, de la pestaña
+Imagen de la cinta, del menú Colores, o haga clic derecho en una muestra, en la imagen o en el
+SVG:</p>
 <ul>
-<li><b>Cambiar color...</b> los traza con otro color que usted elige: las formas se quedan,
-solo cambia su color.</li>
-<li><b>Combinar</b> los traza como un solo color, en una sola capa: elija cuál de ellos en la
+<li><b>Cambiar color...</b> (<i>Colores &gt; Cambiar color...</i>) los traza con otro color que
+usted elige: las formas se quedan, solo cambia su color.</li>
+<li><b>Combinar</b> (<i>Colores &gt; Combinar colores...</i>) traza dos o más colores seleccionados
+como un solo color, en una sola capa: elija cuál de ellos en la
 lista que abre (el más grande primero), u <b>Otro color...</b>. Para una imagen con demasiados
 tonos del mismo color, combine los tonos que no necesita separados. Los colores combinados se
 muestran como una sola muestra.</li>
-<li><b>Omitir</b> los deja fuera: el SVG es transparente ahí (una muestra tachada;
-selecciónela y haga clic en <b>Recuperar</b> para trazarla de nuevo, con su propio color;
+<li><b>Omitir</b> (<i>Colores &gt; Omitir</i>, Supr) los deja fuera: el SVG es transparente ahí
+(una muestra tachada; selecciónela y use <b>Recuperar</b> para trazarla de nuevo, con su propio color;
 <i>Edición &gt; Deshacer</i> devuelve un color que tenía antes).</li>
-<li><b>Restablecer colores</b> deshace las ediciones de los colores seleccionados, o de todos
-cuando no hay ninguno seleccionado.</li>
+<li><b>Restablecer colores</b> (<i>Colores &gt; Restablecer colores</i>) deshace las ediciones de
+los colores seleccionados, o de todos cuando no hay ninguno seleccionado.</li>
 </ul>
 <p>El <b>fondo</b> (el color alrededor de la imagen, o su parte transparente: lo que <b>Fondo:
 Quitar</b> omite) tiene una muestra propia, con un marco discontinuo, aunque el mismo color esté
@@ -141,17 +174,21 @@ cero.</p>
 <h3>Recortar</h3>
 <p>Para trazar solo una parte de una imagen (el dibujo de una captura de pantalla, sin las
 barras de herramientas del programa alrededor; un logotipo de varios), use <i>Trazar &gt;
-Recortar imagen</i> (Ctrl+R) y arrastre sobre esa parte en el lado izquierdo. Solo esa parte se
+Recortar imagen</i> (Ctrl+R, o <b>Recortar</b> en la cinta) y arrastre sobre esa parte en el lado
+izquierdo. Solo esa parte se
 muestra y se traza, y el SVG tiene su tamaño; con <i>Ajustes automáticos para imágenes
 nuevas</i> activado, los ajustes automáticos se eligen para esa parte (las barras de herramientas
 de una captura pueden hacer que un dibujo le parezca otra cosa). Recorte de nuevo para recortar
-más; Esc deja de recortar antes de arrastrar. <i>Trazar &gt; Quitar recorte</i> (Ctrl+Mayús+R)
+más; Esc o <b>Cancelar</b> en la barra dejan de recortar antes de arrastrar. <i>Trazar &gt; Quitar recorte</i> (Ctrl+Mayús+R)
 devuelve la imagen entera. La opción <code>--crop X,Y,W,H</code> de la línea de comandos hace lo
 mismo.</p>
 <h3>Guardar</h3>
-<p><i>Archivo &gt; Guardar...</i> (Ctrl+S) pregunta dónde la primera vez, y luego guarda ahí de
-nuevo; <i>Archivo &gt; Guardar como...</i> (Ctrl+Mayús+S) siempre pregunta. El tipo que elija
-(o la extensión del nombre del archivo) decide lo que se escribe:</p>
+<p>Elija el tipo de archivo con su comando: <i>Archivo &gt; Guardar como SVG...</i> (Ctrl+Mayús+S),
+<i>Archivo &gt; Guardar como PDF...</i>, <i>Archivo &gt; Guardar como EPS...</i> o <i>Archivo &gt;
+Guardar como DXF...</i> (en la cinta, <b>Guardar como</b> guarda el tipo que muestra, y su flecha
+lista los cuatro: entonces muestra el último usado). Cada uno pregunta dónde, con la extensión del
+nombre ya puesta. <i>Archivo &gt; Guardar...</i> (Ctrl+S) pregunta la primera vez (con el tipo
+guardado la última vez), y luego guarda de nuevo en el mismo archivo.</p>
 <ul>
 <li><b>SVG</b>: para editores vectoriales (Inkscape, Illustrator, Affinity), máquinas de corte
 (Cricut Design Space, Silhouette Studio) y páginas web.</li>
@@ -175,12 +212,14 @@ alto lo sigue. La línea de debajo muestra el tamaño que tendrán los archivos.
 se guarda (y se copia), no el trazado, y se conserva para la próxima vez.</p>
 <h3>Borrar partes de la imagen</h3>
 <p>Para dejar algo fuera del trazado (una marca de agua, una mancha, un texto junto a un
-logotipo, una marca suelta), use <i>Trazar &gt; Borrar en la imagen</i> (Ctrl+E) y arrastre
-sobre ello en el lado izquierdo: lo que arrastra se vuelve transparente, como el fondo de una
-imagen transparente, y el SVG se actualiza al soltar. (Con <b>Fondo: Quitar</b> se omite; con
-<b>Conservar</b>, una parte transparente se traza en blanco.) <i>Trazar &gt; Borrador más
-pequeño</i> ([) y <i>Trazar &gt; Borrador más grande</i> (]) cambian su tamaño; el botón central
-del ratón sigue moviendo la imagen. Ctrl+E de nuevo o Esc dejan de borrar. <i>Edición &gt;
+logotipo, una marca suelta), use <i>Trazar &gt; Borrar en la imagen</i> (Ctrl+E, o <b>Borrar</b>
+en la cinta) y arrastre sobre ello en el lado izquierdo. Un círculo bajo el ratón muestra el
+borrador, tan grande como lo que borra. Lo que arrastra se vuelve transparente, como el fondo de
+una imagen transparente, y el SVG se actualiza al soltar. (Con <b>Fondo: Quitar</b> se omite; con
+<b>Conservar</b>, una parte transparente se traza en blanco.) El control de <b>Tamaño</b> de la
+barra encima de la imagen, <i>Trazar &gt; Borrador más pequeño</i> ([) y <i>Trazar &gt; Borrador
+más grande</i> (]) cambian su tamaño; el botón central del ratón sigue moviendo la imagen.
+<b>Listo</b> en la barra, Ctrl+E de nuevo o Esc dejan de borrar. <i>Edición &gt;
 Deshacer</i> devuelve los trazos uno por uno, y <i>Trazar &gt; Restaurar la imagen</i>
 (Ctrl+Mayús+E) devuelve todo lo borrado. El archivo de la imagen nunca cambia; una imagen nueva
 empieza sin nada borrado. Borrar funciona también con un recorte (se conserva al recortar o al
@@ -216,21 +255,26 @@ muestra con sus colores reducidos, tal como se trazará. <i>Ver &gt; Mostrar con
 (Ctrl+L) muestra el SVG como sus contornos, líneas oscuras finas, con sus nodos como cuadraditos
 azules (con un zoom del 150% o más, o cuando no hay más de 3.000): para ver por dónde irá una
 máquina de corte, y qué cambian Ajustar formas, Tolerancia y Motas. Los dos lados se acercan y se
-mueven juntos: gire la rueda del ratón para el zoom, arrastre para mover. <i>Ver &gt; Ajustar a
-la ventana</i> (Ctrl+0), <i>Ver &gt; Tamaño real</i> (Ctrl+1), <i>Ver &gt; Acercar</i> (Ctrl++),
-<i>Ver &gt; Alejar</i> (Ctrl+-).</p>
+mueven juntos: la rueda del ratón mueve la imagen arriba y abajo (Mayús+rueda: a los lados),
+Ctrl+rueda hace zoom, y un arrastre la mueve. <i>Ver &gt; Ajustar a la ventana</i> (Ctrl+0),
+<i>Ver &gt; Tamaño real</i> (Ctrl+1), <i>Ver &gt; Acercar</i> (Ctrl++), <i>Ver &gt; Alejar</i>
+(Ctrl+-).</p>
+<p>La rueda desplaza el panel de ajustes incluso sobre un número o una lista: estos cambian con la
+rueda solo después de hacer clic en ellos.</p>
 <h3>Atajos de teclado</h3>
 <table cellpadding="2">
 <tr><td>Ctrl+O</td><td>Abrir imagen</td></tr>
 <tr><td>Ctrl+Mayús+O</td><td>Convertir varias imágenes</td></tr>
 <tr><td>Ctrl+V</td><td>Pegar imagen</td></tr>
 <tr><td>Ctrl+S</td><td>Guardar</td></tr>
-<tr><td>Ctrl+Mayús+S</td><td>Guardar como</td></tr>
+<tr><td>Ctrl+Mayús+S</td><td>Guardar como SVG</td></tr>
 <tr><td>Ctrl+Mayús+C</td><td>Copiar SVG</td></tr>
 <tr><td>F5</td><td>Actualizar ahora</td></tr>
 <tr><td>Ctrl+Mayús+A</td><td>Ajustes automáticos</td></tr>
 <tr><td>Ctrl+Z / Ctrl+Y</td><td>Deshacer / Rehacer</td></tr>
 <tr><td>Ctrl+clic</td><td>Seleccionar más colores (una muestra, la imagen o el SVG)</td></tr>
+<tr><td>Supr</td><td>Omitir (los colores seleccionados)</td></tr>
+<tr><td>Esc</td><td>Volver a Seleccionar colores; después, no seleccionar ningún color</td></tr>
 <tr><td>Ctrl+R / Ctrl+Mayús+R</td><td>Recortar imagen / Quitar recorte</td></tr>
 <tr><td>Ctrl+T</td><td>Mostrar los colores a trazar</td></tr>
 <tr><td>Ctrl+L</td><td>Mostrar contornos</td></tr>
@@ -238,6 +282,8 @@ la ventana</i> (Ctrl+0), <i>Ver &gt; Tamaño real</i> (Ctrl+1), <i>Ver &gt; Acer
 <tr><td>[ / ]</td><td>Borrador más pequeño / Borrador más grande</td></tr>
 <tr><td>Ctrl+0 / Ctrl+1</td><td>Ajustar a la ventana / Tamaño real</td></tr>
 <tr><td>Ctrl++ / Ctrl+-</td><td>Acercar / Alejar</td></tr>
+<tr><td>Ctrl+rueda / rueda</td><td>Zoom / mover la imagen (Mayús+rueda: a los lados)</td></tr>
+<tr><td>Ctrl+F1</td><td>Contraer la cinta</td></tr>
 <tr><td>F1</td><td>Cómo usar KanzonasSVG</td></tr>
 <tr><td>Ctrl+Q</td><td>Salir</td></tr>
 </table>

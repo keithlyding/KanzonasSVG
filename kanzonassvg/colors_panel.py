@@ -72,9 +72,12 @@ class Group:
 
 
 class ColorsPanel(QGroupBox):
-    """changed: the edits changed (trace again)."""
+    """changed: the edits changed (trace again). selection_changed: other swatches selected (or
+    the same ones, edited). menu_requested: a swatch was right-clicked (where, on the screen)."""
 
     changed = Signal()
+    selection_changed = Signal()
+    menu_requested = Signal(object)
 
     def __init__(self):
         super().__init__(tr("Colors"))
@@ -85,7 +88,8 @@ class ColorsPanel(QGroupBox):
         self.selected = set()       # the selected swatches' members: (original color, where)
         lay = QVBoxLayout(self)
         self.hint = QLabel(tr("Click a color to select it, Ctrl+click to select more (here, on the picture "
-                           "or on the SVG), then change, merge or leave them out."))
+                           "or on the SVG): they're marked on the SVG. Then change, merge or leave them out, "
+                           "or right-click for the same."))
         self.hint.setWordWrap(True)
         lay.addWidget(self.hint)
         self.grid_box = QWidget()
@@ -237,6 +241,9 @@ class ColorsPanel(QGroupBox):
                 tip = tr("The background: %s. The same color inside the picture is a swatch of its own.") % tip
             b.setToolTip(tip)
             b.clicked.connect(lambda _checked=False, g=g: self.click_group(g, ctrl_held()))
+            # right-click: the color commands for it (selected first, if it isn't already)
+            b.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            b.customContextMenuRequested.connect(lambda pos, g=g, b=b: self._swatch_menu(g, b.mapToGlobal(pos)))
             self.grid.addWidget(b, i // COLUMNS, i % COLUMNS)
             self.buttons.append(b)
         # The box keeps the height it has had for this picture: fewer colors (fewer rows) leave
@@ -273,41 +280,65 @@ class ColorsPanel(QGroupBox):
                 self.selected |= members
         else:
             self.selected = members
+        self.click_group_refresh()
+
+    def _selected_groups(self):
+        return [g for g in self.groups if set(g.members) & self.selected]
+
+    def _swatch_menu(self, g, where):
+        if not set(g.members) & self.selected:
+            self.click_group(g)
+        self.menu_requested.emit(where)
+
+    def can(self):
+        """What the selection allows: (change, merge, leave out or put back, put back, reset)."""
+        sel = self._selected_groups()
+        kept = [g for g in sel if not g.left_out]
+        return (bool(kept), len(kept) >= 2, bool(sel), bool(sel) and all(g.left_out for g in sel), bool(self.edits))
+
+    def selected_colors(self):
+        """The colors the selected swatches are traced as (not those left out)."""
+        return [g.color for g in self._selected_groups() if not g.left_out]
+
+    def _update_buttons(self):
+        change, merge, out, put_back, reset = self.can()
+        self.b_change.setEnabled(change)
+        self.b_merge.setEnabled(merge)
+        self.b_out.setEnabled(out)
+        self.b_out.setText(tr("Put back") if put_back else tr("Leave out"))
+        self.b_reset.setEnabled(reset)
+        self.selection_changed.emit()
+
+    def group_at(self, color, background=False):
+        """The swatch of the traced color nearest to <color> (a picture's pixel; in the
+        background or not), or None."""
+        if background:
+            return next((g for g in self.groups if g.background), None)
+        inside = [(c, w) for c, w in self.entries() if w == engine.INSIDE]
+        if not inside:
+            return None
+        nearest = min(inside, key=lambda m: sum((a - b) ** 2 for a, b in zip(m[0], color)))
+        return next((g for g in self.groups if nearest in g.members), None)
+
+    def select_at(self, color, add=False, background=False):
+        """Select the swatch of the traced color nearest to <color> (a picture's pixel; in the
+        background or not) as a click on it does (add: Ctrl held). Returns its group."""
+        g = self.group_at(color, background)
+        if g is not None:
+            self.click_group(g, add)
+        return g
+
+    def select_none(self):
+        if self.selected:
+            self.selected = set()
+            self.click_group_refresh()
+
+    def click_group_refresh(self):
         for grp, b in zip(self.groups, self.buttons):
             b.blockSignals(True)
             b.setChecked(bool(set(grp.members) & self.selected))
             b.blockSignals(False)
         self._update_buttons()
-
-    def _selected_groups(self):
-        return [g for g in self.groups if set(g.members) & self.selected]
-
-    def _update_buttons(self):
-        sel = self._selected_groups()
-        kept = [g for g in sel if not g.left_out]
-        self.b_change.setEnabled(bool(kept))
-        self.b_merge.setEnabled(len(kept) >= 2)
-        self.b_out.setEnabled(bool(sel))
-        self.b_out.setText(tr("Put back") if sel and all(g.left_out for g in sel) else tr("Leave out"))
-        self.b_reset.setEnabled(bool(self.edits))
-
-    def select_at(self, color, add=False, background=False):
-        """Select the swatch of the traced color nearest to <color> (a picture's pixel; in the
-        background or not) as a click on it does (add: Ctrl held). Returns its group."""
-        if background:
-            g = next((g for g in self.groups if g.background), None)
-            if g is not None:
-                self.click_group(g, add)
-            return g
-        inside = [(c, w) for c, w in self.entries() if w == engine.INSIDE]
-        if not inside:
-            return None
-        nearest = min(inside, key=lambda m: sum((a - b) ** 2 for a, b in zip(m[0], color)))
-        for g in self.groups:
-            if nearest in g.members:
-                self.click_group(g, add)
-                return g
-        return None
 
     # for Undo: the edits as they are, and put back
 
@@ -362,14 +393,14 @@ class ColorsPanel(QGroupBox):
                 self._set(m, color)
         self._done()
 
-    def merge(self, target=None):
+    def merge(self, target=None, where=None):
         """Trace the selected colors as one: <target>, or the one picked from a list of them
-        (or another color)."""
+        (or another color), opened at <where> on the screen (or under the Merge button)."""
         kept = [g for g in self._selected_groups() if not g.left_out]
         if len(kept) < 2:
             return
         if target is None:
-            target = self._pick_merge_color(kept)
+            target = self._pick_merge_color(kept, where)
             if target is None:
                 return
         for g in kept:
@@ -377,7 +408,7 @@ class ColorsPanel(QGroupBox):
                 self._set(m, target)
         self._done()
 
-    def _pick_merge_color(self, kept):
+    def _pick_merge_color(self, kept, where=None):
         """The list Merge opens: each selected color (biggest first), and Another color..."""
         total = self.total()
         menu = QMenu(self)
@@ -389,7 +420,9 @@ class ColorsPanel(QGroupBox):
         menu.addSeparator()
         other = menu.addAction(tr("Another color..."))
         other.setData("other")
-        chosen = self.open_menu(menu, self.b_merge.mapToGlobal(self.b_merge.rect().bottomLeft()))
+        if where is None:
+            where = self.b_merge.mapToGlobal(self.b_merge.rect().bottomLeft())
+        chosen = self.open_menu(menu, where)
         if chosen is None:
             return None
         if chosen.data() == "other":

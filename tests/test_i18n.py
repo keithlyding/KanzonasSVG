@@ -58,7 +58,7 @@ class TestSpanishWindow(unittest.TestCase):
 
     def test_menus_and_panel(self):
         m = self.menus()
-        self.assertEqual(list(m), ["Archivo", "Edición", "Ver", "Trazar", "Ayuda"])
+        self.assertEqual(list(m), ["Archivo", "Edición", "Ver", "Trazar", "Colores", "Ayuda"])
         self.assertIn("Abrir imagen...", m["Archivo"])
         self.assertIn("Ajustar formas", self.w.settings.snap.text())
         self.assertEqual(self.w.settings.mode.itemText(0), "Colores")

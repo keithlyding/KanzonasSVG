@@ -2,6 +2,28 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.5
+
+New:
+- **A ribbon** at the top of the window, with tabs for Home, Picture and View: every command
+  with an icon and its name, the same commands as the menus. Double-click a tab (or Ctrl+F1)
+  to make it smaller.
+- **The tools say what they do**: Select colors, Crop and Erase are on the ribbon, one on at a
+  time, and a bar above the picture tells you what the one that's on does, with its controls
+  (the eraser's size, Done, Cancel). Esc goes back to selecting colors.
+- **Easier color editing**: the colors you select are marked on the SVG (everything else
+  fades), the status bar tells you which color a click will select before you click, and a
+  right-click on the picture, the SVG or a swatch gives you Change color, Merge and Leave out.
+  There's a new Colors menu, and Delete leaves the selected colors out.
+- **Save as SVG, PDF, EPS or DXF**: a command for each kind of file, instead of picking the type
+  in the save dialog.
+- The eraser shows as a circle the size of what it wipes out.
+
+Changed:
+- The mouse wheel moves the picture (Shift+wheel: sideways) and **Ctrl+wheel zooms**. In the
+  settings panel, the wheel scrolls the panel: a number or a list changes with the wheel only
+  after you click into it.
+
 ## 1.4
 
 New:

@@ -6,14 +6,14 @@ import sys
 import threading
 from dataclasses import replace
 
-from PySide6.QtCore import QUrl, QByteArray, QEvent, QMimeData, QObject, QPointF, QRect, QRectF, QSettings, Qt, QThread, \
-    QTimer, Signal
+from PySide6.QtCore import QUrl, QByteArray, QEvent, QMimeData, QObject, QPointF, QRect, QRectF, QSettings, QSize, Qt, \
+    QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QDesktopServices, QGuiApplication, QIcon, QImage, QKeySequence, QPainter, \
     QPalette, QPen
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, \
+from PySide6.QtWidgets import QAbstractSpinBox, QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, \
     QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QProgressBar, \
-    QProgressDialog, QPushButton, QScrollArea, QSpinBox, QSplitter, QTextBrowser, QVBoxLayout, QWidget
+    QMenu, QProgressDialog, QPushButton, QScrollArea, QSpinBox, QSplitter, QTextBrowser, QVBoxLayout, QWidget
 
 from kanzonassvg import APP_NAME, __version__, engine, export, i18n, image, tracing
 from kanzonassvg.colors_panel import ColorsPanel
@@ -54,6 +54,12 @@ or another vector editor.</p>
 (Ctrl+F) to search: every match is marked, the chapters that have them show how many, and
 Enter (or F3) goes to the next one, Shift+Enter to the one before. The help can stay open
 while you work.</p>
+<p>The commands are on the <b>ribbon</b> at the top of the window, in three tabs: <b>Home</b>
+(opening, saving, Undo, Auto settings and the tools), <b>Picture</b> (the tools, the color
+edits, the crop and the eraser) and <b>View</b> (zoom, what's shown, help). The same commands
+are in the menus, by the same names (the ribbon's are sometimes shorter), with their shortcuts.
+Hover over a button to see what it does. Double-click a tab, or use <i>View &gt; Collapse the
+ribbon</i> (Ctrl+F1), to show only the tabs' names; click a tab to open it again.</p>
 <h3>Making an SVG</h3>
 <ol>
 <li><b>Open a picture</b>: <i>File &gt; Open picture...</i> (Ctrl+O), drag a file into the
@@ -64,10 +70,29 @@ it).</li>
 settings that suit it (see <b>Auto settings</b> below) and traces it. Change any setting and
 the SVG on the right side of the window updates (unless <i>Trace &gt; Update automatically</i>
 is off: then press <i>Trace &gt; Update now</i>, F5).</li>
-<li><b>Save</b>: <i>File &gt; Save...</i> (Ctrl+S) as an SVG, or as a PDF, EPS or DXF (pick
-the type in the dialog; see <b>Saving</b> below), or <i>File &gt; Copy SVG</i> (Ctrl+Shift+C)
-to paste it straight into Inkscape or another program.</li>
+<li><b>Save</b>: <i>File &gt; Save as SVG...</i> (Ctrl+Shift+S), <i>File &gt; Save as PDF...</i>,
+<i>File &gt; Save as EPS...</i> or <i>File &gt; Save as DXF...</i> (on the ribbon, <b>Save as</b> and
+its arrow; see <b>Saving</b> below), or <i>File &gt; Copy SVG</i> (Ctrl+Shift+C) to paste it
+straight into Inkscape or another program.</li>
 </ol>
+<h3>The tools</h3>
+<p>What a click or a drag on the picture does depends on the tool that's on: one of three, on
+the ribbon (<b>Tools</b>, on the Home and Picture tabs) and in the Trace menu. The bar above
+the picture and the SVG says what the tool that's on does, and has its controls. Esc goes back
+to Select colors.</p>
+<ul>
+<li><i>Trace &gt; Select colors</i> (on at first): a click on the picture or the SVG selects the
+color traced there, Ctrl+click selects more, and a drag moves the picture. The selected colors
+are marked on the SVG (everything else faded) and the bar has <b>Change color</b>,
+<b>Merge</b> and <b>Leave out</b> for them (see <b>Editing colors</b>). With the mouse over the
+picture, the status bar says which color a click there selects. Right-click for the color
+commands.</li>
+<li><i>Trace &gt; Crop picture</i> (Ctrl+R): drag across the part of the picture to trace (see
+<b>Cropping</b>). <b>Cancel</b> on the bar, or Esc, stops it.</li>
+<li><i>Trace &gt; Erase on the picture</i> (Ctrl+E): drag on the picture to wipe out what
+shouldn't be traced; a circle shows the eraser and its size (see <b>Erasing parts of the
+picture</b>). The bar has a <b>Size</b> slider, <b>Restore the picture</b> and <b>Done</b>.</li>
+</ul>
 <h3>Auto settings</h3>
 <p>The <b>Auto settings</b> button (or <i>Trace &gt; Auto settings</i>, Ctrl+Shift+A) picks the
 settings for the picture: how many colors it needs (the fewest after which more colors no
@@ -138,18 +163,24 @@ wait for the whole picture's SVG.</p>
 <p>In <b>Colors</b>, <b>Grays</b> and <b>Autotrace: colors</b>, the <b>Colors</b> box shows the
 colors the SVG is traced with, one swatch each. Click a swatch to select its color, and
 Ctrl+click more to select them too (Ctrl+click a selected one to unselect it). Clicking the
-picture or the SVG does the same with the color traced there. Then:</p>
+picture or the SVG does the same with the color traced there (with the <b>Select colors</b>
+tool on): the status bar says which color a click selects before you click. The selected
+colors are marked on the SVG: everything else is faded until you select none
+(<i>Colors &gt; Select no color</i>, or Esc). Then use the buttons in the Colors box, on the bar
+above the picture, on the ribbon's Picture tab, in the Colors menu, or right-click a swatch,
+the picture or the SVG:</p>
 <ul>
-<li><b>Change color...</b> traces them as another color you pick: the shapes stay, only their
-color changes.</li>
-<li><b>Merge</b> traces them as one color, in one layer: pick which of them from the list it
-opens (biggest first), or <b>Another color...</b>. For a picture with too many shades of the
-same color, merge the shades you don't need apart. Merged colors show as one swatch.</li>
-<li><b>Leave out</b> leaves them out: the SVG is see-through there (a crossed-out swatch;
-select it and click <b>Put back</b> to trace it again, in its own color; <i>Edit &gt; Undo</i>
-brings back a color it had before).</li>
-<li><b>Reset colors</b> undoes the edits of the selected colors, or of all when none is
-selected.</li>
+<li><b>Change color...</b> (<i>Colors &gt; Change color...</i>) traces them as another color you
+pick: the shapes stay, only their color changes.</li>
+<li><b>Merge</b> (<i>Colors &gt; Merge colors...</i>) traces two or more selected colors as one
+color, in one layer: pick which of them from the list it opens (biggest first), or
+<b>Another color...</b>. For a picture with too many shades of the same color, merge the
+shades you don't need apart. Merged colors show as one swatch.</li>
+<li><b>Leave out</b> (<i>Colors &gt; Leave out</i>, Delete) leaves them out: the SVG is
+see-through there (a crossed-out swatch; select it and use <b>Put back</b> to trace it again,
+in its own color; <i>Edit &gt; Undo</i> brings back a color it had before).</li>
+<li><b>Reset colors</b> (<i>Colors &gt; Reset colors</i>) undoes the edits of the selected
+colors, or of all when none is selected.</li>
 </ul>
 <p>The <b>background</b> (the color around the picture, or its transparent part: what
 <b>Background: Remove</b> leaves out) has a swatch of its own, with a dashed frame, even when
@@ -171,17 +202,20 @@ SVG traced for the picture shown can be gone back to; a change made after an Und
 Redo would have brought back, and a new picture starts afresh.</p>
 <h3>Cropping</h3>
 <p>To trace only part of a picture (the drawing in a screenshot, without the program's
-toolbars around it; one logo of several), use <i>Trace &gt; Crop picture</i> (Ctrl+R) and
-drag across that part on the left side. Only it is shown and traced, and the SVG is its size;
+toolbars around it; one logo of several), use <i>Trace &gt; Crop picture</i> (Ctrl+R, or
+<b>Crop</b> on the ribbon) and drag across that part on the left side. Only it is shown and traced, and the SVG is its size;
 with <i>Auto settings for new pictures</i> on, Auto picks the settings for the part (a
 screenshot's toolbars can make a drawing look like something else to it). Crop again to
-crop further; Esc stops cropping before you drag. <i>Trace &gt; Remove crop</i>
+crop further; Esc or <b>Cancel</b> on the bar stops cropping before you drag. <i>Trace &gt; Remove crop</i>
 (Ctrl+Shift+R) brings the whole picture back. The command line's <code>--crop X,Y,W,H</code>
 does the same.</p>
 <h3>Saving</h3>
-<p><i>File &gt; Save...</i> (Ctrl+S) asks where the first time, then saves there again;
-<i>File &gt; Save as...</i> (Ctrl+Shift+S) always asks. The type you pick (or the file name's
-extension) decides what's written:</p>
+<p>Pick the kind of file with its command: <i>File &gt; Save as SVG...</i> (Ctrl+Shift+S),
+<i>File &gt; Save as PDF...</i>, <i>File &gt; Save as EPS...</i> or <i>File &gt; Save as DXF...</i>
+(on the ribbon, <b>Save as</b> saves the kind its face shows, and its arrow lists all four:
+the face then shows the one used last). Each asks where, with the name's extension filled in.
+<i>File &gt; Save...</i> (Ctrl+S) asks the first time (as the kind saved last), then saves to
+the same file again.</p>
 <ul>
 <li><b>SVG</b>: for vector editors (Inkscape, Illustrator, Affinity), cutting machines (Cricut
 Design Space, Silhouette Studio) and web pages.</li>
@@ -205,11 +239,13 @@ not the trace, and is kept for next time.</p>
 <h3>Erasing parts of the picture</h3>
 <p>To leave something out of the trace (a watermark, a smudge, text next to a logo, a stray
 mark), use <i>Trace &gt; Erase on the picture</i> (Ctrl+E) and drag across it on the left
-side: what you drag over becomes see-through, as a transparent picture's background is, and
-the SVG updates when you let go. (With <b>Background: Remove</b> it's left out; with
-<b>Keep</b>, a see-through part is traced as white.) <i>Trace &gt; Smaller eraser</i> ([) and
-<i>Trace &gt; Bigger eraser</i> (]) change its size; the middle mouse button still moves the
-picture. Ctrl+E again or Esc stops erasing. <i>Edit &gt; Undo</i> takes strokes back one by one,
+side (or use <b>Erase</b> on the ribbon). A circle under the mouse shows the eraser, as big as
+what it wipes out. What you drag over becomes see-through, as a transparent picture's
+background is, and the SVG updates when you let go. (With <b>Background: Remove</b> it's left
+out; with <b>Keep</b>, a see-through part is traced as white.) The <b>Size</b> slider on the bar
+above the picture, <i>Trace &gt; Smaller eraser</i> ([) and <i>Trace &gt; Bigger eraser</i> (])
+change its size; the middle mouse button still moves the picture. <b>Done</b> on the bar,
+Ctrl+E again or Esc stops erasing. <i>Edit &gt; Undo</i> takes strokes back one by one,
 and <i>Trace &gt; Restore the picture</i> (Ctrl+Shift+E) brings back everything erased. The
 picture file itself never changes; a new picture starts with nothing erased. Erasing works
 with a crop too (it's kept when you crop or remove the crop).</p>
@@ -240,21 +276,26 @@ colors, for fewer). The status bar says the same.</p>
 with its colors reduced, as it will be traced. <i>View &gt; Show outlines</i> (Ctrl+L) shows
 the SVG as its outlines, thin dark lines, with its nodes as small blue squares (when zoomed
 to 150% or more, or when there are no more than 3,000 of them): to see where a cutting
-machine will go, and what Snap shapes, Tolerance and Speckles change. Both sides zoom and move together: turn the
-mouse wheel to zoom, drag to move. <i>View &gt; Zoom to fit</i> (Ctrl+0), <i>View &gt; Actual
-size</i> (Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> (Ctrl+-).</p>
+machine will go, and what Snap shapes, Tolerance and Speckles change. Both sides zoom and move
+together: the mouse wheel moves the picture up and down (Shift+wheel: sideways), Ctrl+wheel
+zooms, and a drag moves it. <i>View &gt; Zoom to fit</i> (Ctrl+0), <i>View &gt; Actual size</i>
+(Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> (Ctrl+-).</p>
+<p>The wheel scrolls the settings panel even over a number or a list in it: those change with
+the wheel only once you've clicked into them.</p>
 <h3>Keyboard shortcuts</h3>
 <table cellpadding="2">
 <tr><td>Ctrl+O</td><td>Open picture</td></tr>
 <tr><td>Ctrl+Shift+O</td><td>Convert many pictures</td></tr>
 <tr><td>Ctrl+V</td><td>Paste picture</td></tr>
 <tr><td>Ctrl+S</td><td>Save</td></tr>
-<tr><td>Ctrl+Shift+S</td><td>Save as</td></tr>
+<tr><td>Ctrl+Shift+S</td><td>Save as SVG</td></tr>
 <tr><td>Ctrl+Shift+C</td><td>Copy SVG</td></tr>
 <tr><td>F5</td><td>Update now</td></tr>
 <tr><td>Ctrl+Shift+A</td><td>Auto settings</td></tr>
 <tr><td>Ctrl+Z / Ctrl+Y</td><td>Undo / Redo</td></tr>
 <tr><td>Ctrl+click</td><td>Select more colors (a swatch, the picture or the SVG)</td></tr>
+<tr><td>Delete</td><td>Leave out (the selected colors)</td></tr>
+<tr><td>Esc</td><td>Back to Select colors; then select no color</td></tr>
 <tr><td>Ctrl+R / Ctrl+Shift+R</td><td>Crop picture / Remove crop</td></tr>
 <tr><td>Ctrl+T</td><td>Show colors to trace</td></tr>
 <tr><td>Ctrl+L</td><td>Show outlines</td></tr>
@@ -262,6 +303,8 @@ size</i> (Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> 
 <tr><td>[ / ]</td><td>Smaller eraser / Bigger eraser</td></tr>
 <tr><td>Ctrl+0 / Ctrl+1</td><td>Zoom to fit / Actual size</td></tr>
 <tr><td>Ctrl++ / Ctrl+-</td><td>Zoom in / Zoom out</td></tr>
+<tr><td>Ctrl+wheel / wheel</td><td>Zoom / move the picture (Shift+wheel: sideways)</td></tr>
+<tr><td>Ctrl+F1</td><td>Collapse the ribbon</td></tr>
 <tr><td>F1</td><td>How to use KanzonasSVG</td></tr>
 <tr><td>Ctrl+Q</td><td>Quit</td></tr>
 </table>
@@ -406,6 +449,8 @@ class RenderThread(QThread):
         self._quit = False
         self._svg_id = None
         self._renderer = None
+        self._mark_id = None
+        self._marker = None     # the SVG with the selected colors marked (Canvas.set_mark), parsed once
 
     def request(self, number, kind, content_id, content, key, target, size, dpr):
         with self._lock:
@@ -442,7 +487,7 @@ class RenderThread(QThread):
         if kind in ("svg", "outlines"):
             # drawn by the engine (through ctypes: Python's lock is let go, so the window keeps
             # going; Qt's SVG renderer held it all along, 0.3 s for a photo's SVG)
-            svg, nodes = content if kind == "outlines" else (content, False)
+            svg, nodes, mark_id, mark = content
             if kind == "outlines":
                 p.fillRect(target, Qt.GlobalColor.white)
             p.end()
@@ -451,12 +496,23 @@ class RenderThread(QThread):
                     self._renderer.close()
                 self._renderer = engine.Drawing(svg)  # parsed once, used only in this thread
                 self._svg_id = content_id
+            box = (target.left() * dpr, target.top() * dpr, target.width() * dpr, target.height() * dpr)
+            if mark is not None:
+                # the selected colors marked: the SVG with the other colors faded (under the
+                # outlines, when they're shown), made here, not on the window's thread (40 ms
+                # for a photo's SVG)
+                if self._mark_id != (content_id, mark_id):
+                    if self._marker is not None:
+                        self._marker.close()
+                    self._marker = engine.Drawing(tracing.marked(svg, mark))
+                    self._mark_id = (content_id, mark_id)
+                self._marker.render_image(img, *box)
+                if kind != "outlines":
+                    return img
             if kind == "outlines":
-                self._renderer.render_outlines_image(img, target.left() * dpr, target.top() * dpr,
-                                                     target.width() * dpr, target.height() * dpr, nodes)
+                self._renderer.render_outlines_image(img, *box, nodes)
             else:
-                self._renderer.render_image(img, target.left() * dpr, target.top() * dpr,
-                                            target.width() * dpr, target.height() * dpr)
+                self._renderer.render_image(img, *box)
             return img
         else:
             # only the part of the picture that shows, scaled (zoomed in on a 12-megapixel
@@ -471,6 +527,11 @@ class RenderThread(QThread):
                 p.drawImage(visible, content, src)
         p.end()
         return img
+
+
+def colorbox(rgb):
+    """A small square of that color, in a label's rich text."""
+    return '<span style="background-color:#%02x%02x%02x">&nbsp;&nbsp;&nbsp;&nbsp;</span>' % tuple(rgb)
 
 
 def erase(img, strokes):
@@ -510,6 +571,8 @@ class Canvas(QWidget):
     clicked = Signal(QPointF, bool)  # a click (no drag), in picture pixels, and whether Ctrl was held
 
     erased = Signal(float, list)  # (Erase on the picture) a stroke: its radius and points, in picture pixels
+    hovered = Signal(object)  # the mouse over it (no button held), in picture pixels; None: it left
+    menu_requested = Signal(QPointF, object)  # a right-click: in picture pixels, and where on the screen
 
     def __init__(self, view, title):
         super().__init__()
@@ -530,6 +593,11 @@ class Canvas(QWidget):
         self.drag = None
         self.number = 0  # of the latest drawing asked for
         self.checker = _checker_brush()
+        self.mark = None  # (the SVG side) the selected colors ((r, g, b), ...): the others drawn faded
+        self.mark_id = 0
+        self.pointing = False  # clicks select colors here (the Select colors tool, with colors to select)
+        self.mouse = None  # where the mouse is (for the eraser's circle)
+        self.setMouseTracking(True)
         self.setMinimumSize(200, 200)
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent)
         view.changed.connect(self.redraw)
@@ -564,6 +632,27 @@ class Canvas(QWidget):
         self.message = text
         self.update()
 
+    def set_mark(self, colors):
+        """Mark these colors ((r, g, b), ...) on the SVG: the others faded. None: no mark."""
+        colors = tuple(tuple(c) for c in colors) if colors else None
+        if colors != self.mark:
+            self.mark = colors
+            self.mark_id += 1
+            self.redraw()
+
+    def set_pointing(self, on):
+        """Clicks here select colors: the hand cursor shows it (while no other tool is on)."""
+        self.pointing = on
+        self._cursor()
+
+    def _cursor(self):
+        if self.erase_mode or self.crop_mode:
+            self.setCursor(Qt.CursorShape.CrossCursor)
+        elif self.pointing and self.has_content():
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self.unsetCursor()
+
     def set_outlines(self, on):
         """View > Show outlines: the SVG drawn as its outlines and nodes."""
         if on != self.outlines:
@@ -578,17 +667,19 @@ class Canvas(QWidget):
 
     def _key(self):
         return (self.content_id, self.view.scale, self.view.cx, self.view.cy, self.width(), self.height(),
-                self.devicePixelRatioF(), bool(self.svg) and self.outlines, bool(self.svg) and self.show_nodes())
+                self.devicePixelRatioF(), bool(self.svg) and self.outlines, bool(self.svg) and self.show_nodes(),
+                self.mark_id if self.svg and self.mark is not None else 0)
 
     def redraw(self):
         self.update()
         if not self.has_content() or not self.view.width:
             return
         self.number += 1
+        mark = (self.mark_id, self.mark)
         if self.svg and self.outlines:
-            kind, content = "outlines", (self.svg, self.show_nodes())
+            kind, content = "outlines", (self.svg, self.show_nodes()) + mark
         else:
-            kind, content = ("svg", self.svg) if self.svg else ("picture", self.picture)
+            kind, content = ("svg", (self.svg, False) + mark) if self.svg else ("picture", self.picture)
         self.thread.request(self.number, kind, self.content_id, content, self._key(),
                             self.view.target(self.size()), self.size(), self.devicePixelRatioF())
 
@@ -645,6 +736,14 @@ class Canvas(QWidget):
             else:
                 p.drawPolyline(self.stroke)
             p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+        if self.erase_mode and self.mouse is not None and self.has_content():
+            # the eraser: a circle as big as what it wipes out (light and dark, seen on anything)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            for color, width in ((QColor(255, 255, 255, 220), 3), (QColor(0, 0, 0, 220), 1)):
+                p.setPen(QPen(color, width))
+                p.drawEllipse(self.mouse, self.eraser, self.eraser)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         if self.message:
             p.setPen(self.palette().color(QPalette.ColorRole.Text))
             p.drawText(self.rect().adjusted(20, 20, -20, -20), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap,
@@ -653,10 +752,27 @@ class Canvas(QWidget):
         p.drawText(8, 18, self.title)
         p.end()
 
+    WHEEL_STEP = 80  # screen pixels moved for one notch of the wheel
+
     def wheelEvent(self, e):
-        steps = e.angleDelta().y() / 120.0
-        if steps:
-            self.view.zoom(1.25 ** steps, e.position(), self.size())
+        # The wheel moves the picture (Shift: sideways) and Ctrl+wheel zooms, as in Inkscape,
+        # browsers and office programs: the wheel used to zoom, and a turn of it meant for the
+        # settings panel beside zoomed the picture instead (the owner).
+        d = e.angleDelta()
+        if e.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            steps = (d.y() or d.x()) / 120.0
+            if steps:
+                self.view.zoom(1.25 ** steps, e.position(), self.size())
+            return
+        px = e.pixelDelta()
+        if not px.isNull():      # (a touchpad: the distance it says)
+            dx, dy = float(px.x()), float(px.y())
+        else:
+            dx, dy = d.x() / 120.0 * self.WHEEL_STEP, d.y() / 120.0 * self.WHEEL_STEP
+        if e.modifiers() & Qt.KeyboardModifier.ShiftModifier and not dx:
+            dx, dy = dy, 0.0
+        if (dx or dy) and self.has_content():
+            self.view.move(dx, dy)
 
     def set_erase_mode(self, on):
         self.erase_mode = on
@@ -664,9 +780,7 @@ class Canvas(QWidget):
         if on:
             self.crop_mode = False
             self.band = None
-            self.setCursor(Qt.CursorShape.CrossCursor)
-        else:
-            self.unsetCursor()
+        self._cursor()
         self.update()
 
     def set_crop_mode(self, on):
@@ -675,10 +789,7 @@ class Canvas(QWidget):
             self.stroke = None
         self.crop_mode = on
         self.band = None
-        if on:
-            self.setCursor(Qt.CursorShape.CrossCursor)
-        else:
-            self.unsetCursor()
+        self._cursor()
         self.update()
 
     def to_picture(self, point):
@@ -701,6 +812,11 @@ class Canvas(QWidget):
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
 
     def mouseMoveEvent(self, e):
+        if self.erase_mode:
+            self.mouse = e.position()
+            self.update()
+        if not e.buttons() and self.has_content():
+            self.hovered.emit(self.to_picture(e.position()))
         if self.stroke is not None:
             self.stroke.append(e.position())
             self.update()
@@ -735,10 +851,17 @@ class Canvas(QWidget):
             self.cropped.emit(QRectF(a, b).normalized() if moved >= 4 else QRectF())
             return
         self.drag = None
-        if self.crop_mode:
-            self.setCursor(Qt.CursorShape.CrossCursor)
-        else:
-            self.unsetCursor()
+        self._cursor()
+
+    def leaveEvent(self, e):
+        self.mouse = None
+        self.hovered.emit(None)
+        self.update()
+        super().leaveEvent(e)
+
+    def contextMenuEvent(self, e):
+        if self.has_content():
+            self.menu_requested.emit(self.to_picture(QPointF(e.pos())), e.globalPos())
 
     def resizeEvent(self, e):
         if self.view.fitted:
@@ -1026,6 +1149,10 @@ class Settings(QScrollArea):
         # (what's in it needs more once a picture is traced, e.g. the swatches: worked out again
         # whenever its layout changes, and only ever wider, so it doesn't move back and forth)
         box.installEventFilter(self)
+        # number boxes and lists change with the wheel only once clicked into (see eventFilter)
+        for w in box.findChildren(QAbstractSpinBox) + box.findChildren(QComboBox):
+            w.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            w.installEventFilter(self)
         self._fit_contents()
 
     def _fit_contents(self):
@@ -1038,6 +1165,13 @@ class Settings(QScrollArea):
     def eventFilter(self, obj, event):
         if obj is self.widget() and event.type() == QEvent.Type.LayoutRequest:
             self._fit_contents()
+        elif event.type() == QEvent.Type.Wheel and isinstance(obj, (QAbstractSpinBox, QComboBox)) \
+                and not obj.hasFocus():
+            # A number box or a list the mouse happens to be over, not clicked into: the wheel
+            # scrolls the panel, it doesn't change the setting (the owner: scrolling down the
+            # panel changed Colors, Speckles... on the way)
+            QApplication.sendEvent(self.verticalScrollBar(), event)
+            return True
         return super().eventFilter(obj, event)
 
     def current_mode(self):
@@ -1322,14 +1456,25 @@ class MainWindow(QMainWindow):
         self.left.erased.connect(self.on_erased)
         self.right = Canvas(self.view, tr("SVG"))
         self.right.clicked.connect(self.on_picture_clicked)    # (the SVG: the same place in the picture)
+        for side in (self.left, self.right):
+            side.hovered.connect(self.on_hover)
+            side.menu_requested.connect(self.on_picture_menu)
+        self.hover_text = None  # what the status bar said before the mouse came over a color
         self.left.set_message(tr("Open a picture (Ctrl+O), drag one here, or paste one (Ctrl+V)."))
         split = QSplitter()
         split.addWidget(self.left)
         split.addWidget(self.right)
         split.setChildrenCollapsible(False)
         self.settings = Settings()
+        self.tool_bar = self._make_tool_bar()
+        sides = QWidget()
+        lay = QVBoxLayout(sides)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+        lay.addWidget(self.tool_bar)
+        lay.addWidget(split, 1)
         outer = QSplitter()
-        outer.addWidget(split)
+        outer.addWidget(sides)
         outer.addWidget(self.settings)
         outer.setStretchFactor(0, 1)
         outer.setStretchFactor(1, 0)
@@ -1348,6 +1493,8 @@ class MainWindow(QMainWindow):
         self.settings.size_changed.connect(self._show_saved_size)
         self.settings.auto.clicked.connect(self.auto_settings)
         self.settings.load(self.qs)
+        self.settings.colors.selection_changed.connect(self._selection_changed)
+        self.settings.colors.menu_requested.connect(self._color_menu)
 
         self._make_menus()
         self.setAcceptDrops(True)
@@ -1375,15 +1522,22 @@ class MainWindow(QMainWindow):
     def _make_menus(self):
         mb = self.menuBar()
         m = mb.addMenu(tr("&File"))
-        self._action(m, tr("Open picture..."), self.open_dialog, QKeySequence.StandardKey.Open)
+        self.a_open = self._action(m, tr("Open picture..."), self.open_dialog, QKeySequence.StandardKey.Open)
         self.m_recent = m.addMenu(tr("Open recent"))
         self.m_recent.aboutToShow.connect(self._fill_recent)
         self._fill_recent()
-        self._action(m, tr("Convert many pictures..."), lambda: self.convert_many(), "Ctrl+Shift+O")
+        self.a_many = self._action(m, tr("Convert many pictures..."), lambda: self.convert_many(), "Ctrl+Shift+O")
         self.a_paste = self._action(m, tr("Paste picture"), self.paste, QKeySequence.StandardKey.Paste)
         m.addSeparator()
         self.a_save = self._action(m, tr("Save..."), self.save, QKeySequence.StandardKey.Save)
-        self.a_save_as = self._action(m, tr("Save as..."), self.save_as, "Ctrl+Shift+S")
+        # one command for each kind of file (the owner: picking the kind in the file dialog's
+        # list was easy to miss)
+        self.a_save_svg = self._action(m, tr("Save as SVG..."), lambda: self.save_as("svg"), "Ctrl+Shift+S")
+        self.a_save_pdf = self._action(m, tr("Save as PDF..."), lambda: self.save_as("pdf"))
+        self.a_save_eps = self._action(m, tr("Save as EPS..."), lambda: self.save_as("eps"))
+        self.a_save_dxf = self._action(m, tr("Save as DXF..."), lambda: self.save_as("dxf"))
+        self.a_save_dxf.setToolTip(tr("For CAD, laser and cutting programs: a layer for each color"))
+        self.save_actions = [self.a_save_svg, self.a_save_pdf, self.a_save_eps, self.a_save_dxf]
         self.a_copy = self._action(m, tr("Copy SVG"), self.copy_svg, "Ctrl+Shift+C")
         m.addSeparator()
         self._action(m, tr("Quit"), self.close, QKeySequence.StandardKey.Quit)
@@ -1399,11 +1553,13 @@ class MainWindow(QMainWindow):
             self.a_outlines.setChecked(True)
             self.right.set_outlines(True)
         m.addSeparator()
-        self._action(m, tr("Zoom in"), lambda: self.view.zoom(1.25), QKeySequence.StandardKey.ZoomIn)
-        self._action(m, tr("Zoom out"), lambda: self.view.zoom(0.8), QKeySequence.StandardKey.ZoomOut)
-        self._action(m, tr("Zoom to fit"), lambda: self.view.fit(self.left.size()), "Ctrl+0")
-        self._action(m, tr("Actual size"), self.actual_size, "Ctrl+1")
+        self.a_zoom_in = self._action(m, tr("Zoom in"), lambda: self.view.zoom(1.25), QKeySequence.StandardKey.ZoomIn)
+        self.a_zoom_out = self._action(m, tr("Zoom out"), lambda: self.view.zoom(0.8), QKeySequence.StandardKey.ZoomOut)
+        self.a_fit = self._action(m, tr("Zoom to fit"), lambda: self.view.fit(self.left.size()), "Ctrl+0")
+        self.a_actual = self._action(m, tr("Actual size"), self.actual_size, "Ctrl+1")
         m.addSeparator()
+        self.a_collapse = self._action(m, tr("Collapse the ribbon"), lambda on: self.ribbon.set_collapsed(on),
+                                       "Ctrl+F1", True)
         lang_menu = m.addMenu(tr("Language"))
         from PySide6.QtGui import QActionGroup
         group = QActionGroup(self)
@@ -1420,34 +1576,166 @@ class MainWindow(QMainWindow):
         m = mb.addMenu(tr("&Trace"))
         self.a_auto = self._action(m, tr("Update automatically"), self.auto_changed, None, True)
         self.a_auto.setChecked(bool(int(self.qs.value("trace/auto", 1))))
-        self._action(m, tr("Update now"), lambda: self.start_trace(), "F5")
+        self.a_update = self._action(m, tr("Update now"), lambda: self.start_trace(), "F5")
         m.addSeparator()
-        self._action(m, tr("Auto settings"), self.auto_settings, "Ctrl+Shift+A")
+        self.a_auto_settings = self._action(m, tr("Auto settings"), self.auto_settings, "Ctrl+Shift+A")
         self.a_auto_new = self._action(m, tr("Auto settings for new pictures"), self.auto_new_changed, None, True)
         self.a_auto_new.setChecked(bool(int(self.qs.value("trace/auto_new", 1))))
-        self._action(m, tr("Reset settings"), self.settings.reset_all)
+        self.a_reset = self._action(m, tr("Reset settings"), self.settings.reset_all)
         m.addSeparator()
-        self.a_crop = self._action(m, tr("Crop picture"), self.start_crop, "Ctrl+R")
+        # the tools: what a click or a drag on the picture does (one at a time)
+        self.a_select = self._action(m, tr("Select colors"), lambda _on=False: self.set_tool("select"), None, True)
+        self.a_select.setToolTip(tr("Click a color on the picture or the SVG to select it (Ctrl+click: more), "
+                                    "then change, merge or leave it out"))
+        self.a_crop = self._action(m, tr("Crop picture"), lambda on: self.set_tool("crop" if on else "select"),
+                                   "Ctrl+R", True)
+        self.a_crop.setToolTip(tr("Drag across the part of the picture to trace"))
         self.a_uncrop = self._action(m, tr("Remove crop"), self.remove_crop, "Ctrl+Shift+R")
-        m.addSeparator()
-        self.a_erase = self._action(m, tr("Erase on the picture"), lambda on: self.start_erasing(on), "Ctrl+E", True)
-        self._action(m, tr("Smaller eraser"), lambda: self.eraser_size(1 / 1.5), "[")
-        self._action(m, tr("Bigger eraser"), lambda: self.eraser_size(1.5), "]")
+        self.a_erase = self._action(m, tr("Erase on the picture"),
+                                    lambda on: self.set_tool("erase" if on else "select"), "Ctrl+E", True)
+        self.a_erase.setToolTip(tr("Drag on the picture to wipe out what shouldn't be traced"))
+        self.a_smaller = self._action(m, tr("Smaller eraser"), lambda: self.eraser_size(1 / 1.5), "[")
+        self.a_bigger = self._action(m, tr("Bigger eraser"), lambda: self.eraser_size(1.5), "]")
         self.a_unerase = self._action(m, tr("Restore the picture"), self.restore_picture, "Ctrl+Shift+E")
 
-        m = mb.addMenu(tr("&Help"))
-        self._action(m, tr("How to use KanzonasSVG"), self.show_help, QKeySequence.StandardKey.HelpContents)
+        # the color edits (the Colors box's buttons, and a right-click on the picture, the SVG
+        # or a swatch)
+        m = mb.addMenu(tr("&Colors"))
+        colors = self.settings.colors
+        self.a_change = self._action(m, tr("Change color..."), lambda: colors.change_color())
+        self.a_change.setToolTip(colors.b_change.toolTip())
+        self.a_merge = self._action(m, tr("Merge colors..."), lambda: colors.merge(where=self._menu_at()))
+        self.a_merge.setToolTip(colors.b_merge.toolTip())
+        self.a_leave_out = self._action(m, tr("Leave out"), colors.leave_out, "Delete")
+        self.a_leave_out.setToolTip(colors.b_out.toolTip())
+        self.a_reset_colors = self._action(m, tr("Reset colors"), colors.reset)
+        self.a_reset_colors.setToolTip(colors.b_reset.toolTip())
         m.addSeparator()
-        self._action(m, tr("Check for updates..."), self.check_updates)
+        self.a_select_none = self._action(m, tr("Select no color"), colors.select_none)
+        self.color_actions = [self.a_change, self.a_merge, self.a_leave_out, self.a_reset_colors]
+
+        m = mb.addMenu(tr("&Help"))
+        self.a_help = self._action(m, tr("How to use KanzonasSVG"), self.show_help, QKeySequence.StandardKey.HelpContents)
+        m.addSeparator()
+        self.a_check = self._action(m, tr("Check for updates..."), self.check_updates)
         self.a_auto_updates = self._action(m, tr("Check for updates automatically"), self.auto_updates_changed, None, True)
         self.a_auto_updates.setChecked(self.updater().enabled())
         m.addSeparator()
-        self._action(m, tr("About KanzonasSVG"), self.about)
+        self.a_about = self._action(m, tr("About KanzonasSVG"), self.about)
+        self._make_ribbon()
+        self.set_tool("select")
+
+    def _menu_at(self):
+        """Where a menu opened by a command goes: under the mouse."""
+        from PySide6.QtGui import QCursor
+        return QCursor.pos()
+
+    # the ribbon (built from the menus' commands: their names, shortcuts, checks and grayed
+    # states stay the same in both)
+
+    ICONS = {
+        "a_open": "folder-open-outline", "a_paste": "content-paste", "a_many": "image-multiple-outline",
+        "a_save": "content-save-outline", "a_save_svg": "vector-curve", "a_save_pdf": "file-pdf-box",
+        "a_save_eps": "file-export-outline", "a_save_dxf": "vector-polyline", "a_copy": "content-copy",
+        "a_undo": "undo", "a_redo": "redo", "a_auto_settings": "auto-fix", "a_update": "refresh",
+        "a_auto": "sync", "a_auto_new": "image-filter-center-focus", "a_reset": "backup-restore",
+        "a_select": "cursor-default-click-outline", "a_crop": "crop", "a_uncrop": "crop-free",
+        "a_erase": "eraser", "a_smaller": "minus-circle-outline", "a_bigger": "plus-circle-outline",
+        "a_unerase": "restore", "a_change": "format-color-fill", "a_merge": "merge",
+        "a_leave_out": "eye-off-outline", "a_reset_colors": "palette-outline", "a_select_none": "selection-off",
+        "a_colors": "palette-outline", "a_outlines": "vector-square", "a_zoom_in": "magnify-plus-outline",
+        "a_zoom_out": "magnify-minus-outline", "a_fit": "fit-to-screen-outline", "a_actual": "numeric-1-box-outline",
+        "a_help": "help-circle-outline", "a_check": "update", "a_about": "information-outline",
+    }
+
+    # the ribbon's shorter names (the menus keep the full ones)
+    def _ribbon_names(self):
+        return {
+            "a_open": tr("Open"), "a_paste": tr("Paste"), "a_many": tr("Convert many"), "a_save": tr("Save"),
+            "a_save_svg": tr("Save as SVG"), "a_save_pdf": tr("Save as PDF"), "a_save_eps": tr("Save as EPS"),
+            "a_save_dxf": tr("Save as DXF"), "a_copy": tr("Copy SVG"), "a_auto_settings": tr("Auto settings"),
+            "a_update": tr("Update now"), "a_auto": tr("Update automatically"), "a_auto_new": tr("Auto for new pictures"),
+            "a_reset": tr("Reset settings"), "a_select": tr("Select colors"), "a_crop": tr("Crop"),
+            "a_uncrop": tr("Remove crop"), "a_erase": tr("Erase"), "a_smaller": tr("Smaller"), "a_bigger": tr("Bigger"),
+            "a_unerase": tr("Restore the picture"), "a_change": tr("Change color"), "a_merge": tr("Merge"),
+            "a_leave_out": tr("Leave out"), "a_reset_colors": tr("Reset colors"), "a_select_none": tr("Select none"),
+            "a_colors": tr("Colors to trace"), "a_outlines": tr("Outlines"), "a_zoom_in": tr("Zoom in"),
+            "a_zoom_out": tr("Zoom out"), "a_fit": tr("Fit"), "a_actual": tr("Actual size"), "a_help": tr("Help"),
+            "a_check": tr("Check for updates"), "a_about": tr("About"),
+        }
+
+    def _make_ribbon(self):
+        from PySide6.QtWidgets import QToolBar, QToolButton
+        from kanzonassvg import icons
+        from kanzonassvg.ribbon import Ribbon, Stack, split_button, ROWS, SMALL_HEIGHT, LARGE_ICON
+        names = self._ribbon_names()
+        for attr, name in self.ICONS.items():
+            a = getattr(self, attr)
+            a.setIcon(icons.icon(name))
+            a.setIconText(names.get(attr, a.text()))
+            a.setIconVisibleInMenu(False)
+        # Open, with the pictures opened last under its arrow
+        self.b_open = QToolButton()
+        self.b_open.setDefaultAction(self.a_open)
+        self.b_open.setMenu(self.m_recent)
+        self.b_open.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+        self.b_open.setAutoRaise(True)
+        self.b_open.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        self.b_open.setIconSize(QSize(LARGE_ICON, LARGE_ICON))
+        self.b_open.setFixedHeight(ROWS * SMALL_HEIGHT)
+        self.b_open.setToolTip(tr("Open a picture (the arrow: the pictures opened last)"))
+        save_as = split_button(self.save_actions, large=True)
+        r = self.ribbon = Ribbon()
+        r.add_tab(tr("Home"), [
+            (tr("File"), "large", [self.b_open, Stack([self.a_paste, self.a_many])]),
+            (tr("Save"), "large", [self.a_save, save_as, Stack([self.a_copy])]),
+            (tr("Edit"), "small", [self.a_undo, self.a_redo]),
+            (tr("Trace"), "large", [self.a_auto_settings, Stack([self.a_update, self.a_auto]),
+                                    Stack([self.a_auto_new, self.a_reset])]),
+            (tr("Tools"), "large", [self.a_select, self.a_crop, self.a_erase]),
+        ])
+        r.add_tab(tr("Picture"), [
+            (tr("Tools"), "large", [self.a_select, self.a_crop, self.a_erase]),
+            (tr("Colors"), "large", [self.a_change, self.a_merge, self.a_leave_out,
+                                     Stack([self.a_reset_colors, self.a_select_none])]),
+            (tr("Crop"), "small", [self.a_uncrop]),
+            (tr("Eraser"), "small", [self.a_smaller, self.a_bigger, self.a_unerase]),
+        ])
+        r.add_tab(tr("View"), [
+            (tr("Zoom"), "small", [self.a_zoom_in, self.a_zoom_out, self.a_fit, self.a_actual]),
+            (tr("Show"), "small", [self.a_colors, self.a_outlines]),
+            (tr("Help"), "large", [self.a_help, Stack([self.a_check, self.a_about])]),
+        ])
+        r.set_group_names(True)
+        bar = self.ribbon_bar = QToolBar(tr("Ribbon"))
+        bar.setObjectName("ribbon")
+        bar.setMovable(False)
+        bar.toggleViewAction().setVisible(False)
+        bar.layout().setContentsMargins(0, 0, 0, 0)
+        bar.addWidget(r)
+        self.addToolBar(bar)
+        tab = self.qs.value("view/ribbon_tab", 0)
+        try:
+            r.setCurrentIndex(max(0, min(int(tab), r.count() - 1)))
+        except (TypeError, ValueError):
+            pass
+        r.currentChanged.connect(lambda i: self.qs.setValue("view/ribbon_tab", i))
+        r.collapsedChanged.connect(self._ribbon_collapsed)
+        if int(self.qs.value("view/ribbon_collapsed", 0) or 0):
+            self.a_collapse.setChecked(True)
+
+    def _ribbon_collapsed(self, on):
+        self.qs.setValue("view/ribbon_collapsed", int(on))
+        if self.a_collapse.isChecked() != on:
+            self.a_collapse.blockSignals(True)
+            self.a_collapse.setChecked(on)
+            self.a_collapse.blockSignals(False)
 
     def _update_actions(self):
         has = self.result is not None
         self.a_save.setEnabled(has)
-        self.a_save_as.setEnabled(has)
+        for a in self.save_actions:
+            a.setEnabled(has)
         self.a_copy.setEnabled(has)
         self.a_crop.setEnabled(self.img is not None)
         self.a_undo.setEnabled(self.history_at > 0)
@@ -1590,8 +1878,8 @@ class MainWindow(QMainWindow):
         self.settings.colors.clear()    # (color edits are for the picture they were made on)
         self.source_path = path
         self.save_path = None
-        self.cancel_crop()
         self._show_picture(img)
+        self.set_tool("select")     # (a new picture: clicks select colors again)
 
     def _show_picture(self, img, auto=None):
         """Trace img (the picture, or the part of it cropped to) as a new picture (auto: run Auto
@@ -1688,32 +1976,223 @@ class MainWindow(QMainWindow):
 
     # cropping
 
-    def start_crop(self):
-        if self.img is None:
+    # the tools: what a click or a drag on the picture does. One at a time: Select colors (a click
+    # selects the color there; a drag moves the picture), Crop picture, Erase on the picture. The
+    # bar above the two sides says what the one on does, with its controls (the owner: the tools
+    # weren't clear: nothing said which one was on or how it worked).
+
+    def set_tool(self, name):
+        if self.img is None and name != "select":
+            name = "select"
+        self.tool = name
+        for a, n in ((self.a_select, "select"), (self.a_crop, "crop"), (self.a_erase, "erase")):
+            a.blockSignals(True)
+            a.setChecked(n == name)
+            a.blockSignals(False)
+        self.left.set_crop_mode(name == "crop")
+        self.left.set_erase_mode(name == "erase")
+        if name == "erase":
+            self.eraser_slider.blockSignals(True)
+            self.eraser_slider.setValue(2 * self.left.eraser)
+            self.eraser_slider.blockSignals(False)
+        self._update_tool_bar()
+
+    def _make_tool_bar(self):
+        from PySide6.QtWidgets import QFrame, QHBoxLayout, QSlider, QToolButton
+        bar = QFrame()
+        bar.setObjectName("toolHint")
+        bar.setFrameShape(QFrame.Shape.StyledPanel)
+        bar.setAutoFillBackground(True)
+        pal = bar.palette()
+        pal.setColor(QPalette.ColorRole.Window, pal.color(QPalette.ColorRole.AlternateBase))
+        bar.setPalette(pal)
+        row = QHBoxLayout(bar)
+        row.setContentsMargins(8, 3, 8, 3)
+        self.tool_label = QLabel()
+        self.tool_label.setWordWrap(True)
+        self.tool_label.setTextFormat(Qt.TextFormat.RichText)
+        # (two lines, always: a label that wraps in a row is given the height of one, and cut)
+        self.tool_label.setFixedHeight(2 * self.tool_label.fontMetrics().lineSpacing() + 4)
+        row.addWidget(self.tool_label, 1)
+
+        def button(action=None, text=None, slot=None):
+            b = QToolButton()
+            if action is not None:
+                b.setDefaultAction(action)
+            else:
+                b.setText(text)
+                b.clicked.connect(slot)
+            b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+            b.setAutoRaise(False)
+            row.addWidget(b)
+            return b
+
+        # (filled in by _make_ribbon's actions once they exist: see _fill_tool_bar)
+        self.tool_row = row
+        self.tool_button = button
+        self.eraser_size_label = QLabel(tr("Size"))
+        row.addWidget(self.eraser_size_label)
+        self.eraser_slider = QSlider(Qt.Orientation.Horizontal)
+        self.eraser_slider.setRange(4, 400)
+        self.eraser_slider.setFixedWidth(140)
+        self.eraser_slider.setToolTip(tr("The eraser's size, in pixels on the screen ([ smaller, ] bigger)"))
+        self.eraser_slider.valueChanged.connect(self._eraser_slider_moved)
+        row.addWidget(self.eraser_slider)
+        return bar
+
+    def _fill_tool_bar(self):
+        b = self.tool_button
+        self.tb_select = [b(self.a_change), b(self.a_merge), b(self.a_leave_out)]
+        self.tb_erase = [self.eraser_size_label, self.eraser_slider, b(self.a_unerase)]
+        self.tb_done = b(text=tr("Done"), slot=lambda: self.set_tool("select"))
+        self.tb_done.setToolTip(tr("Back to selecting colors (Esc)"))
+
+    def _update_tool_bar(self):
+        if not hasattr(self, "tb_select"):
+            self._fill_tool_bar()
+        tool = getattr(self, "tool", "select")
+        colors = self.settings.colors
+        has_colors = colors.isVisible() or (self.img is not None and self.settings.current_mode() in tracing.COLOR_MODES)
+        for w in self.tb_select:
+            w.setVisible(tool == "select" and has_colors and self.img is not None)
+        for w in self.tb_erase:
+            w.setVisible(tool == "erase")
+        self.tb_done.setVisible(tool != "select")
+        self.tb_done.setText(tr("Cancel") if tool == "crop" else tr("Done"))
+        if tool == "crop":
+            text = tr("<b>Crop picture</b>: drag across the part of the picture to trace (on the left). Esc cancels.")
+        elif tool == "erase":
+            text = tr("<b>Erase on the picture</b>: drag on the picture (on the left) to wipe out what shouldn't "
+                      "be traced. The circle shows the eraser. Undo takes a stroke back; the file never changes.")
+        elif self.img is None:
+            text = tr("Open a picture (Ctrl+O), drag one here, or paste one (Ctrl+V).")
+        elif not has_colors:
+            text = tr("<b>Select colors</b>: this mode traces one color, so there are no colors to select. "
+                      "Drag to move the picture; Ctrl+wheel zooms.")
+        else:
+            picked = colors._selected_groups()
+            if not picked:
+                text = tr("<b>Select colors</b>: click a color on the picture or the SVG to select it (Ctrl+click "
+                          "selects more), then change it, merge it or leave it out. Right-click for the same.")
+            elif len(picked) == 1:
+                g = picked[0]
+                share = 100.0 * g.count / max(1, colors.total())
+                text = tr("<b>%s</b> selected (%.1f%% of the picture), marked on the SVG. Ctrl+click another "
+                          "color to merge them; Esc selects none.") % (colorbox(g.color) + " #%02x%02x%02x" % g.color, share)
+            else:
+                text = tr("<b>%d colors</b> selected, marked on the SVG. Merge them into one, change them, or "
+                          "leave them out; Esc selects none.") % len(picked)
+        self.tool_label.setText(text)
+
+    def _eraser_slider_moved(self, value):
+        self.left.eraser = max(2, min(200, value // 2))
+        self.left.update()
+
+    def _selection_changed(self):
+        colors = self.settings.colors
+        change, merge, out, put_back, reset = colors.can()
+        self.a_change.setEnabled(change)
+        self.a_merge.setEnabled(merge)
+        self.a_leave_out.setEnabled(out)
+        self.a_leave_out.setText(tr("Put back") if put_back else tr("Leave out"))
+        self.a_leave_out.setIconText(self.a_leave_out.text())
+        self.a_reset_colors.setEnabled(reset)
+        self.a_select_none.setEnabled(bool(colors.selected))
+        self._update_mark()
+        self._update_tool_bar()
+
+    def _update_mark(self):
+        """The selected colors marked on the SVG (the rest faded)."""
+        chosen = self.settings.colors.selected_colors() if self.settings.colors.isVisible() else []
+        if self.result is None or not chosen or not self.settings.colors.selected:
+            self.right.set_mark(None)
             return
-        self.a_erase.setChecked(False)
-        self.left.set_crop_mode(True)
-        self.status.setText(tr("Drag across the picture on the left to crop it (Esc: cancel)."))
+        self.right.set_mark(chosen)
+
+    def _color_at(self, point):
+        """The Colors box's swatch for the picture's pixel at point, or None."""
+        colors = self.settings.colors
+        if self.img is None or not colors.isVisible() or not colors.palette:
+            return None
+        x, y = int(point.x()), int(point.y())
+        if not (0 <= x < self.img.width() and 0 <= y < self.img.height()):
+            return None
+        c = self.img.pixelColor(x, y)
+        if c.alpha() < 128:
+            c = QColor(255, 255, 255)   # (transparent parts are traced as white)
+        in_bg = self.result is not None and self.result.in_background(x, y)
+        return colors.group_at((c.red(), c.green(), c.blue()), in_bg)
+
+    def on_hover(self, point):
+        """The mouse over the picture or the SVG (Select colors): say what a click there selects."""
+        pointing = getattr(self, "tool", "select") == "select" and self.settings.colors.isVisible() \
+            and bool(self.settings.colors.palette)
+        self.left.set_pointing(pointing)
+        self.right.set_pointing(pointing)
+        g = self._color_at(point) if (point is not None and pointing) else None
+        if g is None:
+            if self.hover_text is not None:
+                self.status.setText(self.hover_text)
+                self.hover_text = None
+            return
+        if self.hover_text is None:
+            self.hover_text = self.status.text()
+        colors = self.settings.colors
+        how = tr("left out") if g.left_out else tr("%.1f%% of the picture") % (100.0 * g.count / max(1, colors.total()))
+        what = tr("the background, #%02x%02x%02x") % g.color if g.background else "#%02x%02x%02x" % g.color
+        self.status.setText(tr("Click: select %s (%s). Ctrl+click: add it. Right-click: the color commands.") % (what, how))
+
+    def on_picture_menu(self, point, where):
+        """A right-click on the picture or the SVG: the color there selected (if it wasn't), and
+        the color commands."""
+        g = self._color_at(point)
+        if g is not None and not set(g.members) & self.settings.colors.selected:
+            self.settings.colors.click_group(g)
+        self._color_menu(where)
+
+    def _color_menu(self, where):
+        menu = QMenu(self)
+        if self.settings.colors.isVisible() and self.settings.colors.palette:
+            menu.addActions(self.color_actions)
+            menu.addAction(self.a_select_none)
+            menu.addSeparator()
+        menu.addActions([self.a_crop, self.a_erase])
+        if self.crop is not None:
+            menu.addAction(self.a_uncrop)
+        if self.erased:
+            menu.addAction(self.a_unerase)
+        self.open_menu(menu, where)
+
+    def open_menu(self, menu, where):
+        """Show a right-click menu (a test answers it instead)."""
+        self.menu_shown = menu
+        menu.exec(where)
+
+    def start_crop(self):
+        self.set_tool("crop")
+        if self.tool == "crop":
+            self.status.setText(tr("Drag across the picture on the left to crop it (Esc: cancel)."))
 
     def cancel_crop(self):
         if self.left.crop_mode:
-            self.left.set_crop_mode(False)
+            self.set_tool("select")
             return True
         return False
 
     def keyPressEvent(self, e):
-        if e.key() == Qt.Key.Key_Escape and self.cancel_crop():
-            self.status.setText("")
-            return
-        if e.key() == Qt.Key.Key_Escape and self.left.erase_mode:
-            self.start_erasing(False)
-            self.status.setText("")
-            return
+        if e.key() == Qt.Key.Key_Escape:
+            if getattr(self, "tool", "select") != "select":
+                self.set_tool("select")
+                self.status.setText("")
+                return
+            if self.settings.colors.selected:
+                self.settings.colors.select_none()
+                return
         super().keyPressEvent(e)
 
     def on_cropped(self, rect):
         """The rectangle dragged (picture pixels of what's shown): trace only that part."""
-        self.left.set_crop_mode(False)
+        self.set_tool("select")
         if self.img is None:
             return
         r = rect.toAlignedRect().intersected(QRect(0, 0, self.img.width(), self.img.height()))
@@ -1753,19 +2232,14 @@ class MainWindow(QMainWindow):
         self.start_trace(auto=False)
 
     def start_erasing(self, on=True):
-        if self.img is None:
-            on = False
-        self.a_erase.setChecked(on)
-        self.left.set_erase_mode(on)
-        if on:
-            self.cancel_crop()
-            self.status.setText(tr("Drag across the picture on the left to erase (the eraser: [ smaller, ] bigger, "
-                                "%d pixels across on the screen). Esc or Ctrl+E: stop erasing.") % (2 * self.left.eraser))
+        self.set_tool("erase" if on else "select")
 
     def eraser_size(self, factor):
         self.left.eraser = max(2, min(200, round(self.left.eraser * factor)))
-        if self.left.erase_mode:
-            self.start_erasing(True)
+        self.eraser_slider.blockSignals(True)
+        self.eraser_slider.setValue(2 * self.left.eraser)
+        self.eraser_slider.blockSignals(False)
+        self.left.update()
 
     def on_erased(self, radius, points):
         """A stroke dragged on the picture shown: erase it (in the opened picture's pixels)."""
@@ -1805,6 +2279,7 @@ class MainWindow(QMainWindow):
 
     def settings_changed(self):
         self.settings.save(self.qs)
+        self._update_tool_bar()
         if self.a_auto.isChecked():
             self.timer.start()
 
@@ -1906,7 +2381,10 @@ class MainWindow(QMainWindow):
         if self.job.auto_info is not None:
             text = describe_auto(self.job.options, self.job.auto_info) + ". " + text[0].upper() + text[1:]
         self.status.setText(text)
+        self.hover_text = None
         self._update_actions()
+        self._update_mark()
+        self._update_tool_bar()
 
     def on_failed(self, number, message):
         if number != self.job_number or not message:
@@ -1984,22 +2462,27 @@ class MainWindow(QMainWindow):
             return self.write(self.save_path)
         return self.save_as()
 
-    def save_as(self):
+    def save_as(self, fmt=None):
+        """File > Save as SVG/PDF/EPS/DXF...: the file dialog for that kind of file (fmt; None:
+        the kind saved last)."""
         if self.result is None:
             return False
-        start = self.save_path or self.default_name()
-        fmt = export.format_of(start)
-        filters = [export.filter_text(f) for f in export.FORMATS]
-        path, chosen = QFileDialog.getSaveFileName(self, tr("Save as"), start, ";;".join(filters),
-                                                   export.filter_text(fmt))
+        if fmt not in export.FORMATS:
+            last = self.qs.value("paths/format", "svg")
+            fmt = last if last in export.FORMATS else "svg"
+        start = os.path.splitext(self.save_path or self.default_name())[0] + "." + fmt
+        path = self.ask_save_path(start, fmt)
         if not path:
             return False
-        ext = os.path.splitext(path)[1].lower().lstrip(".")
-        if ext not in export.FORMATS:
-            # no type typed: the one chosen in the dialog's list
-            picked = [f for f in export.FORMATS if export.filter_text(f) == chosen]
-            path += "." + (picked[0] if picked else "svg")
+        if os.path.splitext(path)[1].lower().lstrip(".") != fmt:
+            path += "." + fmt
         return self.write(path)
+
+    def ask_save_path(self, start, fmt):
+        """The file dialog (a test answers it instead)."""
+        path, _chosen = QFileDialog.getSaveFileName(self, tr("Save as %s") % fmt.upper(), start,
+                                                    export.filter_text(fmt))
+        return path
 
     def write(self, path):
         """Save the trace to path, in the format its extension names (SVG, PDF, EPS or DXF) at
