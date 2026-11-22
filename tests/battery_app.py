@@ -28,6 +28,7 @@ import traceback
 import zlib
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ["KANZONASSVG_LANG"] = "en"   # (in English, whatever this computer's language)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PySide6.QtCore import QPointF, QRectF, QSettings, Qt  # noqa: E402
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     APP.setOrganizationName("Kanzonas")
     APP.setApplicationName("KanzonasSVG-battery")
 
-from kanzonassvg import app, cli, engine, export, image, tracing  # noqa: E402
+from kanzonassvg import app, batch, cli, engine, export, image, tracing  # noqa: E402
 
 ERRORS = []
 
@@ -337,7 +338,7 @@ def check_window(steps, seed, fails):
             action = rng.choice(["open", "open", "paste", "setting", "setting", "setting", "setting", "auto",
                                  "update", "colors", "zoom", "move", "fit", "save", "copy", "reopen", "auto_new",
                                  "events", "new_version", "crop", "uncrop", "colors", "colors", "pick", "undo", "undo", "redo",
-                                 "save", "saved_width"])
+                                 "save", "saved_width", "many", "erase", "erase", "outlines", "recent"])
             try:
                 if action == "open":
                     w.open_path(rng.choice(pics))
@@ -374,6 +375,51 @@ def check_window(steps, seed, fails):
                                              % (seed, step, fmt, size))
                         if w.savers:
                             fails.append("window seed %d step %d: a save never finished" % (seed, step))
+                elif action == "many":
+                    # Convert many pictures: a few of the pictures, any settings, format and place
+                    d = w.convert_many()
+                    d.clear()
+                    chosen = rng.sample(pics, rng.randrange(1, 4))
+                    d.add_files(chosen)
+                    (d.r_auto if rng.random() < 0.5 else d.r_shown).setChecked(True)
+                    d.format.setCurrentIndex(rng.randrange(d.format.count()))
+                    d.where.setCurrentIndex(1)
+                    out = os.path.join(folder, "many%d" % rng.randrange(3))
+                    d.folder.setText(out)
+                    d.replace.setChecked(rng.random() < 0.7)
+                    d.start()
+                    if rng.random() < 0.2:
+                        d.stop()
+                    d.wait()
+                    stopped = "stopped" in d.summary.text()
+                    fmt = d.format.currentData()
+                    for row, src in enumerate(chosen):
+                        ok, text = d.results.get(row, (False, "not done"))
+                        dst = batch.output_path(src, out, fmt)
+                        if ok and not os.path.isfile(dst):
+                            fails.append("window seed %d step %d: converted but no %s" % (seed, step, dst))
+                        if not ok and not stopped and not text.startswith("skipped"):
+                            fails.append("window seed %d step %d: %s: %s (%s)" % (seed, step, src, text, d.summary.text()))
+                    d.close()
+                elif action == "erase":
+                    # a stroke anywhere (partly or wholly off the picture), any size; or all back
+                    if w.img is not None:
+                        if rng.random() < 0.15:
+                            w.restore_picture()
+                        else:
+                            w.start_erasing(rng.random() < 0.8)
+                            iw, ih = w.img.width(), w.img.height()
+                            pts = [QPointF(rng.uniform(-0.2, 1.2) * iw, rng.uniform(-0.2, 1.2) * ih)
+                                   for _ in range(rng.randrange(1, 6))]
+                            w.on_erased(rng.choice([0.5, 2, 10, 60]), pts)
+                elif action == "outlines":
+                    w.a_outlines.trigger()
+                elif action == "recent":
+                    files = w.recent_files()
+                    if files:
+                        w.open_recent(rng.choice(files))
+                    if len(w.recent_files()) > 10:
+                        fails.append("window seed %d step %d: %d recent files" % (seed, step, len(w.recent_files())))
                 elif action == "saved_width":
                     # another unit or width: nothing traced again
                     number, s = w.job_number, w.settings
@@ -465,6 +511,9 @@ def check_window(steps, seed, fails):
                     if "Couldn't trace" not in w.right.message:
                         fails.append("window seed %d step %d: no SVG and no message" % (seed, step))
                     continue
+                if w.full_img is not None and w.img != w.picture_now():
+                    fails.append("window seed %d step %d: the picture traced isn't the one opened with its erasing "
+                                 "and crop" % (seed, step))
                 if w.history and w.history[w.history_at] != w._state():
                     fails.append("window seed %d step %d: Undo's place isn't what's shown" % (seed, step))
                 if w.job.options != w.settings.options():

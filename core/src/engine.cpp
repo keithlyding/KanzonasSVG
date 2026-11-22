@@ -9,6 +9,7 @@
  * no GTK, GLib or 2geom, SVG path data written directly. Released under GNU GPL v2+.
  */
 #include "kzsvg.h"
+#include "snap.h"
 
 #include <algorithm>
 #include <thread>
@@ -137,6 +138,31 @@ public:
         }
     };
 
+    // Whether to stop, for code that only asks that (Autotrace's test_cancel): it asks the
+    // caller's callback (at most every 50 ms) even when the fraction done hasn't moved. Only
+    // asking report() missed a cancel for as long as no progress was reported: Autotrace's
+    // centerline thinning, 20 s and more on a big picture, went on after Cancel, and the next
+    // trace (and closing the window) waited for it.
+    // (<often>: asked for every pixel, as Autotrace does: the clock read every 256th time)
+    bool poll(bool often = false)
+    {
+        if (stopped) {
+            return true;
+        }
+        if (cancel && *cancel) {
+            stopped = true;
+        } else if (func && (!often || ++polls % 256 == 0)) {
+            auto now = std::chrono::steady_clock::now();
+            if (now - last_poll >= std::chrono::milliseconds(50)) {
+                last_poll = now;
+                if (func(std::max(last, from), data)) {
+                    stopped = true;
+                }
+            }
+        }
+        return stopped;
+    }
+
     bool stopped = false;
     std::atomic<bool> const *cancel = nullptr; // a layer's: stop when the whole trace stops
 
@@ -144,6 +170,8 @@ private:
     kz_progress_func func;
     void *data;
     double from = 0.0, span = 1.0, last = -1.0;
+    std::chrono::steady_clock::time_point last_poll{};
+    unsigned polls = 0;
 };
 
 /*
@@ -376,10 +404,11 @@ struct PointHash
 using PointSet = std::unordered_set<std::pair<double, double>, PointHash>;
 
 // Write Potrace's path tree; <points> leaves out paths already written (as Inkscape does).
-void write_paths(potrace_path_t *paths, PathData &out, PointSet &points);
+// <snap>: kz_options.snap (snap.h).
+void write_paths(potrace_path_t *paths, PathData &out, PointSet &points, int snap);
 
 // One outline, then the outlines inside it (its holes, and the shapes in those).
-void write_path(potrace_path_t *path, PathData &out, PointSet &points)
+void write_path(potrace_path_t *path, PathData &out, PointSet &points, int snap)
 {
     {
         auto const &curve = path->curve;
@@ -390,27 +419,57 @@ void write_path(potrace_path_t *path, PathData &out, PointSet &points)
         if (!points.emplace(last.x, last.y).second) {
             return;
         }
-        out.move(last.x, last.y);
-        for (int i = 0; i < curve.n; i++) {
-            auto const *seg = curve.c[i];
-            if (curve.tag[i] == POTRACE_CORNER) {
-                out.line(seg[1].x, seg[1].y);
-                out.line(seg[2].x, seg[2].y);
-            } else if (curve.tag[i] == POTRACE_CURVETO) {
-                out.curve(seg[0].x, seg[0].y, seg[1].x, seg[1].y, seg[2].x, seg[2].y);
+        if (!snap) {
+            out.move(last.x, last.y);
+            for (int i = 0; i < curve.n; i++) {
+                auto const *seg = curve.c[i];
+                if (curve.tag[i] == POTRACE_CORNER) {
+                    out.line(seg[1].x, seg[1].y);
+                    out.line(seg[2].x, seg[2].y);
+                } else if (curve.tag[i] == POTRACE_CURVETO) {
+                    out.curve(seg[0].x, seg[0].y, seg[1].x, seg[1].y, seg[2].x, seg[2].y);
+                }
+            }
+        } else {
+            std::vector<kzsnap::Seg> segs;
+            segs.reserve(curve.n * 2);
+            kzsnap::Pt at{last.x, last.y};
+            for (int i = 0; i < curve.n; i++) {
+                auto const *seg = curve.c[i];
+                if (curve.tag[i] == POTRACE_CORNER) {
+                    kzsnap::Pt v{seg[1].x, seg[1].y}, e{seg[2].x, seg[2].y};
+                    segs.push_back({false, at, at, v, v});
+                    segs.push_back({false, v, v, e, e});
+                    at = e;
+                } else if (curve.tag[i] == POTRACE_CURVETO) {
+                    kzsnap::Pt e{seg[2].x, seg[2].y};
+                    segs.push_back({true, at, {seg[0].x, seg[0].y}, {seg[1].x, seg[1].y}, e});
+                    at = e;
+                }
+            }
+            kzsnap::snap(segs, snap);
+            if (!segs.empty()) {
+                out.move(segs[0].p0.x, segs[0].p0.y);
+                for (auto const &s : segs) {
+                    if (s.curve) {
+                        out.curve(s.c1.x, s.c1.y, s.c2.x, s.c2.y, s.p1.x, s.p1.y);
+                    } else {
+                        out.line(s.p1.x, s.p1.y);
+                    }
+                }
             }
         }
         out.close();
         for (auto child = path->childlist; child; child = child->sibling) {
-            write_paths(child, out, points);
+            write_paths(child, out, points, snap);
         }
     }
 }
 
-void write_paths(potrace_path_t *paths, PathData &out, PointSet &points)
+void write_paths(potrace_path_t *paths, PathData &out, PointSet &points, int snap)
 {
     for (auto path = paths; path; path = path->sibling) {
-        write_path(path, out, points);
+        write_path(path, out, points, snap);
     }
 }
 
@@ -448,7 +507,7 @@ Paths trace_bitmap(BitmapPtr bitmap, kz_options const &o, Progress &progress)
     PointSet points;
     for (auto path = state->plist; path; path = path->sibling) {
         PathData group;
-        write_path(path, group, points);
+        write_path(path, group, points, o.snap);
         if (!group.empty()) {
             out.push_back(std::move(group));
         }
@@ -500,6 +559,13 @@ GrayMap single_scan(RgbMap const &rgb, kz_options const &o, double floor, double
     return map;
 }
 
+// The Progress of the trace this thread runs (kz_trace sets it; none elsewhere, e.g. in
+// kz_palette or the layers' threads). The color steps (smoothing, quantizing...) report no
+// progress: each checks it as it starts, so Cancel is noticed between them. Before, nothing
+// was noticed until all of them were done (a second and more on a big picture, the same for
+// every mode). A step stopped this way throws before its result is cached.
+thread_local Progress *current_progress = nullptr;
+
 // KZ_PROFILE=1 prints how long each step takes (to stderr).
 struct Timer
 {
@@ -507,7 +573,11 @@ struct Timer
     std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
     explicit Timer(const char *w)
         : what(w)
-    {}
+    {
+        if (current_progress && current_progress->poll()) {
+            throw Cancelled();
+        }
+    }
     ~Timer()
     {
         static const bool on = std::getenv("KZ_PROFILE") != nullptr;
@@ -611,7 +681,14 @@ std::shared_ptr<Prepared const> prepared(RgbMap const &map, uint64_t key, bool s
         }
     }
     auto p = std::make_shared<Prepared>();
-    { Timer t("smooth"); p->smoothed = smooth ? rgbMapGaussian(map) : map; }
+    {
+        Timer t("smooth");
+        p->smoothed = smooth ? rgbMapGaussian(map, [] {
+            if (current_progress && current_progress->poll()) {
+                throw Cancelled();
+            }
+        }) : map;
+    }
     { Timer t("histogram"); p->histogram = colorHistogram(p->smoothed); }
     std::lock_guard<std::mutex> lock(prepared_cache.m);
     auto &e = prepared_cache.entries;
@@ -1215,12 +1292,18 @@ Shapes trace_autotrace(RgbMap const &map, kz_options const &o, Progress &progres
         splines.reset(at_splines_new_full(
             &bitmap, opts.get(), nullptr, nullptr,
             [](gfloat f, gpointer data) {
+                // (Autotrace reports for every pixel, and goes on to the end of a row once
+                // stopped: report() would throw, and this catch it, millions of times, 12 s)
+                auto *p = static_cast<Progress *>(data);
+                if (p->stopped) {
+                    return;
+                }
                 try {
-                    static_cast<Progress *>(data)->report(f);
+                    p->report(f);
                 } catch (Cancelled const &) {
                 }
             },
-            &progress, [](gpointer data) -> gboolean { return static_cast<Progress *>(data)->stopped; }, &progress));
+            &progress, [](gpointer data) -> gboolean { return static_cast<Progress *>(data)->poll(true); }, &progress));
     }
     opts->background_color = nullptr; // not Autotrace's to free
     if (progress.stopped) {
@@ -1373,6 +1456,7 @@ kz_options checked(kz_options const *in)
         o.edits = nullptr;
     }
     o.remove_background = std::clamp(o.remove_background, 0, 2);
+    o.snap &= kzsnap::ALL;
     o.threshold = std::clamp(o.threshold, 0.0, 1.0);
     o.speckles = std::clamp(o.speckles, 0, 100000);
     o.smooth_corners = std::clamp(o.smooth_corners, 0.0, 1.34);
@@ -1800,7 +1884,8 @@ int kz_trace(unsigned char const *rgba, int width, int height, int stride, kz_op
         std::atomic<size_t> bytes{0};
         svg_budget = &bytes;
         traced_input = Input{rgba, width, height, stride};
-        struct Reset { ~Reset() { svg_budget = nullptr; traced_input = Input{}; } } reset;
+        current_progress = &progress;
+        struct Reset { ~Reset() { svg_budget = nullptr; traced_input = Input{}; current_progress = nullptr; } } reset;
         Shapes shapes;
         switch (o.mode) {
             case KZ_GRAYS:

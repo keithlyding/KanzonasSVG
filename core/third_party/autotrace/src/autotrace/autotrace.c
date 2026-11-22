@@ -275,8 +275,9 @@ at_splines_type *at_splines_new_full(at_bitmap * bitmap, at_fitting_opts_type * 
     /* Hereafter, dist is allocated. dist must be freed if
        the execution is canceled or exception is raised;
        use FATAL_THEN_CLEANUP_DIST. */
-    thin_image(bitmap, opts->background_color, &exp);
+    thin_image(bitmap, opts->background_color, &exp, test_cancel, testcancel_data);
     FATAL_THEN_CLEANUP_DIST()
+    CANCEL_THEN_CLEANUP_DIST();
   }
 
   /* Hereafter, pixels is allocated. pixels must be freed if

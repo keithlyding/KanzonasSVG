@@ -9,17 +9,19 @@ in 0.33 s; the window's longest freeze 0.02-0.1 s; a photo's SVG drawn in 0.02-0
 
 import os
 import random
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 
 from tests import helpers  # noqa: F401 (Qt first)
-from PySide6.QtCore import QRectF, QTimer, Qt
+from PySide6.QtCore import QRectF, QSettings, QTimer, Qt
 from PySide6.QtGui import QColor, QImage, QPainter
 from PySide6.QtWidgets import QApplication
 
-from kanzonassvg import app, engine, image
+from kanzonassvg import app, engine, image, tracing
 
 SLACK = float(os.environ.get("KZ_SPEED_SLACK", "1"))  # more on a known-slow machine
 
@@ -135,6 +137,86 @@ class TestSpeed(unittest.TestCase):
         finally:
             w.close()
             os.remove(path)
+
+    @staticmethod
+    def solid_area():
+        """A big solid area: Autotrace's centerline thinning needs a pass for each pixel from its
+        edge to its middle (1,400 at 4 times this size)."""
+        img = QImage(1600, 1000, QImage.Format.Format_RGBA8888)
+        img.fill(QColor(255, 255, 255))
+        p = QPainter(img)
+        p.fillRect(QRectF(200, 150, 1200, 700), QColor(0, 0, 0))
+        p.end()
+        return img
+
+    def test_centerline_of_a_solid_area(self):
+        # Each pass went over the whole picture: minutes for this one (an hour for the app
+        # battery's pictures); 3 s today
+        t = time.perf_counter()
+        tracing.trace_image(self.solid_area(), engine.Options(mode=engine.CENTERLINE), enlarge=4)
+        took = time.perf_counter() - t
+        self.assertLess(took, 20.0 * SLACK, "centerline of a solid area at 4 times: %.2f s" % took)
+
+    def test_cancelling_centerline(self):
+        # Cancel wasn't noticed while the centerline was being thinned, nor while the colors were
+        # reduced (any mode: no progress reported then), and once noticed while Autotrace
+        # looked for the lines, it went on to the end of the picture throwing an exception
+        # for every pixel (15 s): the next trace, and closing the window, waited for it. Cancelled
+        # early (colors), while thinning, and while finding the lines: each stops within 0.3 s.
+        img = self.solid_area()
+        for when, at in (("in the colors", 0.1), ("while thinning", 0.5), ("finding the lines", 0.3)):
+            t = time.perf_counter()
+            stop = [None]
+
+            def progress(f, at=at, when=when):
+                if stop[0] is None and (f >= at if when == "finding the lines" else time.perf_counter() - t > at):
+                    stop[0] = time.perf_counter()
+                return stop[0] is not None
+
+            with self.assertRaises(engine.Cancelled):
+                tracing.trace_image(img, engine.Options(mode=engine.CENTERLINE), enlarge=4, progress=progress)
+            took = time.perf_counter() - stop[0]
+            self.assertLess(took, 1.5 * SLACK, "a centerline cancelled %s went on for %.2f s" % (when, took))
+
+    def test_window_switching_away_from_centerline(self):
+        # A big picture traced as a centerline, then Colors while it was still tracing: the colors
+        # waited for the whole centerline (minutes on a slow machine), and so did closing the window
+        w = app.MainWindow()
+        folder = tempfile.mkdtemp()
+        w.qs = QSettings(os.path.join(folder, "s.ini"), QSettings.Format.IniFormat)
+        w.show()
+        s = w.settings
+        s.mode.setCurrentIndex(s.mode.findData(engine.CENTERLINE))
+        s.enlarge.setCurrentIndex(s.enlarge.findData(4))
+        try:
+            w.set_image(image.to_rgba(self.solid_area()), None)
+            end = time.time() + 30
+            while w.worker is None and time.time() < end:
+                QApplication.processEvents()
+                time.sleep(0.002)
+            self.assertIsNotNone(w.worker, "the centerline trace didn't start")
+            time.sleep(0.5)
+            s.mode.setCurrentIndex(s.mode.findData(engine.COLORS))
+            t = time.perf_counter()
+            end = time.time() + 60
+            while time.time() < end and (w.worker is not None or w.timer.isActive() or w.pending):
+                QApplication.processEvents()
+                time.sleep(0.002)
+            took = time.perf_counter() - t
+            self.assertLess(took, 6.0 * SLACK, "Colors after Centerline took %.2f s" % took)
+            s.mode.setCurrentIndex(s.mode.findData(engine.CENTERLINE))
+            end = time.time() + 30
+            while w.worker is None and time.time() < end:
+                QApplication.processEvents()
+                time.sleep(0.002)
+            time.sleep(0.5)
+        finally:
+            t = time.perf_counter()
+            w.close()
+            took = time.perf_counter() - t
+            w.deleteLater()
+            shutil.rmtree(folder, ignore_errors=True)
+        self.assertLess(took, 1.5 * SLACK, "closing the window during a centerline took %.2f s" % took)
 
     def test_window_never_freezes(self):
         w = app.MainWindow()

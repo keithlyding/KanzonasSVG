@@ -8,6 +8,7 @@ import ctypes
 import os
 import sys
 from dataclasses import dataclass, fields
+from kanzonassvg.i18n import tr
 
 # Modes (enum kz_mode in kzsvg.h)
 COLORS = 0
@@ -69,8 +70,12 @@ class _Options(ctypes.Structure):
         ("preserve_width", ctypes.c_int),
         ("nedits", ctypes.c_int),
         ("edits", ctypes.POINTER(_ColorEdit)),
+        ("snap", ctypes.c_int),
     ]
 
+
+SNAP_LINES, SNAP_RIGHT_ANGLES, SNAP_CIRCLES = 1, 2, 4
+SNAP_ALL = 7
 
 EDIT_MATCH = 24  # KZ_EDIT_MATCH: an edit applies to the palette color within this many levels
 # kz_edit_where: which areas an edit is for (the background: the background color's area reaching
@@ -121,6 +126,9 @@ class Options:
     # color edits: ((r, g, b) of a palette color, (r, g, b) to trace it as or None: leave it out,
     # and optionally where: EVERYWHERE, INSIDE or BACKGROUND)
     edits: tuple = ()
+    # Potrace: snap outlines to straight lines (SNAP_LINES), level and upright lines
+    # (SNAP_RIGHT_ANGLES) and ellipses and circles (SNAP_CIRCLES); SNAP_ALL, or 0 (off)
+    snap: int = 0
 
     def _struct(self):
         s = _Options()
@@ -243,6 +251,10 @@ def library():
     lib.kz_drawing_render.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int,
                                       ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
     lib.kz_drawing_render.restype = ctypes.c_int
+    lib.kz_drawing_render_outlines.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
+                                               ctypes.c_int, ctypes.c_double, ctypes.c_double, ctypes.c_double,
+                                               ctypes.c_double, ctypes.c_int]
+    lib.kz_drawing_render_outlines.restype = ctypes.c_int
     lib.kz_drawing_close.argtypes = [ctypes.c_void_p]
     lib.kz_drawing_close.restype = None
     lib.kz_free.argtypes = [ctypes.c_void_p]
@@ -259,9 +271,9 @@ def version():
 
 def _check_image(rgba, width, height, stride):
     if width <= 0 or height <= 0:
-        raise TraceError("The image is empty.")
+        raise TraceError(tr("The image is empty."))
     if stride < width * 4 or len(rgba) < stride * (height - 1) + width * 4:
-        raise TraceError("The image data is too short for its size.")
+        raise TraceError(tr("The image data is too short for its size."))
 
 
 def trace(rgba, width, height, stride=None, options=None, progress=None):
@@ -323,7 +335,7 @@ def palette(rgba, width, height, stride=None, options=None, mask=False):
     region = ctypes.create_string_buffer(width * height) if mask else None
     if lib.kz_palette(ctypes.addressof(buf), width, height, stride, ctypes.byref(opts), rgb, counts, background,
                       region, 257, ctypes.byref(n)) != OK:
-        raise TraceError("Couldn't work out the colors.")
+        raise TraceError(tr("Couldn't work out the colors."))
     colors = [((rgb[3 * k], rgb[3 * k + 1], rgb[3 * k + 2]), counts[k], bool(background[k])) for k in range(n.value)]
     return (colors, region.raw) if mask else colors
 
@@ -338,7 +350,7 @@ def preview(rgba, width, height, stride=None, options=None):
         (ctypes.c_char * len(rgba)).from_buffer(rgba)
     out = ctypes.create_string_buffer(width * height * 3)
     if lib.kz_preview(ctypes.addressof(buf), width, height, stride, ctypes.byref(opts), out) != OK:
-        raise TraceError("The preview failed.")
+        raise TraceError(tr("The preview failed."))
     return out.raw
 
 
@@ -353,7 +365,7 @@ def auto(rgba, width, height, stride=None):
     info = _AutoInfo()
     info.size = ctypes.sizeof(_AutoInfo)
     if lib.kz_auto(ctypes.addressof(buf), width, height, stride, ctypes.byref(opts), ctypes.byref(info)) != OK:
-        raise TraceError("Couldn't work out settings for this picture.")
+        raise TraceError(tr("Couldn't work out settings for this picture."))
     o = Options()
     for f in fields(o):
         if f.name == "edits":
@@ -371,13 +383,13 @@ class Drawing:
         self._lib = library()
         self._handle = self._lib.kz_drawing_open(svg.encode("utf-8"))
         if not self._handle:
-            raise TraceError("Couldn't read the SVG to show it.")
+            raise TraceError(tr("Couldn't read the SVG to show it."))
 
     def render(self, buffer_address, width, height, stride, left, top, target_width, target_height):
         """Draw into a premultiplied ARGB32 buffer (a QImage's bits). Python's lock is let go."""
         if self._lib.kz_drawing_render(self._handle, buffer_address, width, height, stride, left, top,
                                        target_width, target_height) != OK:
-            raise TraceError("Couldn't draw the SVG.")
+            raise TraceError(tr("Couldn't draw the SVG."))
 
     def render_image(self, img, left, top, target_width, target_height):
         """Draw into a QImage (Format_ARGB32_Premultiplied)."""
@@ -385,6 +397,16 @@ class Drawing:
         buf = (ctypes.c_char * len(bits)).from_buffer(bits)
         self.render(ctypes.addressof(buf), img.width(), img.height(), img.bytesPerLine(), left, top,
                     target_width, target_height)
+
+    def render_outlines_image(self, img, left, top, target_width, target_height, nodes=True):
+        """Draw its outlines (and nodes) into a QImage (Format_ARGB32_Premultiplied), over
+        what's in it."""
+        bits = img.bits()
+        buf = (ctypes.c_char * len(bits)).from_buffer(bits)
+        if self._lib.kz_drawing_render_outlines(self._handle, ctypes.addressof(buf), img.width(), img.height(),
+                                                img.bytesPerLine(), left, top, target_width, target_height,
+                                                int(bool(nodes))) != OK:
+            raise TraceError(tr("Couldn't draw the SVG."))
 
     def close(self):
         if self._handle:

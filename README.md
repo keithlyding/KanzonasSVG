@@ -3,7 +3,7 @@
 ![KanzonasSVG](assets/kanzonassvg-logo.png)
 
 Turn pictures (logos, drawings, scans) into SVG files, on Windows and Linux. Or into PDF, EPS
-and DXF, for printers, cutting machines and lasers.
+and DXF, for printers, cutting machines and lasers. In English or Spanish (*View > Language*).
 
 ![The KanzonasSVG window: on the left, a picture of a yellow sunflower with a brown center on a dark green cactus; on the right, its SVG traced in 6 flat colors with Auto settings, petals, center and cactus matching the picture, its size above it (161 KB, 6 shapes, 4,079 nodes); the settings panel on the right shows Colors mode, 6 colors, Background: Remove, the Colors box with the six colors traced and a dashed swatch for the see-through background, and Saved width: Picture's pixels, 239 x 292 pixels (2.49 x 3.04 in)](docs/screenshot.png)
 
@@ -80,12 +80,25 @@ installed until you click it. (1.0.x doesn't have this: install 1.1 by hand once
 5. *File > Save...* (Ctrl+S) as SVG, PDF, EPS or DXF (pick the type when saving), or
    *File > Copy SVG* (Ctrl+Shift+C) to paste it into Inkscape or another program.
 
+**Seeing and fixing**: *View > Show outlines* (Ctrl+L) shows the SVG as its outlines and
+nodes; *Trace > Erase on the picture* (Ctrl+E) wipes out parts of the picture before tracing
+(a watermark, a smudge, text beside a logo), with Undo; *File > Open recent* lists the last 10
+pictures. The help (F1) is in chapters, with a search.
+
+**Many pictures at once**: *File > Convert many pictures...* (Ctrl+Shift+O), or pick or drag
+in several pictures (or a folder). Each is traced with Auto settings for it, or with the settings
+shown, and saved as SVG, PDF, EPS or DXF next to it or in one folder; the list says what happened
+to each. It works in the background: the window stays usable.
+
 **For cutting machines and lasers** (Cricut, Silhouette, LightBurn, CNC): each color is a group
 of its own, named by its color (a layer in Inkscape, and in the DXF), so programs that show
 groups list the colors instead of hundreds of loose shapes. **Saved width** (under Size) saves it at a width in
 inches or millimeters (the height follows; otherwise the picture's pixels, 96 to the inch).
 The node count above the SVG tells you how much a blade or laser has to turn: fewer nodes cut
-cleaner. A DXF holds outlines only (one layer per color), curves as short straight pieces
+cleaner. **Snap shapes** (under Curves) straightens edges that are all but straight, makes nearly
+level or upright lines exactly so, and round shapes perfect circles and ellipses: square corners
+come out square and the files get smaller (the flat illustration in the screenshots: 4,452 nodes
+without, 2,663 with). A DXF holds outlines only (one layer per color), curves as short straight pieces
 within 0.025 mm, in millimeters (in inches when the width is in inches).
 
 **Background**: *Remove* makes the picture's background (the color around its edge, light or
@@ -113,6 +126,7 @@ kanzonassvg-cli --background remove logo.jpg  a see-through background
 kanzonassvg-cli --mode bw scan.jpg -o scan.svg
 kanzonassvg-cli logo.png -o logo.dxf --width 100mm   a DXF 100 mm wide (the extension picks the type)
 kanzonassvg-cli --format pdf *.png -o pdfs    every PNG as a PDF
+kanzonassvg-cli --snap logo.png               straight lines, square corners, perfect circles
 kanzonassvg-cli --help                        every option
 ```
 
@@ -162,7 +176,8 @@ What each does:
 | Leaving the background out | Remove background (the bottom layer) | The color around the edge, around the picture or everywhere, or the transparent part |
 | Tracing part of a picture | | Crop |
 | The result while you set it up | A small preview | The SVG beside the picture, zooming together |
-| Many files at once | | The command line |
+| Many files at once | | *Convert many pictures* in the window, and the command line |
+| Snapping to straight lines, right angles, circles | | Snap shapes |
 | Saving as | SVG, PDF, EPS, DXF and more (it's a vector editor) | SVG, PDF, EPS, DXF, at a width in inches or mm, one group per color |
 | Editing the SVG afterwards | Yes: it's a vector editor | No: open the SVG in Inkscape, Illustrator or another editor |
 | Pixel art (Depixelize), selecting the foreground (SIOX) | Yes | No |

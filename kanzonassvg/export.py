@@ -31,12 +31,14 @@ PX_PER_IN = 96.0
 PT_PER_IN = 72.0
 
 FORMATS = ("svg", "pdf", "eps", "dxf")
-FILTERS = {
-    "svg": "SVG (*.svg)",
-    "pdf": "PDF (*.pdf)",
-    "eps": "EPS (*.eps)",
-    "dxf": "DXF for CAD, laser and cutting programs (*.dxf)",
-}
+
+
+def filter_text(fmt):
+    """The file dialog's line for a format (in the user's language)."""
+    from kanzonassvg.i18n import tr
+    if fmt == "dxf":
+        return tr("DXF for CAD, laser and cutting programs") + " (*.dxf)"
+    return "%s (*.%s)" % (fmt.upper(), fmt)
 
 
 @dataclass(frozen=True)
@@ -89,12 +91,13 @@ def inches(svg, size=PIXELS):
 
 def size_text(svg, size=PIXELS):
     """The saved size, as the window says it ("1280 x 960 pixels (13.33 x 10 in)", "4 x 3 in")."""
+    from kanzonassvg.i18n import tr
     w, h = svg_size(svg)[:2]
     wi, hi = inches(svg, size)
     if size.unit == PX:
-        return "%d x %d pixels (%s x %s in)" % (round(w), round(h), _short(wi), _short(hi))
+        return tr("%d x %d pixels (%s x %s in)") % (round(w), round(h), _short(wi), _short(hi))
     k = MM_PER_IN if size.unit == MM else 1.0
-    return "%s x %s %s" % (_short(wi * k), _short(hi * k), size.unit)
+    return "%s x %s %s" % (_short(wi * k), _short(hi * k), tr("in") if size.unit == IN else size.unit)
 
 
 def _short(v):

@@ -37,6 +37,7 @@ struct Shape
     unsigned char r, g, b;
     bool stroke;          // a centerline (stroked, 1 unit wide), else filled
     std::vector<Seg> segs; // closed outlines (filled) or the line itself (stroked)
+    std::vector<float> nodes; // x, y of each point the path goes through (M, L and C ends): View > Show outlines
     float minx, miny, maxx, maxy;
 };
 
@@ -113,9 +114,15 @@ void parse_path(char const *p, char const *end, Shape &s)
             cy = sy = v[1];
             open = true;
             cmd = 'L'; // more pairs after M are lines
+            s.nodes.push_back((float)v[0]);
+            s.nodes.push_back((float)v[1]);
         } else if (cmd == 'L') {
             line(v[0], v[1]);
+            s.nodes.push_back((float)v[0]);
+            s.nodes.push_back((float)v[1]);
         } else {
+            s.nodes.push_back((float)v[4]);
+            s.nodes.push_back((float)v[5]);
             // flattened finely enough for any zoom (redone in pixel units when drawing would be
             // better, but the SVG's units are pixels of the picture, and 64x zoom at most)
             double x0 = cx, y0 = cy;
@@ -326,6 +333,82 @@ void render_rows(Drawing const &dr, unsigned char *out, int w, int stride, int r
     }
 }
 
+// Composite the coverage accumulated in rows [y0, y1) in one color.
+void composite(std::vector<float> &acc, unsigned char *out, int w, int stride, int r0, int y0, int y1, float cr,
+               float cg, float cb)
+{
+    for (int y = y0; y < y1; y++) {
+        float *row = acc.data() + (size_t)(y - r0) * (w + 2);
+        unsigned char *px = out + (size_t)y * stride;
+        float sum = 0;
+        for (int x = 0; x < w; x++) {
+            sum += row[x];
+            float c = std::min(1.0f, std::fabs(sum));
+            if (c <= 0.0005f) {
+                continue;
+            }
+            unsigned char *q = px + 4 * x;
+            float keep = 1 - c;
+            q[0] = (unsigned char)(cb * c + q[0] * keep + 0.5f);
+            q[1] = (unsigned char)(cg * c + q[1] * keep + 0.5f);
+            q[2] = (unsigned char)(cr * c + q[2] * keep + 0.5f);
+            q[3] = (unsigned char)(255 * c + q[3] * keep + 0.5f);
+        }
+    }
+}
+
+// View > Show outlines: every shape's outline one pixel wide (on the screen) in dark gray, and
+// its nodes as small blue squares (when <nodes>).
+void render_outline_rows(Drawing const &dr, unsigned char *out, int w, int stride, int r0, int r1, double sx,
+                         double sy, double ox, double oy, bool nodes)
+{
+    int const rows = r1 - r0;
+    std::vector<float> acc((size_t)rows * (w + 2), 0.0f);
+    auto quad = [&](float const *px, float const *py) {
+        for (int i = 0; i < 4; i++) {
+            add_line(acc, w, r0, r0, r1, px[i], py[i], px[(i + 1) % 4], py[(i + 1) % 4]);
+        }
+    };
+    for (auto const &s : dr.shapes) {
+        if (s.maxy * sy + oy < r0 - 2 || s.miny * sy + oy > r1 + 2 || s.minx * sx + ox > w + 2 ||
+            s.maxx * sx + ox < -2) {
+            continue;
+        }
+        for (auto const &g : s.segs) {
+            // the segment in screen pixels, as a quad 1 pixel wide (all turning the same way)
+            double x0 = g.x0 * sx + ox, y0 = g.y0 * sy + oy, x1 = g.x1 * sx + ox, y1 = g.y1 * sy + oy;
+            if (std::max(y0, y1) < r0 - 1 || std::min(y0, y1) > r1 + 1) {
+                continue;
+            }
+            double dx = x1 - x0, dy = y1 - y0, len = std::hypot(dx, dy);
+            if (len == 0) {
+                continue;
+            }
+            double nx = -dy / len * 0.5, ny = dx / len * 0.5;
+            float px[4] = {(float)(x0 + nx), (float)(x1 + nx), (float)(x1 - nx), (float)(x0 - nx)};
+            float py[4] = {(float)(y0 + ny), (float)(y1 + ny), (float)(y1 - ny), (float)(y0 - ny)};
+            quad(px, py);
+        }
+    }
+    composite(acc, out, w, stride, r0, r0, r1, 48, 48, 48);
+    if (!nodes) {
+        return;
+    }
+    std::fill(acc.begin(), acc.end(), 0.0f);
+    for (auto const &s : dr.shapes) {
+        for (size_t i = 0; i + 1 < s.nodes.size(); i += 2) {
+            double x = s.nodes[i] * sx + ox, y = s.nodes[i + 1] * sy + oy;
+            if (y < r0 - 3 || y > r1 + 3 || x < -3 || x > w + 3) {
+                continue;
+            }
+            float px[4] = {(float)(x - 2), (float)(x + 2), (float)(x + 2), (float)(x - 2)};
+            float py[4] = {(float)(y - 2), (float)(y - 2), (float)(y + 2), (float)(y + 2)};
+            quad(px, py);
+        }
+    }
+    composite(acc, out, w, stride, r0, r0, r1, 30, 136, 229);
+}
+
 } // namespace
 
 extern "C" {
@@ -360,6 +443,28 @@ int kz_drawing_render(void *drawing, unsigned char *out, int width, int height, 
         // bands of rows on several cores (each band draws every shape over its rows only)
         kz::parallel_for(height, [&](long r0, long r1) {
             render_rows(*dr, out, width, stride, (int)r0, (int)r1, sx, sy, left, top);
+        }, 16);
+        return KZ_OK;
+    } catch (...) {
+        return KZ_ERROR;
+    }
+}
+
+int kz_drawing_render_outlines(void *drawing, unsigned char *out, int width, int height, int stride, double left,
+                               double top, double target_width, double target_height, int nodes)
+{
+    auto dr = static_cast<Drawing *>(drawing);
+    if (!dr || !out || width <= 0 || height <= 0 || stride < width * 4 || dr->vbw <= 0 || dr->vbh <= 0 ||
+        !(target_width > 0) || !(target_height > 0)) {
+        return KZ_ERROR;
+    }
+    try {
+        double sx = target_width / dr->vbw, sy = target_height / dr->vbh;
+        // (half a pixel over: a line on whole pixels runs through the middle of a row of pixels,
+        // one dark pixel wide, not between two, half gray each)
+        kz::parallel_for(height, [&](long r0, long r1) {
+            render_outline_rows(*dr, out, width, stride, (int)r0, (int)r1, sx, sy, left + 0.5, top + 0.5,
+                                nodes != 0);
         }, 16);
         return KZ_OK;
     } catch (...) {

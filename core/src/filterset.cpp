@@ -74,7 +74,7 @@ GrayMap grayMapGaussian(GrayMap const &me) // Todo: Make member function, keep i
     return newGm;
 }
 
-RgbMap rgbMapGaussian(RgbMap const &me)
+RgbMap rgbMapGaussian(RgbMap const &me, std::function<void()> const &between)
 {
     int width  = me.width;
     int height = me.height;
@@ -93,8 +93,14 @@ RgbMap rgbMapGaussian(RgbMap const &me)
     // as soft rings of other colors around every shape and letter.
     constexpr int edge = 120;
     static_assert(sizeof(RGB) == 3);
-    kz::parallel_for(height - 4, [&](long y0, long y1) {
-    for (int y = 2 + (int)y0; y < 2 + (int)y1; y++) {
+    // In bands of rows (each row reads only the picture given: the same result), calling
+    // <between> after each: the engine checks there whether the trace was cancelled (smoothing a
+    // big picture takes 0.4 s and more).
+    int const bands = between ? 8 : 1;
+    for (int band = 0; band < bands; band++) {
+    long const from = (long)(height - 4) * band / bands, to = (long)(height - 4) * (band + 1) / bands;
+    kz::parallel_for(to - from, [&](long y0, long y1) {
+    for (int y = 2 + (int)(from + y0); y < 2 + (int)(from + y1); y++) {
         unsigned char const *rows[5];
         for (int i = 0; i < 5; i++) {
             rows[i] = reinterpret_cast<unsigned char const *>(me.row(y - 2 + i));
@@ -123,6 +129,10 @@ RgbMap rgbMapGaussian(RgbMap const &me)
         }
     }
     });
+    if (between) {
+        between();
+    }
+    }
 
     return newGm;
 }

@@ -36,8 +36,11 @@
 
 typedef unsigned char Pixel[3]; /* RGB pixel data type */
 
-void thin3(at_bitmap * image, Pixel colour);
-void thin1(at_bitmap * image, unsigned char colour);
+static gboolean thin3(at_bitmap * image, Pixel colour, Pixel bg_color, at_testcancel_func test_cancel, gpointer testcancel_data);
+static gboolean thin3_scan(at_bitmap * image, Pixel colour, Pixel bg_color, at_testcancel_func test_cancel, gpointer testcancel_data);
+static gboolean thin1(at_bitmap * image, unsigned char colour, unsigned char bg_color, at_testcancel_func test_cancel, gpointer testcancel_data);
+
+#define CANCELLED() (test_cancel && test_cancel(testcancel_data))
 
 /* -------------------------------- ThinImage - Thin binary image. --------------------------- *
  *
@@ -99,10 +102,12 @@ static unsigned char todelete[512] = {
   1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
 };
 
-static at_color background = { 0xff, 0xff, 0xff };
-
-void thin_image(at_bitmap * image, const at_color * bg, at_exception_type * exp)
+/* KanzonasSVG: the background color is passed on (it was kept in a static variable, which
+   two traces at once could change under each other), and thinning stops when
+   test_cancel says so. */
+void thin_image(at_bitmap * image, const at_color * bg, at_exception_type * exp, at_testcancel_func test_cancel, gpointer testcancel_data)
 {
+  at_color background = { 0xff, 0xff, 0xff };
   /* This is nasty as we need to call thin once for each
    * colour in the image the way I do this is to keep a second
    * copy of the bitmap and to use this to keep
@@ -143,7 +148,8 @@ void thin_image(at_bitmap * image, const at_color * bg, at_exception_type * exp)
             if (PIXEL_EQUAL(ptr[m], p))
               PIXEL_SET(ptr[m], bg_color);
           }
-          thin3(image, p);
+          if (!thin3(image, p, bg_color, test_cancel, testcancel_data))
+            goto cleanup;
         }
       }
       break;
@@ -166,7 +172,8 @@ void thin_image(at_bitmap * image, const at_color * bg, at_exception_type * exp)
           for (m = n - 1; m >= 0L; --m)
             if (ptr[m] == c)
               ptr[m] = bg_color;
-          thin1(image, c);
+          if (!thin1(image, c, bg_color, test_cancel, testcancel_data))
+            goto cleanup;
         }
       }
       break;
@@ -183,10 +190,129 @@ cleanup:
   free(bm.bitmap);
 }
 
-void thin3(at_bitmap * image, Pixel colour)
+/* KanzonasSVG: the same thinning, pixel for pixel, but looking only at the pixels that can
+   be deleted. Each of a pass's four sub-passes decides from the image as it was when the
+   sub-pass began (the scan below reads every neighbor before changing it), so the order
+   pixels are looked at doesn't matter; and a pixel is only ever deleted if one of its four
+   neighbors north, south, west and east is not of the colour (todelete[] is 0 without the
+   centre bit, and (p & m) == 0 needs the neighbor in direction m off). So only pixels of the
+   colour next to another one are looked at, kept in a list that grows as pixels are deleted.
+   And a pixel that was looked at in all four sub-passes with none of its neighbors changing
+   leaves the list until a neighbor is deleted (until then it would be kept again: the same
+   neighbors, the same four directions). The scan went over the whole image on every pass,
+   and a solid area needs a pass for each pixel from its edge to its middle: 20 s for a
+   scanned page traced at 3 times its size, an hour for a big solid area; now the work is
+   about the number of pixels deleted. Returns FALSE when cancelled. */
+
+#define ON(x, y) ((x) >= 0 && (x) < w && (y) >= 0 && (y) < h && PIXEL_EQUAL(ptr[(y) * w + (x)], colour))
+
+static unsigned int neighbors3(Pixel * ptr, long w, long h, long x, long y, Pixel colour)
+{
+  return ((unsigned int)ON(x - 1, y - 1) << 8) | ((unsigned int)ON(x, y - 1) << 7) | ((unsigned int)ON(x + 1, y - 1) << 6)
+      | ((unsigned int)ON(x - 1, y) << 5) | ((unsigned int)ON(x, y) << 4) | ((unsigned int)ON(x + 1, y) << 3)
+      | ((unsigned int)ON(x - 1, y + 1) << 2) | ((unsigned int)ON(x, y + 1) << 1) | (unsigned int)ON(x + 1, y + 1);
+}
+
+static gboolean thin3(at_bitmap * image, Pixel colour, Pixel bg_color, at_testcancel_func test_cancel, gpointer testcancel_data)
+{
+  long w = AT_BITMAP_WIDTH(image), h = AT_BITMAP_HEIGHT(image);
+  Pixel *ptr = (Pixel *) AT_BITMAP_BITS(image);
+  unsigned char *listed;         /* 0: not in the list; else 1 + sub-passes looked at unchanged */
+  long *list, *dels;
+  long n = 0, cap = 1024, nd, k, x, y, count = 1;
+  unsigned int i, p;
+  gboolean ok = TRUE;
+
+  if (w < 2)                    /* (the scan's edges differ there) */
+    return thin3_scan(image, colour, bg_color, test_cancel, testcancel_data);
+
+  XMALLOC(listed, (size_t)w * h);
+  memset(listed, 0, (size_t)w * h);
+  XMALLOC(list, cap * sizeof(long));
+  for (y = 0; y < h; y++)
+    for (x = 0; x < w; x++)
+      if (ON(x, y) && (!ON(x, y - 1) || !ON(x, y + 1) || !ON(x - 1, y) || !ON(x + 1, y))) {
+        if (n == cap) {
+          cap *= 2;
+          XREALLOC(list, cap * sizeof(long));
+        }
+        list[n++] = y * w + x;
+        listed[y * w + x] = 1;
+      }
+  XMALLOC(dels, cap * sizeof(long));
+
+  while (count) {               /* passes, while any pixel is deleted */
+    count = 0;
+    if (CANCELLED()) {
+      ok = FALSE;
+      break;
+    }
+    for (i = 0; i < 4; i++) {
+      unsigned int m = masks[i];
+      /* decide, all from the image as it is now */
+      nd = 0;
+      for (k = 0; k < n; k++) {
+        x = list[k] % w;
+        y = list[k] / w;
+        /* (the pixels the scan leaves out in this sub-pass) */
+        if (!((i == 2 && x == 0) || (i == 1 && y == h - 1) || (i == 3 && x == w - 1 && y != h - 1))) {
+          p = neighbors3(ptr, w, h, x, y, colour);
+          if ((p & m) == 0 && todelete[p]) {
+            dels[nd++] = list[k];
+            continue;
+          }
+        }
+        listed[list[k]]++;      /* (kept in this direction) */
+      }
+      /* then delete, and list the neighbors that may be deletable now */
+      for (k = 0; k < nd; k++)
+        PIXEL_SET(ptr[dels[k]], bg_color);
+      count += nd;
+      for (k = 0; k < nd; k++) {
+        long dx, dy;
+        x = dels[k] % w;
+        y = dels[k] / w;
+        for (dy = -1; dy <= 1; dy++)
+          for (dx = -1; dx <= 1; dx++) {
+            long xx = x + dx, yy = y + dy;
+            if (ON(xx, yy)) {
+              if (!listed[yy * w + xx]) {
+                if (n == cap) {
+                  cap *= 2;
+                  XREALLOC(list, cap * sizeof(long));
+                  XREALLOC(dels, cap * sizeof(long));
+                }
+                list[n++] = yy * w + xx;
+              }
+              listed[yy * w + xx] = 1;  /* (its neighbors changed: all four directions again) */
+            }
+          }
+      }
+      /* the deleted pixels leave the list, and those kept in all four directions since
+         their neighbors last changed */
+      {
+        long j = 0;
+        for (k = 0; k < n; k++)
+          if (listed[list[k]] <= 4 && PIXEL_EQUAL(ptr[list[k]], colour))
+            list[j++] = list[k];
+          else
+            listed[list[k]] = 0;
+        n = j;
+      }
+    }
+  }
+  free(dels);
+  free(list);
+  free(listed);
+  return ok;
+}
+
+#undef ON
+
+/* The original scan (Cychosz's), for images one pixel wide. */
+static gboolean thin3_scan(at_bitmap * image, Pixel colour, Pixel bg_color, at_testcancel_func test_cancel, gpointer testcancel_data)
 {
   Pixel *ptr, *y_ptr, *y1_ptr;
-  Pixel bg_color;
   unsigned int xsize, ysize;    /* Image resolution             */
   unsigned int x, y;            /* Pixel location               */
   unsigned int i;               /* Pass index           */
@@ -198,10 +324,6 @@ void thin3(at_bitmap * image, Pixel colour)
   /* scanline                     */
   unsigned int m;               /* Deletion direction mask      */
 
-  bg_color[0] = background.r;
-  bg_color[1] = background.g;
-  bg_color[2] = background.b;
-
   LOG(" Thinning image.....\n ");
   xsize = AT_BITMAP_WIDTH(image);
   ysize = AT_BITMAP_HEIGHT(image);
@@ -212,6 +334,10 @@ void thin3(at_bitmap * image, Pixel colour)
   while (count) {               /* Scan image while deletions   */
     pc++;
     count = 0;
+    if (CANCELLED()) {
+      free(qb);
+      return FALSE;
+    }
 
     for (i = 0; i < 4; i++) {
 
@@ -266,12 +392,12 @@ void thin3(at_bitmap * image, Pixel colour)
     LOG("ThinImage: pass %d, %d pixels deleted\n", pc, count);
   }
   free(qb);
+  return TRUE;
 }
 
-void thin1(at_bitmap * image, unsigned char colour)
+static gboolean thin1(at_bitmap * image, unsigned char colour, unsigned char bg_color, at_testcancel_func test_cancel, gpointer testcancel_data)
 {
   unsigned char *ptr, *y_ptr, *y1_ptr;
-  unsigned char bg_color;
   unsigned int xsize, ysize;    /* Image resolution             */
   unsigned int x, y;            /* Pixel location               */
   unsigned int i;               /* Pass index           */
@@ -283,11 +409,6 @@ void thin1(at_bitmap * image, unsigned char colour)
   /* scanline                     */
   unsigned int m;               /* Deletion direction mask      */
 
-  if (background.r == background.g && background.g == background.b)
-    bg_color = background.r;
-  else
-    bg_color = at_color_luminance(&background);
-
   LOG(" Thinning image.....\n ");
   xsize = AT_BITMAP_WIDTH(image);
   ysize = AT_BITMAP_HEIGHT(image);
@@ -298,6 +419,10 @@ void thin1(at_bitmap * image, unsigned char colour)
   while (count) {               /* Scan image while deletions   */
     pc++;
     count = 0;
+    if (CANCELLED()) {
+      free(qb);
+      return FALSE;
+    }
 
     for (i = 0; i < 4; i++) {
 
@@ -350,4 +475,5 @@ void thin1(at_bitmap * image, unsigned char colour)
     LOG("thin1: pass %d, %d pixels deleted\n", pc, count);
   }
   free(qb);
+  return TRUE;
 }

@@ -39,6 +39,7 @@ from PySide6.QtCore import QCoreApplication, QObject, QUrl, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 
 from kanzonassvg import APP_NAME, __version__
+from kanzonassvg.i18n import tr
 
 REPO = "keithlyding/KanzonasSVG"
 API = "https://api.github.com/repos/" + REPO + "/releases?per_page=20"
@@ -384,12 +385,12 @@ def appimage_unwritable(path):
     the new file is written next to it and renamed over it, so its folder must take new files."""
     folder = os.path.dirname(os.path.abspath(path))
     if not os.access(folder, os.W_OK | os.X_OK):
-        return "You don't have permission to change the folder it is in (%s)." % folder
+        return tr("You don't have permission to change the folder it is in (%s).") % folder
     try:
         import stat
         st = os.stat(folder)
         if st.st_mode & stat.S_ISVTX and os.stat(path).st_uid != os.getuid() and st.st_uid != os.getuid():
-            return "It belongs to another user."    # (a shared folder like /tmp)
+            return tr("It belongs to another user.")    # (a shared folder like /tmp)
     except OSError as e:
         return str(e)
     return None
@@ -515,7 +516,7 @@ class UpdateChecker(QObject):
             self._reply = None
         if reply.error() != QNetworkReply.NetworkError.NoError:
             if manual and reply.error() != QNetworkReply.NetworkError.OperationCanceledError:
-                self.result.emit("Couldn't reach GitHub to check for updates (%s)." % reply.errorString())
+                self.result.emit(tr("Couldn't reach GitHub to check for updates (%s).") % reply.errorString())
             return
         raw = bytes(reply.readAll())
         try:
@@ -524,7 +525,7 @@ class UpdateChecker(QObject):
             data = None
         if not isinstance(data, list):
             if manual:
-                self.result.emit("GitHub sent an unexpected answer. Try again later.")
+                self.result.emit(tr("GitHub sent an unexpected answer. Try again later."))
             return
         self.settings.setValue(KEY_LAST, time.time())
         self.manual = manual
@@ -532,7 +533,7 @@ class UpdateChecker(QObject):
         self.release = newest_release(data)
         if self.release is None:
             if manual:
-                self.result.emit("You have the latest version (%s)." % __version__)
+                self.result.emit(tr("You have the latest version (%s).") % __version__)
             return
         version = release_version(self.release)
         if not manual and str(self.settings.value(KEY_SKIP, "")) == version:
@@ -602,7 +603,7 @@ class PortableUpdater(QObject):
 
     def start(self):
         if not self._expected_hex():
-            self.failed.emit("The update was not applied: the release has no sha256 digest.")
+            self.failed.emit(tr("The update was not applied: the release has no sha256 digest."))
             return
         try:
             self.file = self._open()
@@ -669,14 +670,14 @@ class PortableUpdater(QObject):
                 self.failed.emit(self._write_error(self._failed_write))
                 return
             if self._too_big:
-                self.failed.emit("The download was stopped: it is far bigger than KanzonasSVG.")
+                self.failed.emit(tr("The download was stopped: it is far bigger than KanzonasSVG."))
                 return
             if r.error() != QNetworkReply.NetworkError.NoError:
                 if r.error() != QNetworkReply.NetworkError.OperationCanceledError:
-                    self.failed.emit("The download failed (%s)." % r.errorString())
+                    self.failed.emit(tr("The download failed (%s).") % r.errorString())
                 return
             if file_sha256(self.path) != self._expected_hex():
-                self.failed.emit("The download was not applied: its sha256 does not match the release.")
+                self.failed.emit(tr("The download was not applied: its sha256 does not match the release."))
                 return
             try:
                 result = self._finish()
@@ -691,7 +692,7 @@ class PortableUpdater(QObject):
     # what InstallerUpdater and AppImageUpdater do differently
 
     def _write_error(self, e):
-        return "Can't write next to %s (%s)." % (EXE, e)
+        return tr("Can't write next to %s (%s).") % (EXE, e)
 
     def _open(self):
         self.path = os.path.join(self.folder, STAGING + ".zip")
@@ -719,7 +720,7 @@ class InstallerUpdater(PortableUpdater):
         self.version = version
 
     def _write_error(self, e):
-        return "Can't save the new setup (%s)." % e
+        return tr("Can't save the new setup (%s).") % e
 
     def _open(self):
         import tempfile
@@ -747,7 +748,7 @@ class AppImageUpdater(PortableUpdater):
         self.appimage = os.path.abspath(appimage)
 
     def _write_error(self, e):
-        return "Can't write next to %s (%s)." % (os.path.basename(self.appimage), e)
+        return tr("Can't write next to %s (%s).") % (os.path.basename(self.appimage), e)
 
     def _open(self):
         # a new file only this user can read or change, under a name nobody can guess, never

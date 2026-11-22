@@ -15,8 +15,9 @@ from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDial
     QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QProgressBar, \
     QProgressDialog, QPushButton, QScrollArea, QSpinBox, QSplitter, QTextBrowser, QVBoxLayout, QWidget
 
-from kanzonassvg import APP_NAME, __version__, engine, export, image, tracing
+from kanzonassvg import APP_NAME, __version__, engine, export, i18n, image, tracing
 from kanzonassvg.colors_panel import ColorsPanel
+from kanzonassvg.i18n import tr
 
 # (label, engine mode)
 MODES = [
@@ -32,17 +33,33 @@ POTRACE_MODES = {engine.COLORS, engine.GRAYS, engine.BRIGHTNESS_STEPS, engine.BR
 MULTI_MODES = {engine.COLORS, engine.GRAYS, engine.BRIGHTNESS_STEPS}
 AUTOTRACE_MODES = {engine.AUTOTRACE, engine.CENTERLINE}
 
-PICTURE_FILTER = "Pictures (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff *.ico);;All files (*)"
+def help_html():
+    """The help in the language in use."""
+    if i18n.language() == "es":
+        from kanzonassvg.help_es import HELP_HTML_ES
+        return HELP_HTML_ES
+    return HELP_HTML
+
+
+def picture_filter():
+    """The file dialog's types (in the user's language)."""
+    return tr("Pictures") + " (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff *.ico);;" + tr("All files") + " (*)"
 
 HELP_HTML = """
 <h2>KanzonasSVG</h2>
 <p>KanzonasSVG turns a picture (a logo, a drawing, a scan) into an SVG file: shapes
 instead of pixels, sharp at any size. Edit the SVG afterwards in Inkscape, Illustrator
 or another vector editor.</p>
+<p>This help is in chapters: click one in the list to go to it. Type in the box at the top
+(Ctrl+F) to search: every match is marked, the chapters that have them show how many, and
+Enter (or F3) goes to the next one, Shift+Enter to the one before. The help can stay open
+while you work.</p>
 <h3>Making an SVG</h3>
 <ol>
 <li><b>Open a picture</b>: <i>File &gt; Open picture...</i> (Ctrl+O), drag a file into the
-window, or copy a picture and use <i>File &gt; Paste picture</i> (Ctrl+V).</li>
+window, or copy a picture and use <i>File &gt; Paste picture</i> (Ctrl+V).
+<i>File &gt; Open recent</i> lists the last 10 pictures opened (<i>Clear the list</i> empties
+it).</li>
 <li><b>Check the settings</b> on the right. When you open a picture, KanzonasSVG picks the
 settings that suit it (see <b>Auto settings</b> below) and traces it. Change any setting and
 the SVG on the right side of the window updates (unless <i>Trace &gt; Update automatically</i>
@@ -63,7 +80,7 @@ background) it keeps the lines' own colors, leaves <b>Smooth</b> off (it would w
 out) and sets <b>Enlarge first</b> to 4 times, so lines a pixel or two wide trace as solid
 shapes. It also puts the curve settings (<b>Speckles</b>, <b>Smooth corners</b>,
 <b>Optimize</b>, <b>Tolerance</b>) back to the values that suit the picture: Auto sets every
-setting. The status bar says what it picked. Change anything after: Auto doesn't change it
+setting but <b>Snap shapes</b>, which stays as you set it. The status bar says what it picked. Change anything after: Auto doesn't change it
 back.</p>
 <p><i>Trace &gt; Auto settings for new pictures</i> (on at first) does this for every picture you
 open or paste; turn it off to keep your own settings for each new picture.</p>
@@ -98,6 +115,12 @@ always leaves out white, or with Remove, the background color, everywhere.)</li>
 <li><b>Smooth corners</b>: 0 keeps every corner sharp; higher rounds them off.</li>
 <li><b>Optimize</b>: joins curve segments (smaller files); <b>Tolerance</b> is how far that may
 move the curve.</li>
+<li><b>Snap shapes</b> (off at first): edges that are all but straight become straight lines,
+lines within 1.5 degrees of level or upright become exactly level or upright, and round shapes
+within half a pixel of a circle or an ellipse (with level axes) become perfect ones. For
+cutting machines, lasers, CAD and clean logos: fewer nodes, square corners stay square. It can
+move an edge by up to half a pixel, and evens out art that was a little uneven on purpose, so
+it's yours to turn on (Auto leaves it as it is). Not in the Autotrace modes.</li>
 <li><b>Error threshold</b> and <b>Filter passes</b> (Autotrace): how closely curves follow
 the outline, and how much outlines are smoothed first.</li>
 <li><b>Keep line widths</b> (centerline): gives each line its width in the picture.</li>
@@ -179,18 +202,51 @@ keeps the picture's own size, 96 pixels to the inch (as browsers, Inkscape and I
 count them), or give a width in <i>Inches</i> or <i>Millimeters</i> and the height follows.
 The line under it shows the size the files get. It changes only what's saved (and copied),
 not the trace, and is kept for next time.</p>
+<h3>Erasing parts of the picture</h3>
+<p>To leave something out of the trace (a watermark, a smudge, text next to a logo, a stray
+mark), use <i>Trace &gt; Erase on the picture</i> (Ctrl+E) and drag across it on the left
+side: what you drag over becomes see-through, as a transparent picture's background is, and
+the SVG updates when you let go. (With <b>Background: Remove</b> it's left out; with
+<b>Keep</b>, a see-through part is traced as white.) <i>Trace &gt; Smaller eraser</i> ([) and
+<i>Trace &gt; Bigger eraser</i> (]) change its size; the middle mouse button still moves the
+picture. Ctrl+E again or Esc stops erasing. <i>Edit &gt; Undo</i> takes strokes back one by one,
+and <i>Trace &gt; Restore the picture</i> (Ctrl+Shift+E) brings back everything erased. The
+picture file itself never changes; a new picture starts with nothing erased. Erasing works
+with a crop too (it's kept when you crop or remove the crop).</p>
+<h3>Many pictures at once</h3>
+<p><i>File &gt; Convert many pictures...</i> (Ctrl+Shift+O) traces and saves a list of pictures
+in one go. It also opens when you pick several pictures in <i>Open picture</i>, or drag several
+pictures (or a folder) into the window. Add pictures with <b>Add pictures...</b>, <b>Add a
+folder...</b> (the pictures in it, not SVGs) or by dragging them into the list, then choose:</p>
+<ul>
+<li><b>Settings</b>: <i>Auto settings for each picture</i> (each gets the settings that suit it,
+as when you open it, with <b>Snap shapes</b> as you set it), or <i>The settings shown now</i>, the same for all (not the color edits,
+which are for the picture shown, nor its crop).</li>
+<li><b>Save as</b>: SVG, PDF, EPS or DXF, at the <b>Saved width</b> set under Size (every picture
+that wide, or each at its own size in pixels).</li>
+<li><b>Save to</b>: next to each picture, with its name, or in one folder. Files already there
+are skipped unless <b>Replace files that are already there</b> is on.</li>
+</ul>
+<p><b>Convert</b> starts; the list says what happened to each picture (saved, with its shapes
+and nodes; skipped; or why it failed, and the next one is done anyway). <b>Stop</b> stops at once
+(the picture being traced isn't saved, and the rest aren't done). <b>Open the folder</b> shows the files. The window
+stays usable while it works. The command line does the same for scripts.</p>
 <h3>Looking at it</h3>
 <p>Above the SVG: its size, as Save writes an SVG, how many shapes it has, and how many
 <b>nodes</b> (the points its outlines go through; a cutting machine turns at each, and fewer
 cut cleaner: raise <b>Tolerance</b>, <b>Smooth corners</b> or <b>Speckles</b>, or use fewer
 colors, for fewer). The status bar says the same.</p>
 <p>The left side shows the picture; <i>View &gt; Show colors to trace</i> (Ctrl+T) shows it
-with its colors reduced, as it will be traced. Both sides zoom and move together: turn the
+with its colors reduced, as it will be traced. <i>View &gt; Show outlines</i> (Ctrl+L) shows
+the SVG as its outlines, thin dark lines, with its nodes as small blue squares (when zoomed
+to 150% or more, or when there are no more than 3,000 of them): to see where a cutting
+machine will go, and what Snap shapes, Tolerance and Speckles change. Both sides zoom and move together: turn the
 mouse wheel to zoom, drag to move. <i>View &gt; Zoom to fit</i> (Ctrl+0), <i>View &gt; Actual
 size</i> (Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> (Ctrl+-).</p>
 <h3>Keyboard shortcuts</h3>
 <table cellpadding="2">
 <tr><td>Ctrl+O</td><td>Open picture</td></tr>
+<tr><td>Ctrl+Shift+O</td><td>Convert many pictures</td></tr>
 <tr><td>Ctrl+V</td><td>Paste picture</td></tr>
 <tr><td>Ctrl+S</td><td>Save</td></tr>
 <tr><td>Ctrl+Shift+S</td><td>Save as</td></tr>
@@ -201,6 +257,9 @@ size</i> (Ctrl+1), <i>View &gt; Zoom in</i> (Ctrl++), <i>View &gt; Zoom out</i> 
 <tr><td>Ctrl+click</td><td>Select more colors (a swatch, the picture or the SVG)</td></tr>
 <tr><td>Ctrl+R / Ctrl+Shift+R</td><td>Crop picture / Remove crop</td></tr>
 <tr><td>Ctrl+T</td><td>Show colors to trace</td></tr>
+<tr><td>Ctrl+L</td><td>Show outlines</td></tr>
+<tr><td>Ctrl+E / Ctrl+Shift+E</td><td>Erase on the picture / Restore the picture</td></tr>
+<tr><td>[ / ]</td><td>Smaller eraser / Bigger eraser</td></tr>
 <tr><td>Ctrl+0 / Ctrl+1</td><td>Zoom to fit / Actual size</td></tr>
 <tr><td>Ctrl++ / Ctrl+-</td><td>Zoom in / Zoom out</td></tr>
 <tr><td>F1</td><td>How to use KanzonasSVG</td></tr>
@@ -213,6 +272,10 @@ see every option, for example:<br>
 <code>kanzonassvg-cli --colors 4 *.png -o svgs</code><br>
 <code>kanzonassvg-cli logo.png -o logo.dxf --width 100mm</code> (the extension picks the type;
 <code>--format pdf</code> for many files; <code>--width</code> in <code>in</code> or <code>mm</code>)</p>
+<h3>Language</h3>
+<p><i>View &gt; Language</i>: <i>Automatic (the system's)</i>, <i>English</i> or
+<i>Español</i>. KanzonasSVG switches the next time it starts (its menus, settings, messages, this
+help, and Qt's own buttons and dialogs). The command line is always in English.</p>
 <h3>Updates</h3>
 <p>Once a day, a few seconds after it starts, KanzonasSVG asks GitHub whether a newer version is
 out (<i>Help &gt; Check for updates automatically</i>, on at first; it sends nothing about you
@@ -376,17 +439,24 @@ class RenderThread(QThread):
         p = QPainter(img)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        if kind == "svg":
+        if kind in ("svg", "outlines"):
             # drawn by the engine (through ctypes: Python's lock is let go, so the window keeps
             # going; Qt's SVG renderer held it all along, 0.3 s for a photo's SVG)
+            svg, nodes = content if kind == "outlines" else (content, False)
+            if kind == "outlines":
+                p.fillRect(target, Qt.GlobalColor.white)
             p.end()
             if self._svg_id != content_id:
                 if self._renderer is not None:
                     self._renderer.close()
-                self._renderer = engine.Drawing(content)  # parsed once, used only in this thread
+                self._renderer = engine.Drawing(svg)  # parsed once, used only in this thread
                 self._svg_id = content_id
-            self._renderer.render_image(img, target.left() * dpr, target.top() * dpr,
-                                        target.width() * dpr, target.height() * dpr)
+            if kind == "outlines":
+                self._renderer.render_outlines_image(img, target.left() * dpr, target.top() * dpr,
+                                                     target.width() * dpr, target.height() * dpr, nodes)
+            else:
+                self._renderer.render_image(img, target.left() * dpr, target.top() * dpr,
+                                            target.width() * dpr, target.height() * dpr)
             return img
         else:
             # only the part of the picture that shows, scaled (zoomed in on a 12-megapixel
@@ -401,6 +471,23 @@ class RenderThread(QThread):
                 p.drawImage(visible, content, src)
         p.end()
         return img
+
+
+def erase(img, strokes):
+    """A copy of img with the strokes (radius, points) made see-through."""
+    out = img.copy()
+    p = QPainter(out)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
+    for radius, pts in strokes:
+        p.setPen(QPen(Qt.GlobalColor.black, 2 * radius, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap,
+                      Qt.PenJoinStyle.RoundJoin))
+        if len(pts) == 1:
+            p.drawPoint(QPointF(*pts[0]))
+        else:
+            p.drawPolyline([QPointF(x, y) for x, y in pts])
+    p.end()
+    return out
 
 
 def _checker_brush():
@@ -422,14 +509,21 @@ class Canvas(QWidget):
     cropped = Signal(QRectF)  # (Crop picture) the rectangle dragged, in picture pixels
     clicked = Signal(QPointF, bool)  # a click (no drag), in picture pixels, and whether Ctrl was held
 
+    erased = Signal(float, list)  # (Erase on the picture) a stroke: its radius and points, in picture pixels
+
     def __init__(self, view, title):
         super().__init__()
         self.crop_mode = False
+        self.erase_mode = False
+        self.eraser = 12  # the eraser's radius, in screen pixels
+        self.stroke = None  # the points of the stroke being dragged, in widget coordinates
         self.band = None  # [start, end] of the rectangle being dragged, in widget coordinates
         self.view = view
         self.title = title
         self.picture = None  # QImage
         self.svg = None  # SVG text
+        self.outlines = False  # View > Show outlines (the SVG side)
+        self.nodes = 0  # the SVG's node count (for whether to show its nodes)
         self.content_id = 0
         self.message = ""
         self.cache = None  # (key, QImage, scale, cx, cy) of the last drawing
@@ -470,16 +564,31 @@ class Canvas(QWidget):
         self.message = text
         self.update()
 
+    def set_outlines(self, on):
+        """View > Show outlines: the SVG drawn as its outlines and nodes."""
+        if on != self.outlines:
+            self.outlines = on
+            self.redraw()
+
+    # nodes shown when they can be told apart: at 150% zoom or more, or when there are few
+    NODES_ZOOM, NODES_FEW = 1.5, 3000
+
+    def show_nodes(self):
+        return self.view.scale >= self.NODES_ZOOM or self.nodes <= self.NODES_FEW
+
     def _key(self):
         return (self.content_id, self.view.scale, self.view.cx, self.view.cy, self.width(), self.height(),
-                self.devicePixelRatioF())
+                self.devicePixelRatioF(), bool(self.svg) and self.outlines, bool(self.svg) and self.show_nodes())
 
     def redraw(self):
         self.update()
         if not self.has_content() or not self.view.width:
             return
         self.number += 1
-        kind, content = ("svg", self.svg) if self.svg else ("picture", self.picture)
+        if self.svg and self.outlines:
+            kind, content = "outlines", (self.svg, self.show_nodes())
+        else:
+            kind, content = ("svg", self.svg) if self.svg else ("picture", self.picture)
         self.thread.request(self.number, kind, self.content_id, content, self._key(),
                             self.view.target(self.size()), self.size(), self.devicePixelRatioF())
 
@@ -500,6 +609,8 @@ class Canvas(QWidget):
             key, img, scale, cx, cy = self.cache
             if key[1:] == self._key()[1:]:
                 p.drawImage(0, 0, img)
+            elif key[7] != self._key()[7]:
+                pass        # (fills shown, outlines asked for, or the other way: wait for it)
             else:
                 # moved or zoomed since it was drawn: show it moved and scaled to match
                 f = self.view.scale / scale
@@ -523,6 +634,17 @@ class Canvas(QWidget):
             pen.setDashOffset(4)
             p.setPen(pen)
             p.drawRect(r)
+        if self.stroke is not None:
+            # the stroke being dragged: where it erases (done when the button is let go)
+            pen = QPen(QColor(220, 40, 40, 120), 2 * self.eraser, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap,
+                       Qt.PenJoinStyle.RoundJoin)
+            p.setPen(pen)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            if len(self.stroke) == 1:
+                p.drawPoint(self.stroke[0])
+            else:
+                p.drawPolyline(self.stroke)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         if self.message:
             p.setPen(self.palette().color(QPalette.ColorRole.Text))
             p.drawText(self.rect().adjusted(20, 20, -20, -20), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap,
@@ -536,7 +658,21 @@ class Canvas(QWidget):
         if steps:
             self.view.zoom(1.25 ** steps, e.position(), self.size())
 
+    def set_erase_mode(self, on):
+        self.erase_mode = on
+        self.stroke = None
+        if on:
+            self.crop_mode = False
+            self.band = None
+            self.setCursor(Qt.CursorShape.CrossCursor)
+        else:
+            self.unsetCursor()
+        self.update()
+
     def set_crop_mode(self, on):
+        if on:
+            self.erase_mode = False
+            self.stroke = None
         self.crop_mode = on
         self.band = None
         if on:
@@ -551,6 +687,10 @@ class Canvas(QWidget):
         return QPointF((point.x() - t.x()) / self.view.scale, (point.y() - t.y()) / self.view.scale)
 
     def mousePressEvent(self, e):
+        if self.erase_mode and e.button() == Qt.MouseButton.LeftButton and self.has_content():
+            self.stroke = [e.position()]
+            self.update()
+            return
         if self.crop_mode and e.button() == Qt.MouseButton.LeftButton and self.has_content():
             self.band = [e.position(), e.position()]
             self.update()
@@ -561,6 +701,10 @@ class Canvas(QWidget):
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
 
     def mouseMoveEvent(self, e):
+        if self.stroke is not None:
+            self.stroke.append(e.position())
+            self.update()
+            return
         if self.band is not None:
             self.band[1] = e.position()
             self.update()
@@ -571,6 +715,11 @@ class Canvas(QWidget):
             self.view.move(d.x(), d.y())
 
     def mouseReleaseEvent(self, e):
+        if self.stroke is not None:
+            stroke, self.stroke = self.stroke, None
+            self.update()
+            self.erased.emit(self.eraser / self.view.scale, [self.to_picture(q) for q in stroke])
+            return
         press, self.press = getattr(self, "press", None), None
         if press is not None and self.band is None and (e.position() - press).manhattanLength() < 4 \
                 and self.has_content():
@@ -698,24 +847,26 @@ def auto_options(img, current):
     # the trace was made with another threshold than the one the panel keeps)
     threshold = picked.threshold if picked.mode == engine.BRIGHTNESS else current.threshold
     # (the color edits stay: they're the user's, for this picture)
-    return replace(picked, threshold=threshold, stack=True, invert=False, edits=current.edits), info
+    # (Snap shapes stays as it is: it's a choice about the result, not something a picture needs)
+    return replace(picked, threshold=threshold, stack=True, invert=False, edits=current.edits,
+                   snap=current.snap), info
 
 
 def describe_auto(options, info):
     """What Auto picked, in a few words for the status bar."""
     if options.mode == engine.BRIGHTNESS:
-        parts = ["black and white"]
+        parts = [tr("black and white")]
     else:
-        parts = ["%d colors" % options.scans]
+        parts = [tr("%d colors") % options.scans]
         if info.photo:
-            parts[0] += " (a photo or painting: it has more)"
+            parts[0] += tr(" (a photo or painting: it has more)")
     if options.smooth:
-        parts.append("smoothed")
+        parts.append(tr("smoothed"))
     if options.remove_background:
-        parts.append("transparent background kept")
+        parts.append(tr("transparent background kept"))
     if getattr(info, "line_art", False):
-        parts.append("thin lines: enlarged %d times first" % info.enlarge)
-    return "Auto: " + ", ".join(parts)
+        parts.append(tr("thin lines: enlarged %d times first") % info.enlarge)
+    return tr("Auto: %s") % ", ".join(parts)
 
 
 class Settings(QScrollArea):
@@ -731,37 +882,37 @@ class Settings(QScrollArea):
         box = QWidget()
         lay = QVBoxLayout(box)
 
-        self.auto = QPushButton("Auto settings")
-        self.auto.setToolTip("Pick the settings that suit this picture (you can change them after)")
+        self.auto = QPushButton(tr("Auto settings"))
+        self.auto.setToolTip(tr("Pick the settings that suit this picture (you can change them after)"))
         lay.addWidget(self.auto)
 
         self.mode = QComboBox()
         for label, mode in MODES:
-            self.mode.addItem(label, mode)
+            self.mode.addItem(tr(label), mode)
         top = QFormLayout()
-        top.addRow("Mode", self.mode)
+        top.addRow(tr("Mode"), self.mode)
         lay.addLayout(top)
 
-        self.g_multi = QGroupBox("Layers")
+        self.g_multi = QGroupBox(tr("Layers"))
         f = QFormLayout(self.g_multi)
         self.scans = QSpinBox(minimum=2, maximum=64, value=8)
-        self.scans.setToolTip("How many colors (count the background too)")
-        self.scans_label = QLabel("Colors")
+        self.scans.setToolTip(tr("How many colors (count the background too)"))
+        self.scans_label = QLabel(tr("Colors"))
         f.addRow(self.scans_label, self.scans)
-        self.smooth = QCheckBox("Smooth", checked=True)
-        self.smooth.setToolTip("Even out noise and JPEG blotches first; edges stay sharp")
-        self.stack = QCheckBox("Stack", checked=True)
-        self.stack.setToolTip("Each layer also covers the layers above it, so no gaps show")
+        self.smooth = QCheckBox(tr("Smooth"), checked=True)
+        self.smooth.setToolTip(tr("Even out noise and JPEG blotches first; edges stay sharp"))
+        self.stack = QCheckBox(tr("Stack"), checked=True)
+        self.stack.setToolTip(tr("Each layer also covers the layers above it, so no gaps show"))
         for w in (self.smooth, self.stack):
             f.addRow(w)
         self.remove_bg = QComboBox()
-        self.remove_bg.addItem("Keep", engine.BG_KEEP)
-        self.remove_bg.addItem("Remove", engine.BG_REMOVE)
-        self.remove_bg.addItem("Remove, also inside", engine.BG_REMOVE_ALL)
-        self.remove_bg.setToolTip("Leave out the picture's background (the color around its edge):\n"
+        self.remove_bg.addItem(tr("Keep"), engine.BG_KEEP)
+        self.remove_bg.addItem(tr("Remove"), engine.BG_REMOVE)
+        self.remove_bg.addItem(tr("Remove, also inside"), engine.BG_REMOVE_ALL)
+        self.remove_bg.setToolTip(tr("Leave out the picture's background (the color around its edge):\n"
                                   "Remove: around the picture only (that color inside shapes stays)\n"
-                                  "Remove, also inside: that color everywhere")
-        self.bg_label = QLabel("Background")
+                                  "Remove, also inside: that color everywhere"))
+        self.bg_label = QLabel(tr("Background"))
         f.addRow(self.bg_label, self.remove_bg)
         lay.addWidget(self.g_multi)
 
@@ -769,74 +920,79 @@ class Settings(QScrollArea):
         self.colors.changed.connect(self.changed)
         lay.addWidget(self.colors)
 
-        self.g_single = QGroupBox("Scan")
+        self.g_single = QGroupBox(tr("Scan"))
         f = QFormLayout(self.g_single)
         self.threshold = QDoubleSpinBox(minimum=0.0, maximum=1.0, singleStep=0.05, decimals=2, value=0.45)
-        self.threshold.setToolTip("Black and white: everything darker than this is traced.\n"
-                                  "Edges: higher finds fewer edges.")
-        self.invert = QCheckBox("Invert")
-        self.invert.setToolTip("Trace the light parts instead")
-        f.addRow("Threshold", self.threshold)
+        self.threshold.setToolTip(tr("Black and white: everything darker than this is traced.\n"
+                                  "Edges: higher finds fewer edges."))
+        self.invert = QCheckBox(tr("Invert"))
+        self.invert.setToolTip(tr("Trace the light parts instead"))
+        f.addRow(tr("Threshold"), self.threshold)
         f.addRow(self.invert)
         lay.addWidget(self.g_single)
 
-        self.g_potrace = QGroupBox("Curves")
+        self.g_potrace = QGroupBox(tr("Curves"))
         f = QFormLayout(self.g_potrace)
         self.speckles = QSpinBox(minimum=0, maximum=1000, value=2)
-        self.speckles.setToolTip("Drop spots of up to this many pixels")
+        self.speckles.setToolTip(tr("Drop spots of up to this many pixels"))
         self.corners = QDoubleSpinBox(minimum=0.0, maximum=1.34, singleStep=0.1, decimals=2, value=1.0)
-        self.corners.setToolTip("0 keeps every corner sharp; higher rounds them off")
-        self.optimize = QCheckBox("Optimize", checked=True)
-        self.optimize.setToolTip("Join curve segments: smaller files")
+        self.corners.setToolTip(tr("0 keeps every corner sharp; higher rounds them off"))
+        self.optimize = QCheckBox(tr("Optimize"), checked=True)
+        self.optimize.setToolTip(tr("Join curve segments: smaller files"))
         self.tolerance = QDoubleSpinBox(minimum=0.0, maximum=5.0, singleStep=0.1, decimals=2, value=0.2)
-        self.tolerance.setToolTip("How far joining segments may move the curve")
-        f.addRow("Speckles", self.speckles)
-        f.addRow("Smooth corners", self.corners)
+        self.tolerance.setToolTip(tr("How far joining segments may move the curve"))
+        f.addRow(tr("Speckles"), self.speckles)
+        f.addRow(tr("Smooth corners"), self.corners)
         f.addRow(self.optimize)
-        f.addRow("Tolerance", self.tolerance)
+        f.addRow(tr("Tolerance"), self.tolerance)
+        self.snap = QCheckBox(tr("Snap shapes"))
+        self.snap.setToolTip(tr("Make (all but) straight edges straight, level and upright ones exactly level and "
+                             "upright, and round shapes perfect circles and ellipses: for cutting, CAD and clean "
+                             "logos (it can move an edge up to half a pixel)"))
+        f.addRow(self.snap)
         lay.addWidget(self.g_potrace)
 
-        self.g_auto = QGroupBox("Autotrace")
+        self.g_auto = QGroupBox(tr("Autotrace"))
         f = QFormLayout(self.g_auto)
         self.error = QDoubleSpinBox(minimum=0.1, maximum=10.0, singleStep=0.25, decimals=2, value=2.0)
-        self.error.setToolTip("How far a curve may be from the outline, in pixels")
+        self.error.setToolTip(tr("How far a curve may be from the outline, in pixels"))
         self.filters = QSpinBox(minimum=0, maximum=20, value=4)
-        self.filters.setToolTip("Smoothing passes on outlines before fitting curves")
-        self.width = QCheckBox("Keep line widths", checked=True)
-        f.addRow("Error threshold", self.error)
-        f.addRow("Filter passes", self.filters)
+        self.filters.setToolTip(tr("Smoothing passes on outlines before fitting curves"))
+        self.width = QCheckBox(tr("Keep line widths"), checked=True)
+        f.addRow(tr("Error threshold"), self.error)
+        f.addRow(tr("Filter passes"), self.filters)
         f.addRow(self.width)
         lay.addWidget(self.g_auto)
 
-        g = QGroupBox("Size")
+        g = QGroupBox(tr("Size"))
         f = QFormLayout(g)
         self.enlarge = QComboBox()
-        self.enlarge.addItem("Auto", tracing.AUTO)
-        self.enlarge.addItem("Off", 1)
-        self.enlarge.addItem("2 times", 2)
-        self.enlarge.addItem("4 times", 4)
-        self.enlarge.setToolTip("Trace small pictures bigger, for smoother curves (the SVG keeps the picture's size)")
-        f.addRow("Enlarge first", self.enlarge)
+        self.enlarge.addItem(tr("Auto"), tracing.AUTO)
+        self.enlarge.addItem(tr("Off"), 1)
+        self.enlarge.addItem(tr("2 times"), 2)
+        self.enlarge.addItem(tr("4 times"), 4)
+        self.enlarge.setToolTip(tr("Trace small pictures bigger, for smoother curves (the SVG keeps the picture's size)"))
+        f.addRow(tr("Enlarge first"), self.enlarge)
         # the size it's saved at (SVG, PDF, EPS, DXF): changes only the file, not the trace
         self.size_unit = QComboBox()
-        self.size_unit.addItem("Picture's pixels", export.PX)
-        self.size_unit.addItem("Inches", export.IN)
-        self.size_unit.addItem("Millimeters", export.MM)
-        self.size_unit.setToolTip("The width it's saved at; the height follows. Picture's pixels: the picture's own "
-                                  "size, 96 pixels to the inch (as browsers, Inkscape and Illustrator count them)")
+        self.size_unit.addItem(tr("Picture's pixels"), export.PX)
+        self.size_unit.addItem(tr("Inches"), export.IN)
+        self.size_unit.addItem(tr("Millimeters"), export.MM)
+        self.size_unit.setToolTip(tr("The width it's saved at; the height follows. Picture's pixels: the picture's own "
+                                  "size, 96 pixels to the inch (as browsers, Inkscape and Illustrator count them)"))
         self.size_width = QDoubleSpinBox(minimum=0.01, maximum=100000.0, decimals=2, value=4.0)
-        self.size_width.setToolTip("The saved width, in the unit beside it (the height follows the picture)")
+        self.size_width.setToolTip(tr("The saved width, in the unit beside it (the height follows the picture)"))
         self.size_info = QLabel()
         self.size_info.setWordWrap(True)
         row = QHBoxLayout()
         row.addWidget(self.size_width, 1)
         row.addWidget(self.size_unit, 1)
-        f.addRow("Saved width", row)
+        f.addRow(tr("Saved width"), row)
         f.addRow(self.size_info)
         self.picture_px = None      # the picture's width in pixels (MainWindow sets it): for the first width
         lay.addWidget(g)
 
-        self.reset = QPushButton("Reset settings")
+        self.reset = QPushButton(tr("Reset settings"))
         lay.addWidget(self.reset)
         lay.addStretch(1)
         self.setWidget(box)
@@ -850,7 +1006,7 @@ class Settings(QScrollArea):
             w.valueChanged.connect(self._changed)
         for w in (self.threshold, self.corners, self.tolerance, self.error):
             w.valueChanged.connect(self._changed)
-        for w in (self.smooth, self.stack, self.invert, self.optimize, self.width):
+        for w in (self.smooth, self.stack, self.invert, self.optimize, self.width, self.snap):
             w.toggled.connect(self._changed)
         self.reset.clicked.connect(self.reset_all)
         self._unit = export.PX
@@ -911,7 +1067,7 @@ class Settings(QScrollArea):
         self.stack.setVisible(mode in MULTI_MODES)
         self.remove_bg.setVisible(mode in MULTI_MODES or mode == engine.AUTOTRACE)
         self.bg_label.setVisible(mode in MULTI_MODES or mode == engine.AUTOTRACE)
-        self.scans_label.setText({engine.GRAYS: "Grays", engine.BRIGHTNESS_STEPS: "Steps"}.get(mode, "Colors"))
+        self.scans_label.setText({engine.GRAYS: tr("Grays"), engine.BRIGHTNESS_STEPS: tr("Steps")}.get(mode, tr("Colors")))
         self.g_single.setVisible(mode in (engine.BRIGHTNESS, engine.EDGES))
         self.g_potrace.setVisible(mode in POTRACE_MODES)
         self.g_auto.setVisible(mode in AUTOTRACE_MODES)
@@ -935,6 +1091,7 @@ class Settings(QScrollArea):
             filter_iterations=self.filters.value(),
             preserve_width=self.width.isChecked(),
             edits=self.colors.edits_tuple(),
+            snap=engine.SNAP_ALL if self.snap.isChecked() else 0,
         )
 
     def enlarge_setting(self):
@@ -978,7 +1135,7 @@ class Settings(QScrollArea):
 
     # saved between runs
     _SAVED = ["mode", "scans", "smooth", "stack", "remove_bg", "threshold", "invert", "speckles", "corners",
-              "optimize", "tolerance", "error", "filters", "width", "enlarge"]
+              "optimize", "tolerance", "error", "filters", "width", "enlarge", "snap"]
 
     def _widgets(self):
         return [(name, getattr(self, name)) for name in self._SAVED]
@@ -1120,6 +1277,7 @@ class Settings(QScrollArea):
         self.filters.setValue(4)
         self.width.setChecked(True)
         self.enlarge.setCurrentIndex(0)
+        self.snap.setChecked(False)
         for w in widgets:
             w.blockSignals(False)
         self._edge, self._bw, self._last_mode = 0.65, 0.45, engine.COLORS
@@ -1136,11 +1294,14 @@ class MainWindow(QMainWindow):
         self.img = None  # QImage, RGBA8888: the picture traced (cropped, if it is)
         self.full_img = None  # the whole picture opened
         self.crop = None  # QRect of full_img that img is, or None
+        self.erased = ()  # (Erase on the picture) strokes: (radius, ((x, y), ...)) in full_img's pixels
         self.history = []  # Undo: (settings, crop) of each SVG traced for this picture
         self.history_at = -1
         self.source_path = None
         self.save_path = None
         self.savers = []  # Saver threads still writing
+        self.batch = None  # the Convert many pictures dialog, once opened
+        self.help = None  # the help window, once opened
         self.result = None  # tracing.Result
         self.preview = None  # QImage
         self.job_number = 0
@@ -1155,12 +1316,13 @@ class MainWindow(QMainWindow):
         self.load_number = 0
 
         self.view = View()
-        self.left = Canvas(self.view, "Picture")
+        self.left = Canvas(self.view, tr("Picture"))
         self.left.cropped.connect(self.on_cropped)
         self.left.clicked.connect(self.on_picture_clicked)
-        self.right = Canvas(self.view, "SVG")
+        self.left.erased.connect(self.on_erased)
+        self.right = Canvas(self.view, tr("SVG"))
         self.right.clicked.connect(self.on_picture_clicked)    # (the SVG: the same place in the picture)
-        self.left.set_message("Open a picture (Ctrl+O), drag one here, or paste one (Ctrl+V).")
+        self.left.set_message(tr("Open a picture (Ctrl+O), drag one here, or paste one (Ctrl+V)."))
         split = QSplitter()
         split.addWidget(self.left)
         split.addWidget(self.right)
@@ -1212,49 +1374,75 @@ class MainWindow(QMainWindow):
 
     def _make_menus(self):
         mb = self.menuBar()
-        m = mb.addMenu("&File")
-        self._action(m, "Open picture...", self.open_dialog, QKeySequence.StandardKey.Open)
-        self.a_paste = self._action(m, "Paste picture", self.paste, QKeySequence.StandardKey.Paste)
+        m = mb.addMenu(tr("&File"))
+        self._action(m, tr("Open picture..."), self.open_dialog, QKeySequence.StandardKey.Open)
+        self.m_recent = m.addMenu(tr("Open recent"))
+        self.m_recent.aboutToShow.connect(self._fill_recent)
+        self._fill_recent()
+        self._action(m, tr("Convert many pictures..."), lambda: self.convert_many(), "Ctrl+Shift+O")
+        self.a_paste = self._action(m, tr("Paste picture"), self.paste, QKeySequence.StandardKey.Paste)
         m.addSeparator()
-        self.a_save = self._action(m, "Save...", self.save, QKeySequence.StandardKey.Save)
-        self.a_save_as = self._action(m, "Save as...", self.save_as, "Ctrl+Shift+S")
-        self.a_copy = self._action(m, "Copy SVG", self.copy_svg, "Ctrl+Shift+C")
+        self.a_save = self._action(m, tr("Save..."), self.save, QKeySequence.StandardKey.Save)
+        self.a_save_as = self._action(m, tr("Save as..."), self.save_as, "Ctrl+Shift+S")
+        self.a_copy = self._action(m, tr("Copy SVG"), self.copy_svg, "Ctrl+Shift+C")
         m.addSeparator()
-        self._action(m, "Quit", self.close, QKeySequence.StandardKey.Quit)
+        self._action(m, tr("Quit"), self.close, QKeySequence.StandardKey.Quit)
 
-        m = mb.addMenu("&Edit")
-        self.a_undo = self._action(m, "Undo", self.undo, QKeySequence.StandardKey.Undo)
-        self.a_redo = self._action(m, "Redo", self.redo, QKeySequence.StandardKey.Redo)
+        m = mb.addMenu(tr("&Edit"))
+        self.a_undo = self._action(m, tr("Undo"), self.undo, QKeySequence.StandardKey.Undo)
+        self.a_redo = self._action(m, tr("Redo"), self.redo, QKeySequence.StandardKey.Redo)
 
-        m = mb.addMenu("&View")
-        self.a_colors = self._action(m, "Show colors to trace", self.show_colors_changed, "Ctrl+T", True)
+        m = mb.addMenu(tr("&View"))
+        self.a_colors = self._action(m, tr("Show colors to trace"), self.show_colors_changed, "Ctrl+T", True)
+        self.a_outlines = self._action(m, tr("Show outlines"), self.show_outlines_changed, "Ctrl+L", True)
+        if int(self.qs.value("view/outlines", 0)):
+            self.a_outlines.setChecked(True)
+            self.right.set_outlines(True)
         m.addSeparator()
-        self._action(m, "Zoom in", lambda: self.view.zoom(1.25), QKeySequence.StandardKey.ZoomIn)
-        self._action(m, "Zoom out", lambda: self.view.zoom(0.8), QKeySequence.StandardKey.ZoomOut)
-        self._action(m, "Zoom to fit", lambda: self.view.fit(self.left.size()), "Ctrl+0")
-        self._action(m, "Actual size", self.actual_size, "Ctrl+1")
+        self._action(m, tr("Zoom in"), lambda: self.view.zoom(1.25), QKeySequence.StandardKey.ZoomIn)
+        self._action(m, tr("Zoom out"), lambda: self.view.zoom(0.8), QKeySequence.StandardKey.ZoomOut)
+        self._action(m, tr("Zoom to fit"), lambda: self.view.fit(self.left.size()), "Ctrl+0")
+        self._action(m, tr("Actual size"), self.actual_size, "Ctrl+1")
+        m.addSeparator()
+        lang_menu = m.addMenu(tr("Language"))
+        from PySide6.QtGui import QActionGroup
+        group = QActionGroup(self)
+        wanted = str(self.qs.value("view/language", "auto") or "auto")
+        self.language_actions = {}
+        for code, label in (("auto", tr("Automatic (the system's)")), ("en", "English"), ("es", "Español")):
+            a = lang_menu.addAction(label)
+            a.setCheckable(True)
+            a.setChecked(code == wanted)
+            group.addAction(a)
+            a.triggered.connect(lambda _c=False, code=code: self.set_language(code))
+            self.language_actions[code] = a
 
-        m = mb.addMenu("&Trace")
-        self.a_auto = self._action(m, "Update automatically", self.auto_changed, None, True)
+        m = mb.addMenu(tr("&Trace"))
+        self.a_auto = self._action(m, tr("Update automatically"), self.auto_changed, None, True)
         self.a_auto.setChecked(bool(int(self.qs.value("trace/auto", 1))))
-        self._action(m, "Update now", lambda: self.start_trace(), "F5")
+        self._action(m, tr("Update now"), lambda: self.start_trace(), "F5")
         m.addSeparator()
-        self._action(m, "Auto settings", self.auto_settings, "Ctrl+Shift+A")
-        self.a_auto_new = self._action(m, "Auto settings for new pictures", self.auto_new_changed, None, True)
+        self._action(m, tr("Auto settings"), self.auto_settings, "Ctrl+Shift+A")
+        self.a_auto_new = self._action(m, tr("Auto settings for new pictures"), self.auto_new_changed, None, True)
         self.a_auto_new.setChecked(bool(int(self.qs.value("trace/auto_new", 1))))
-        self._action(m, "Reset settings", self.settings.reset_all)
+        self._action(m, tr("Reset settings"), self.settings.reset_all)
         m.addSeparator()
-        self.a_crop = self._action(m, "Crop picture", self.start_crop, "Ctrl+R")
-        self.a_uncrop = self._action(m, "Remove crop", self.remove_crop, "Ctrl+Shift+R")
+        self.a_crop = self._action(m, tr("Crop picture"), self.start_crop, "Ctrl+R")
+        self.a_uncrop = self._action(m, tr("Remove crop"), self.remove_crop, "Ctrl+Shift+R")
+        m.addSeparator()
+        self.a_erase = self._action(m, tr("Erase on the picture"), lambda on: self.start_erasing(on), "Ctrl+E", True)
+        self._action(m, tr("Smaller eraser"), lambda: self.eraser_size(1 / 1.5), "[")
+        self._action(m, tr("Bigger eraser"), lambda: self.eraser_size(1.5), "]")
+        self.a_unerase = self._action(m, tr("Restore the picture"), self.restore_picture, "Ctrl+Shift+E")
 
-        m = mb.addMenu("&Help")
-        self._action(m, "How to use KanzonasSVG", self.show_help, QKeySequence.StandardKey.HelpContents)
+        m = mb.addMenu(tr("&Help"))
+        self._action(m, tr("How to use KanzonasSVG"), self.show_help, QKeySequence.StandardKey.HelpContents)
         m.addSeparator()
-        self._action(m, "Check for updates...", self.check_updates)
-        self.a_auto_updates = self._action(m, "Check for updates automatically", self.auto_updates_changed, None, True)
+        self._action(m, tr("Check for updates..."), self.check_updates)
+        self.a_auto_updates = self._action(m, tr("Check for updates automatically"), self.auto_updates_changed, None, True)
         self.a_auto_updates.setChecked(self.updater().enabled())
         m.addSeparator()
-        self._action(m, "About KanzonasSVG", self.about)
+        self._action(m, tr("About KanzonasSVG"), self.about)
 
     def _update_actions(self):
         has = self.result is not None
@@ -1265,6 +1453,8 @@ class MainWindow(QMainWindow):
         self.a_undo.setEnabled(self.history_at > 0)
         self.a_redo.setEnabled(self.history_at + 1 < len(self.history))
         self.a_uncrop.setEnabled(self.crop is not None)
+        self.a_erase.setEnabled(self.img is not None)
+        self.a_unerase.setEnabled(bool(self.erased))
 
     def _update_title(self):
         name = os.path.basename(self.source_path) if self.source_path else None
@@ -1274,9 +1464,24 @@ class MainWindow(QMainWindow):
 
     def open_dialog(self):
         start = self.qs.value("paths/open", os.path.expanduser("~"))
-        path, _ = QFileDialog.getOpenFileName(self, "Open picture", start, PICTURE_FILTER)
-        if path:
-            self.open_path(path)
+        paths, _ = QFileDialog.getOpenFileNames(self, tr("Open picture"), start, picture_filter())
+        if len(paths) == 1:
+            self.open_path(paths[0])
+        elif paths:
+            self.qs.setValue("paths/open", os.path.dirname(os.path.abspath(paths[0])))
+            self.convert_many(paths)        # (several: to convert them all)
+
+    def convert_many(self, files=()):
+        """File > Convert many pictures...: the dialog (one; more pictures are added to it)."""
+        from kanzonassvg.batch import BatchDialog
+        if self.batch is None:
+            self.batch = BatchDialog(self, files)
+        else:
+            self.batch.add_files(files)
+        self.batch.show()
+        self.batch.raise_()
+        self.batch.activateWindow()
+        return self.batch
 
     def open_path(self, path):
         """Open a picture: the quick checks now (a message at once if it can't be read), the
@@ -1294,7 +1499,7 @@ class MainWindow(QMainWindow):
         self.loader.loaded.connect(self.on_loaded)
         self.loader.failed.connect(self.on_load_failed)
         self.loader.finished.connect(self.on_loader_finished)
-        self.status.setText("Opening %s..." % os.path.basename(path))
+        self.status.setText(tr("Opening %s...") % os.path.basename(path))
         self.loader.start()
         return True
 
@@ -1304,6 +1509,49 @@ class MainWindow(QMainWindow):
     def on_loaded(self, number, img, path):
         if number == self.load_number and not self.closing:
             self.set_image(img, path)
+            self.remember_recent(path)
+
+    # File > Open recent: the last pictures opened, newest first
+
+    RECENT = 10
+
+    def recent_files(self):
+        v = self.qs.value("recent/files", [])
+        if isinstance(v, str):          # (QSettings gives one item back as a string)
+            v = [v]
+        return [str(p) for p in (v or []) if p][:self.RECENT]
+
+    def remember_recent(self, path):
+        path = os.path.abspath(path)
+        files = [path] + [p for p in self.recent_files() if os.path.normcase(p) != os.path.normcase(path)]
+        self.qs.setValue("recent/files", files[:self.RECENT])
+
+    def _fill_recent(self):
+        self.m_recent.clear()
+        files = self.recent_files()
+        for i, path in enumerate(files):
+            # (an & in a name would underline the next letter: doubled)
+            a = self.m_recent.addAction("&%d %s" % ((i + 1) % 10, os.path.basename(path).replace("&", "&&")))
+            a.setToolTip(path)
+            a.setStatusTip(path)
+            a.triggered.connect(lambda _c=False, p=path: self.open_recent(p))
+        if files:
+            self.m_recent.addSeparator()
+            self.m_recent.addAction(tr("Clear the list"), self.clear_recent)
+        else:
+            self.m_recent.addAction(tr("No pictures yet")).setEnabled(False)
+        self.m_recent.menuAction().setEnabled(True)
+
+    def open_recent(self, path):
+        if not os.path.isfile(path):
+            self.qs.setValue("recent/files", [p for p in self.recent_files() if p != path])
+            QMessageBox.warning(self, APP_NAME, tr("%s isn't there any more (it was moved, renamed or deleted); "
+                                "it's off the list now.") % path)
+            return False
+        return self.open_path(path)
+
+    def clear_recent(self):
+        self.qs.setValue("recent/files", [])
 
     def on_load_failed(self, number, message):
         if number == self.load_number and not self.closing:
@@ -1324,7 +1572,7 @@ class MainWindow(QMainWindow):
                 if url.isLocalFile():
                     return self.open_path(url.toLocalFile())
         if img is None or img.isNull():
-            QMessageBox.information(self, APP_NAME, "There's no picture on the clipboard. Copy a picture first.")
+            QMessageBox.information(self, APP_NAME, tr("There's no picture on the clipboard. Copy a picture first."))
             return False
         try:
             self.set_image(image.to_rgba(img), None)
@@ -1337,6 +1585,7 @@ class MainWindow(QMainWindow):
         """A new picture: opened, pasted or dropped."""
         self.full_img = img
         self.crop = None
+        self.erased = ()
         self.history, self.history_at = [], -1     # (Undo is for this picture)
         self.settings.colors.clear()    # (color edits are for the picture they were made on)
         self.source_path = path
@@ -1358,14 +1607,14 @@ class MainWindow(QMainWindow):
         self.right.set_message("")
         self._update_title()
         self._update_actions()
-        self.right.title = "SVG"
+        self.right.title = tr("SVG")
         self.start_trace(auto=self.a_auto_new.isChecked() if auto is None else auto)
 
     # Undo: every SVG traced for this picture, with the settings and crop it was traced with
 
     def _state(self):
         c = self.crop
-        return (self.settings.snapshot(), None if c is None else (c.x(), c.y(), c.width(), c.height()))
+        return (self.settings.snapshot(), None if c is None else (c.x(), c.y(), c.width(), c.height()), self.erased)
 
     def remember(self):
         """The SVG shown is done: remember how it was made (unless more changes are on their way,
@@ -1386,7 +1635,7 @@ class MainWindow(QMainWindow):
         if not (0 <= at < len(self.history)) or self.full_img is None:
             return
         self.history_at = at
-        snap, crop = self.history[at]
+        snap, crop, erased = self.history[at]
         self.cancel_crop()
         self.restoring = True
         try:
@@ -1394,8 +1643,11 @@ class MainWindow(QMainWindow):
             self.settings.save(self.qs)
             new_crop = None if crop is None else QRect(*crop)
             if new_crop != self.crop:
-                self.crop = new_crop
-                self._show_picture(self.full_img if new_crop is None else self.full_img.copy(new_crop), auto=False)
+                self.crop, self.erased = new_crop, erased
+                self._show_picture(self.picture_now(), auto=False)
+            elif erased != self.erased:
+                self.erased = erased
+                self._update_picture(self.picture_now())
             else:
                 self.start_trace()
         finally:
@@ -1424,20 +1676,24 @@ class MainWindow(QMainWindow):
         g = colors.select_at((c.red(), c.green(), c.blue()), add, in_bg)
         if g is not None:
             n = len(colors._selected_groups())
-            self.status.setText("%s %s%s in Colors (%s)%s." % (
-                "Unselected" if add and not set(g.members) & colors.selected else "Selected",
-                "the background, " if g.background else "",
-                "#%02x%02x%02x" % g.color, "left out" if g.left_out else "%d%% of the picture" % round(
-                    100.0 * g.count / colors.total()),
-                "; %d colors selected" % n if n > 1 else ""))
+            unselected = add and not set(g.members) & colors.selected
+            if g.background:
+                said = tr("Unselected the background, %s in Colors (%s)") if unselected \
+                    else tr("Selected the background, %s in Colors (%s)")
+            else:
+                said = tr("Unselected %s in Colors (%s)") if unselected else tr("Selected %s in Colors (%s)")
+            how = tr("left out") if g.left_out else tr("%d%% of the picture") % round(100.0 * g.count / colors.total())
+            self.status.setText(said % ("#%02x%02x%02x" % g.color, how)
+                                + (tr("; %d colors selected") % n if n > 1 else "") + ".")
 
     # cropping
 
     def start_crop(self):
         if self.img is None:
             return
+        self.a_erase.setChecked(False)
         self.left.set_crop_mode(True)
-        self.status.setText("Drag across the picture on the left to crop it (Esc: cancel).")
+        self.status.setText(tr("Drag across the picture on the left to crop it (Esc: cancel)."))
 
     def cancel_crop(self):
         if self.left.crop_mode:
@@ -1449,6 +1705,10 @@ class MainWindow(QMainWindow):
         if e.key() == Qt.Key.Key_Escape and self.cancel_crop():
             self.status.setText("")
             return
+        if e.key() == Qt.Key.Key_Escape and self.left.erase_mode:
+            self.start_erasing(False)
+            self.status.setText("")
+            return
         super().keyPressEvent(e)
 
     def on_cropped(self, rect):
@@ -1458,7 +1718,7 @@ class MainWindow(QMainWindow):
             return
         r = rect.toAlignedRect().intersected(QRect(0, 0, self.img.width(), self.img.height()))
         if r.width() < 2 or r.height() < 2:
-            self.status.setText("Too small to crop to: drag across the part to trace.")
+            self.status.setText(tr("Too small to crop to: drag across the part to trace."))
             return
         self.crop_to(r)
 
@@ -1467,14 +1727,61 @@ class MainWindow(QMainWindow):
         if self.crop is not None:
             r = r.translated(self.crop.topLeft())
         self.crop = r
-        self._show_picture(self.full_img.copy(r))
+        self._show_picture(self.picture_now())
 
     def remove_crop(self):
         if self.crop is None or self.full_img is None:
             return
         self.cancel_crop()
         self.crop = None
-        self._show_picture(self.full_img)
+        self._show_picture(self.picture_now())
+
+    # erasing parts of the picture (they're traced as see-through, as a transparent picture's are)
+
+    def picture_now(self):
+        """The picture as it's traced: the one opened, with the parts erased see-through, cropped."""
+        img = self.full_img
+        if self.erased:
+            img = erase(img, self.erased)
+        return img if self.crop is None else img.copy(self.crop)
+
+    def _update_picture(self, img):
+        """The same picture, changed (erased): traced again, the view as it is."""
+        self.img = img
+        self.preview = None
+        self.left.set_picture(img)
+        self.start_trace(auto=False)
+
+    def start_erasing(self, on=True):
+        if self.img is None:
+            on = False
+        self.a_erase.setChecked(on)
+        self.left.set_erase_mode(on)
+        if on:
+            self.cancel_crop()
+            self.status.setText(tr("Drag across the picture on the left to erase (the eraser: [ smaller, ] bigger, "
+                                "%d pixels across on the screen). Esc or Ctrl+E: stop erasing.") % (2 * self.left.eraser))
+
+    def eraser_size(self, factor):
+        self.left.eraser = max(2, min(200, round(self.left.eraser * factor)))
+        if self.left.erase_mode:
+            self.start_erasing(True)
+
+    def on_erased(self, radius, points):
+        """A stroke dragged on the picture shown: erase it (in the opened picture's pixels)."""
+        if self.full_img is None or not points:
+            return
+        dx, dy = (self.crop.x(), self.crop.y()) if self.crop is not None else (0, 0)
+        stroke = (round(radius, 2), tuple((round(q.x() + dx, 2), round(q.y() + dy, 2)) for q in points))
+        self.erased = self.erased + (stroke,)
+        self._update_picture(self.picture_now())
+
+    def restore_picture(self):
+        """Trace > Restore the picture: nothing erased any more."""
+        if not self.erased:
+            return
+        self.erased = ()
+        self._update_picture(self.picture_now())
 
     def dragEnterEvent(self, e):
         if e.mimeData().hasUrls() or e.mimeData().hasImage():
@@ -1482,10 +1789,13 @@ class MainWindow(QMainWindow):
 
     def dropEvent(self, e):
         md = e.mimeData()
-        for url in md.urls():
-            if url.isLocalFile():
-                self.open_path(url.toLocalFile())
-                return
+        local = [u.toLocalFile() for u in md.urls() if u.isLocalFile()]
+        if len(local) > 1 or (local and os.path.isdir(local[0])):
+            self.convert_many(local)        # (several pictures, or a folder: to convert them all)
+            return
+        if local:
+            self.open_path(local[0])
+            return
         if md.hasImage():
             img = QImage(md.imageData())
             if not img.isNull():
@@ -1540,7 +1850,7 @@ class MainWindow(QMainWindow):
         self.worker.finished.connect(self.on_finished)
         self.bar.setValue(0)
         self.bar.show()
-        self.status.setText("Picking settings..." if auto else "Tracing...")
+        self.status.setText(tr("Picking settings...") if auto else tr("Tracing..."))
         self.worker.start()
 
     def on_quick_done(self, number, svg):
@@ -1550,8 +1860,8 @@ class MainWindow(QMainWindow):
         self.result = None
         self.right.set_message("")
         self.right.set_svg(svg)
-        self.right.title = "SVG (quick preview)"
-        self.status.setText("Quick preview shown; tracing the whole picture...")
+        self.right.title = tr("SVG (quick preview)")
+        self.status.setText(tr("Quick preview shown; tracing the whole picture..."))
         self._update_actions()
 
     def on_auto_done(self, number, options, info):
@@ -1559,7 +1869,7 @@ class MainWindow(QMainWindow):
             return
         self.settings.apply_auto(options, self.job.enlarge)
         self.settings.save(self.qs)
-        self.status.setText(describe_auto(options, info) + ". Tracing...")
+        self.status.setText(describe_auto(options, info) + tr(". Tracing..."))
 
     def on_progress(self, number, f):
         if number == self.job_number:
@@ -1573,25 +1883,26 @@ class MainWindow(QMainWindow):
             self.preview = preview
         self.settings.colors.set_palette(result.palette)
         self.right.set_message("")
+        self.right.nodes = result.nodes
         self.right.set_svg(result.svg)
         if self.a_colors.isChecked() and self.preview is not None:
             self.left.set_picture(self.preview)
         size = len(result.svg.encode("utf-8"))
         # (the size Save writes: the same bytes)
-        self.right.title = "SVG: %s, %d shapes, %s nodes" % (_size_text(size), result.shapes,
-                                                            "{:,}".format(result.nodes))
+        self.right.title = tr("SVG: %s, %d shapes, %s nodes") % (_size_text(size), result.shapes,
+                                                            i18n.whole(result.nodes))
         self.right.update()
         self._show_saved_size()
         self.remember()
-        text = "%d shapes, %s nodes, %s, traced in %.2f s" % (result.shapes, "{:,}".format(result.nodes),
-                                                              _size_text(size), result.seconds)
+        text = tr("%d shapes, %s nodes, %s, traced in %.2f s") % (result.shapes, i18n.whole(result.nodes),
+                                                                  _size_text(size), result.seconds)
         if result.factor != 1:
-            text += " (at %d times the size)" % result.factor
+            text += tr(" (at %d times the size)") % result.factor
         if self.crop is not None:
-            text += "; cropped to %d x %d pixels" % (self.crop.width(), self.crop.height())
+            text += tr("; cropped to %d x %d pixels") % (self.crop.width(), self.crop.height())
         edited = self.settings.colors.edited_count()
         if edited:
-            text += "; %d color%s edited" % (edited, "" if edited == 1 else "s")
+            text += tr("; 1 color edited") if edited == 1 else tr("; %d colors edited") % edited
         if self.job.auto_info is not None:
             text = describe_auto(self.job.options, self.job.auto_info) + ". " + text[0].upper() + text[1:]
         self.status.setText(text)
@@ -1602,7 +1913,7 @@ class MainWindow(QMainWindow):
             return
         self.result = None
         self.right.set_svg("")
-        self.right.set_message("Couldn't trace the picture:\n" + message)
+        self.right.set_message(tr("Couldn't trace the picture:\n%s") % message)
         self.status.setText("")
         self._update_actions()
 
@@ -1615,6 +1926,23 @@ class MainWindow(QMainWindow):
         if self.pending:
             self.start_trace()
 
+    # View > Language: kept, and used at the next start (every text is made when the window is)
+
+    RESTART = {"en": "KanzonasSVG will be in English the next time it starts.",
+               "es": "KanzonasSVG estará en español la próxima vez que se abra."}
+
+    def set_language(self, code):
+        self.qs.setValue("view/language", code)
+        target = code if code in i18n.LANGUAGES else (i18n.system_language() if i18n.system_language()
+                                                       in i18n.LANGUAGES else "en")
+        if target != i18n.language():
+            QMessageBox.information(self, APP_NAME, self.RESTART[target])
+
+    def show_outlines_changed(self, on):
+        """View > Show outlines: the SVG as its outlines, with its nodes (kept for next time)."""
+        self.qs.setValue("view/outlines", int(bool(on)))
+        self.right.set_outlines(bool(on))
+
     def show_colors_changed(self, on):
         if self.img is None:
             return
@@ -1625,7 +1953,7 @@ class MainWindow(QMainWindow):
                 self.left.set_picture(self.preview)
         else:
             self.left.set_picture(self.img)
-        self.left.title = "Colors to trace" if on else "Picture"
+        self.left.title = tr("Colors to trace") if on else tr("Picture")
         self.left.update()
         self.left.update()
 
@@ -1642,7 +1970,7 @@ class MainWindow(QMainWindow):
             self.settings.size_info.setText("")
             return
         self.settings.picture_px = export.svg_size(self.result.svg)[0]
-        self.settings.size_info.setText("Saved at " + export.size_text(self.result.svg, self.settings.saved_size()))
+        self.settings.size_info.setText(tr("Saved at %s") % export.size_text(self.result.svg, self.settings.saved_size()))
 
     def default_name(self):
         fmt = self.qs.value("paths/format", "svg")
@@ -1661,15 +1989,15 @@ class MainWindow(QMainWindow):
             return False
         start = self.save_path or self.default_name()
         fmt = export.format_of(start)
-        filters = [export.FILTERS[f] for f in export.FORMATS]
-        path, chosen = QFileDialog.getSaveFileName(self, "Save as", start, ";;".join(filters),
-                                                   export.FILTERS[fmt])
+        filters = [export.filter_text(f) for f in export.FORMATS]
+        path, chosen = QFileDialog.getSaveFileName(self, tr("Save as"), start, ";;".join(filters),
+                                                   export.filter_text(fmt))
         if not path:
             return False
         ext = os.path.splitext(path)[1].lower().lstrip(".")
         if ext not in export.FORMATS:
             # no type typed: the one chosen in the dialog's list
-            picked = [f for f in export.FORMATS if export.FILTERS[f] == chosen]
+            picked = [f for f in export.FORMATS if export.filter_text(f) == chosen]
             path += "." + (picked[0] if picked else "svg")
         return self.write(path)
 
@@ -1688,14 +2016,14 @@ class MainWindow(QMainWindow):
             try:
                 export.write(path, self.result.svg, fmt, size)
             except OSError as e:
-                QMessageBox.warning(self, APP_NAME, "Couldn't save %s:\n%s" % (path, e))
+                QMessageBox.warning(self, APP_NAME, tr("Couldn't save %s:\n%s") % (path, e))
                 return False
-            self.status.setText("Saved %s" % path)
+            self.status.setText(tr("Saved %s") % path)
             return True
         t = Saver(path, self.result.svg, fmt, size)
         t.done.connect(self._saved)
         self.savers.append(t)
-        self.status.setText("Saving %s..." % path)
+        self.status.setText(tr("Saving %s...") % path)
         t.start()
         return True
 
@@ -1705,9 +2033,9 @@ class MainWindow(QMainWindow):
         saver.wait()
         if error:
             if not self.closing:
-                QMessageBox.warning(self, APP_NAME, "Couldn't save %s:\n%s" % (saver.path, error))
+                QMessageBox.warning(self, APP_NAME, tr("Couldn't save %s:\n%s") % (saver.path, error))
         elif not self.closing:
-            self.status.setText("Saved %s" % saver.path)
+            self.status.setText(tr("Saved %s") % saver.path)
 
     def wait_saved(self):
         """Wait until every file being saved is written (for quitting, and the tests)."""
@@ -1729,41 +2057,37 @@ class MainWindow(QMainWindow):
         md.setText(svg)
         QGuiApplication.clipboard().setMimeData(md)
         _hook_clipboard_release()
-        self.status.setText("SVG copied: paste it into Inkscape, Illustrator or another program.")
+        self.status.setText(tr("SVG copied: paste it into Inkscape, Illustrator or another program."))
 
     # help
 
     def show_help(self):
-        d = QDialog(self)
-        d.setWindowTitle("How to use KanzonasSVG")
-        lay = QVBoxLayout(d)
-        t = QTextBrowser()
-        t.setHtml(HELP_HTML)
-        lay.addWidget(t)
-        b = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        b.rejected.connect(d.reject)
-        lay.addWidget(b)
-        d.resize(640, 700)
-        d.exec()
+        """Help > How to use KanzonasSVG: in chapters, with a search; open beside the window."""
+        from kanzonassvg.help_window import HelpWindow
+        if self.help is None:
+            self.help = HelpWindow(self, help_html(), tr("How to use KanzonasSVG"))
+        self.help.show()
+        self.help.raise_()
+        self.help.activateWindow()
+        return self.help
 
     def about(self):
         try:
             ev = engine.version()
         except engine.TraceError:
-            ev = "not found"
+            ev = tr("not found")
         logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.png")
         head = ("<p><img src='%s' width='468'></p>" % QUrl.fromLocalFile(logo).toString()
                 if os.path.exists(logo) else "")
         QMessageBox.about(
-            self, "About KanzonasSVG",
-            head + "<h3>KanzonasSVG %s</h3>"
-            "<p>Turns pictures into SVG files.</p>"
-            "<p>Tracing engine %s: Inkscape's Trace Bitmap, with Potrace 1.16 (Peter Selinger) and "
-            "Autotrace 0.40 (Martin Weber and others), with quality and speed fixes. Window: Qt for "
-            "Python (PySide6).</p>"
-            "<p>Free software under the GNU General Public License, version 2 or later. Source code: "
-            "<a href='https://github.com/keithlyding/KanzonasSVG'>github.com/keithlyding/KanzonasSVG</a></p>"
-            % (__version__, ev))
+            self, tr("About KanzonasSVG"),
+            head + "<h3>KanzonasSVG %s</h3>" % __version__
+            + "<p>%s</p>" % tr("Turns pictures into SVG files.")
+            + "<p>%s</p>" % (tr("Tracing engine %s: Inkscape's Trace Bitmap, with Potrace 1.16 (Peter Selinger) and "
+                                "Autotrace 0.40 (Martin Weber and others), with quality and speed fixes. Window: "
+                                "Qt for Python (PySide6).") % ev)
+            + "<p>%s " % tr("Free software under the GNU General Public License, version 2 or later. Source code:")
+            + "<a href='https://github.com/keithlyding/KanzonasSVG'>github.com/keithlyding/KanzonasSVG</a></p>")
 
     # updates (kanzonassvg/updates.py; the same as KanzonasPDF's)
 
@@ -1772,7 +2096,7 @@ class MainWindow(QMainWindow):
             from kanzonassvg.updates import UpdateChecker
             self._upd = UpdateChecker(self.qs, self)
             self._upd.found.connect(self._update_found)
-            self._upd.result.connect(lambda t: QMessageBox.information(self, "Check for updates", t))
+            self._upd.result.connect(lambda t: QMessageBox.information(self, tr("Check for updates"), t))
         return self._upd
 
     def auto_updates_changed(self, on):
@@ -1790,7 +2114,7 @@ class MainWindow(QMainWindow):
             self._update_timer.start(3600 * 1000)
 
     def check_updates(self):
-        self.statusBar().showMessage("Checking for updates...", 3000)
+        self.statusBar().showMessage(tr("Checking for updates..."), 3000)
         self.updater().check(manual=True)
 
     def _close_update_bar(self):
@@ -1808,14 +2132,14 @@ class MainWindow(QMainWindow):
         bar = QWidget()
         h = QHBoxLayout(bar)
         h.setContentsMargins(0, 0, 0, 0)
-        h.addWidget(QLabel("<b>KanzonasSVG %s is available</b> (you have %s)." % (version, __version__)))
-        buttons = [("What's new", lambda: self.update_box(version))]
+        h.addWidget(QLabel(tr("<b>KanzonasSVG %s is available</b> (you have %s).") % (version, __version__)))
+        buttons = [(tr("What's new"), lambda: self.update_box(version))]
         if self._update_url():
-            buttons.append(("Update now", lambda: (self._close_update_bar(), self.update_now())))
-        buttons += [("Download", lambda: (self._close_update_bar(), self._open_release_page())),
-                    ("Skip this version", lambda: (self.qs.setValue("updates/skip", version),
-                                                   self._close_update_bar())),
-                    ("Later", self._close_update_bar)]
+            buttons.append((tr("Update now"), lambda: (self._close_update_bar(), self.update_now())))
+        buttons += [(tr("Download"), lambda: (self._close_update_bar(), self._open_release_page())),
+                    (tr("Skip this version"), lambda: (self.qs.setValue("updates/skip", version),
+                                                       self._close_update_bar())),
+                    (tr("Later"), self._close_update_bar)]
         for text, slot in buttons:
             b = QPushButton(text)
             b.clicked.connect(slot)
@@ -1842,41 +2166,41 @@ class MainWindow(QMainWindow):
         from kanzonassvg import updates
         kind = updates.update_kind()
         if kind == "installer":
-            return ("Update now downloads the new setup, checks it, closes KanzonasSVG and installs the "
-                    "new version over this one; KanzonasSVG starts again when it's done.")
+            return tr("Update now downloads the new setup, checks it, closes KanzonasSVG and installs the "
+                      "new version over this one; KanzonasSVG starts again when it's done.")
         if kind == "portable":
-            return ("Update now downloads the new version, checks it, closes KanzonasSVG, puts the new "
-                    "program files in this folder and starts it again.")
+            return tr("Update now downloads the new version, checks it, closes KanzonasSVG, puts the new "
+                      "program files in this folder and starts it again.")
         if kind == "appimage":
-            return ("Update now downloads the new AppImage, checks it, puts it in place of %s, closes "
-                    "KanzonasSVG and starts it again." % os.path.basename(updates.running_appimage()))
+            return tr("Update now downloads the new AppImage, checks it, puts it in place of %s, closes "
+                      "KanzonasSVG and starts it again.") % os.path.basename(updates.running_appimage())
         return ""
 
     def update_box(self, version):
         """The short notes of every version newer than this one, then Update now / Download / Later."""
         from kanzonassvg import updates
         d = QDialog(self)
-        d.setWindowTitle("Check for updates")
+        d.setWindowTitle(tr("Check for updates"))
         lay = QVBoxLayout(d)
-        lay.addWidget(QLabel("KanzonasSVG %s is available (you have %s)." % (version, __version__)))
-        lay.addWidget(QLabel("<b>What's new since your version</b>"))
+        lay.addWidget(QLabel(tr("KanzonasSVG %s is available (you have %s).") % (version, __version__)))
+        lay.addWidget(QLabel("<b>%s</b>" % tr("What's new since your version")))
         notes = QTextBrowser()
         notes.setOpenExternalLinks(True)
         parts = []
         for v, text, url in updates.notes_since(self._upd.releases):
-            parts.append("### Version " + v)
-            parts.append(text or "[What's new in %s](%s)" % (v, url))
+            parts.append(tr("### Version ") + v)
+            parts.append(text or tr("[What's new in %s](%s)") % (v, url))
         notes.setMarkdown("\n\n".join(parts))
         lay.addWidget(notes)
         can = self._update_url() is not None
-        info = QLabel(((self._update_now_text() + " Your settings are kept.\n\n") if can else "")
-                      + "Download opens the release page in your browser.")
+        info = QLabel(((self._update_now_text() + tr(" Your settings are kept.\n\n")) if can else "")
+                      + tr("Download opens the release page in your browser."))
         info.setWordWrap(True)
         lay.addWidget(info)
         box = QDialogButtonBox()
-        upd = box.addButton("Update now", QDialogButtonBox.ButtonRole.AcceptRole) if can else None
-        get = box.addButton("Download", QDialogButtonBox.ButtonRole.AcceptRole)
-        box.addButton("Later", QDialogButtonBox.ButtonRole.RejectRole)
+        upd = box.addButton(tr("Update now"), QDialogButtonBox.ButtonRole.AcceptRole) if can else None
+        get = box.addButton(tr("Download"), QDialogButtonBox.ButtonRole.AcceptRole)
+        box.addButton(tr("Later"), QDialogButtonBox.ButtonRole.RejectRole)
         chosen = []
         box.clicked.connect(lambda b: (chosen.append(b), d.accept()))
         lay.addWidget(box)
@@ -1892,7 +2216,7 @@ class MainWindow(QMainWindow):
     def update_now(self):
         from kanzonassvg import updates
         if updates.downloading():
-            QMessageBox.information(self, "Update", "The new version is already downloading.")
+            QMessageBox.information(self, tr("Update"), tr("The new version is already downloading."))
             return
         url = self._update_url()
         if not url:
@@ -1905,8 +2229,8 @@ class MainWindow(QMainWindow):
             target = updates.running_appimage()
             why = updates.appimage_unwritable(target)
             if why:
-                QMessageBox.information(self, "Update", "KanzonasSVG can't replace %s: %s\n\nThe release page "
-                                        "opens so you can download the new %s yourself." % (target, why, name))
+                QMessageBox.information(self, tr("Update"), tr("KanzonasSVG can't replace %s: %s\n\nThe release page "
+                                        "opens so you can download the new %s yourself.") % (target, why, name))
                 self._open_release_page()
                 return
             dl = updates.AppImageUpdater(url, target, self, expected_sha256=digest)
@@ -1914,8 +2238,8 @@ class MainWindow(QMainWindow):
             dl = updates.InstallerUpdater(url, updates.release_version(release), self, expected_sha256=digest)
         else:
             dl = updates.PortableUpdater(url, updates.app_dir(), self, expected_sha256=digest)
-        prog = QProgressDialog("Downloading the new KanzonasSVG...", "Cancel", 0, 0, self)
-        prog.setWindowTitle("Update")
+        prog = QProgressDialog(tr("Downloading the new KanzonasSVG..."), tr("Cancel"), 0, 0, self)
+        prog.setWindowTitle(tr("Update"))
         prog.setMinimumDuration(0)
         prog.canceled.connect(dl.cancel)
 
@@ -1926,8 +2250,8 @@ class MainWindow(QMainWindow):
 
         def failed(message):
             prog.close()
-            QMessageBox.warning(self, "Update", message + "\n\nYou can still download %s from the release "
-                                "page." % name)
+            QMessageBox.warning(self, tr("Update"), message + tr("\n\nYou can still download %s from the release "
+                                "page.") % name)
 
         dl.progress.connect(progress)
         dl.failed.connect(failed)
@@ -1949,8 +2273,8 @@ class MainWindow(QMainWindow):
                     os.remove(path)
                 except OSError:
                     pass
-                QMessageBox.warning(self, "Update", "The new version couldn't be put in place of %s (%s). "
-                                    "The release page opens so you can download it yourself." % (target, e))
+                QMessageBox.warning(self, tr("Update"), tr("The new version couldn't be put in place of %s (%s). "
+                                    "The release page opens so you can download it yourself.") % (target, e))
                 self._open_release_page()
                 return
             cwd = os.environ.get("OWD") or os.path.expanduser("~")
@@ -1985,6 +2309,8 @@ class MainWindow(QMainWindow):
             self.worker.wait()
         for t in list(self.savers):     # (a file being saved is finished first)
             t.wait()
+        if self.batch is not None:
+            self.batch.close()          # (stops converting: a picture half done isn't saved)
         for t in self.old_loaders + ([self.loader] if self.loader is not None else []):
             t.wait()
         self.left.stop()
@@ -1994,7 +2320,7 @@ class MainWindow(QMainWindow):
 
 def _size_text(n):
     if n < 1024:
-        return "%d bytes" % n
+        return tr("%d bytes") % n
     if n < 1024 * 1024:
         return "%.0f KB" % (n / 1024)
     return "%.1f MB" % (n / 1024 / 1024)
@@ -2005,6 +2331,7 @@ def run(argv):
     app.setApplicationName(APP_NAME)
     app.setOrganizationName("Kanzonas")
     app.setApplicationVersion(__version__)
+    i18n.install_qt(app)                # (Qt's own buttons and dialogs in the same language)
     icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.png")
     if os.path.exists(icon):
         app.setWindowIcon(QIcon(icon))

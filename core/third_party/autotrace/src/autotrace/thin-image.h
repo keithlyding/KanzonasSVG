@@ -31,6 +31,9 @@
 #include "color.h"
 #include "exception.h"
 
-void thin_image(at_bitmap * image, const at_color * bg_color, at_exception_type * exp);
+#include "autotrace.h"
+
+/* (KanzonasSVG: stops, leaving the image half thinned, when test_cancel says so) */
+void thin_image(at_bitmap * image, const at_color * bg_color, at_exception_type * exp, at_testcancel_func test_cancel, gpointer testcancel_data);
 
 #endif /* not THIN_IMAGE_H */

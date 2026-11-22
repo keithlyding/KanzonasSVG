@@ -227,6 +227,9 @@ pixel_outline_list_type find_centerline_pixels(at_bitmap * bitmap, at_color bg_c
   outline_list.data = NULL;
 
   for (row = 0; row < AT_BITMAP_HEIGHT(bitmap); row++) {
+    /* (KanzonasSVG: cancelling was only noticed after the whole picture) */
+    if (test_cancel && test_cancel(testcancel_data))
+      break;
     for (col = 0; col < AT_BITMAP_WIDTH(bitmap);) {
       direction_type dir = EAST;
       pixel_outline_type outline;

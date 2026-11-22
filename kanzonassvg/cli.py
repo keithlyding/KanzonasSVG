@@ -80,6 +80,9 @@ def parser():
     p.add_argument("--filter-iterations", type=int, default=4, metavar="N",
                    help="Autotrace: smoothing passes on outlines (default 4)")
     p.add_argument("--no-preserve-width", action="store_true", help="centerline: don't keep line widths")
+    p.add_argument("--snap", action="store_true",
+                   help="snap shapes: (all but) straight edges straight, level and upright ones exactly so, "
+                   "round shapes perfect circles and ellipses (not in the Autotrace modes)")
     p.add_argument("-q", "--quiet", action="store_true", help="print only errors")
     p.add_argument("--version", action="version", version="%s %s" % (APP_NAME, __version__))
     return p
@@ -115,6 +118,7 @@ def options_from(args, picked=None):
         filter_iterations=args.filter_iterations,
         preserve_width=not args.no_preserve_width,
         edits=tuple(args.recolor) + tuple((c, None) for c in args.leave_out),
+        snap=engine.SNAP_ALL if args.snap else 0,
     )
 
 
@@ -220,6 +224,8 @@ def list_colors(src, img, options, enlarge):
 
 
 def run(argv):
+    from kanzonassvg import i18n
+    i18n.use("en")          # (the command line is in English, whatever the window's language)
     args = parser().parse_args(argv)
     qt_app()
     enlarge = tracing.AUTO if args.enlarge == "auto" else int(args.enlarge)
