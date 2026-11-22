@@ -5,35 +5,39 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: es\n"
 
-#: app.py:2255
+#: app.py:2734
 msgid "\n\nYou can still download %s from the release page."
 msgstr "\n\nAún puede descargar %s desde la página de la versión."
 
-#: app.py:863
+#: app.py:983
 msgid " (a photo or painting: it has more)"
 msgstr " (una foto o una pintura: tiene más)"
 
-#: app.py:1901
+#: app.py:2373
 msgid " (at %d times the size)"
 msgstr " (a %d veces el tamaño)"
 
-#: app.py:2198
+#: app.py:2677
 msgid " Your settings are kept.\n\n"
 msgstr " Sus ajustes se conservan.\n\n"
 
-#: app.py:2193
+#: app.py:2672
 msgid "### Version "
 msgstr "### Versión "
 
-#: app.py:2325
+#: app.py:2139
+msgid "%.1f%% of the picture"
+msgstr "%.1f%% de la imagen"
+
+#: app.py:2804
 msgid "%d bytes"
 msgstr "%d bytes"
 
-#: colors_panel.py:258
+#: colors_panel.py:265
 msgid "%d color edits match no color now (they apply again if the colors come back; Reset colors clears them)."
 msgstr "%d ediciones de color ya no corresponden a ningún color (vuelven a aplicarse si los colores reaparecen; Restablecer colores las borra)."
 
-#: app.py:861
+#: app.py:981
 msgid "%d colors"
 msgstr "%d colores"
 
@@ -45,7 +49,7 @@ msgstr "%d de %d"
 msgid "%d pictures"
 msgstr "%d imágenes"
 
-#: app.py:1898
+#: app.py:2370
 msgid "%d shapes, %s nodes, %s, traced in %.2f s"
 msgstr "%d formas, %s nodos, %s, trazado en %.2f s"
 
@@ -53,7 +57,7 @@ msgstr "%d formas, %s nodos, %s, trazado en %.2f s"
 msgid "%d x %d pixels (%s x %s in)"
 msgstr "%d x %d píxeles (%s x %s pulg.)"
 
-#: app.py:1686
+#: app.py:1971
 msgid "%d%% of the picture"
 msgstr "%d%% de la imagen"
 
@@ -61,55 +65,59 @@ msgstr "%d%% de la imagen"
 msgid "%s %s wide (Saved width, under Size), the height following each picture"
 msgstr "%s %s de ancho (Ancho al guardar, en Tamaño), el alto según cada imagen"
 
-#: colors_panel.py:235
+#: colors_panel.py:239
 msgid "%s (%.1f%% of the picture)"
 msgstr "%s (%.1f%% de la imagen)"
 
-#: app.py:1549
+#: app.py:1834
 msgid "%s isn't there any more (it was moved, renamed or deleted); it's off the list now."
 msgstr "%s ya no está (se movió, se cambió de nombre o se eliminó); ya no está en la lista."
 
-#: colors_panel.py:228
+#: colors_panel.py:232
 msgid "%s, left out (%.1f%% of the picture)"
 msgstr "%s, omitido (%.1f%% de la imagen)"
 
-#: colors_panel.py:233
+#: colors_panel.py:237
 msgid "%s, traced as %s (%.1f%% of the picture)"
 msgstr "%s, trazado como %s (%.1f%% de la imagen)"
 
-#: colors_panel.py:230
+#: colors_panel.py:234
 msgid "%s: %d colors merged (%s), %.1f%% of the picture"
 msgstr "%s: %d colores combinados (%s), %.1f%% de la imagen"
 
-#: app.py:1392
+#: app.py:1601
+msgid "&Colors"
+msgstr "&Colores"
+
+#: app.py:1543
 msgid "&Edit"
 msgstr "&Edición"
 
-#: app.py:1378
+#: app.py:1522
 msgid "&File"
 msgstr "&Archivo"
 
-#: app.py:1439
+#: app.py:1615
 msgid "&Help"
 msgstr "Ay&uda"
 
-#: app.py:1421
+#: app.py:1574
 msgid "&Trace"
 msgstr "&Trazar"
 
-#: app.py:1396
+#: app.py:1547
 msgid "&View"
 msgstr "&Ver"
 
-#: app.py:1873
+#: app.py:2345
 msgid ". Tracing..."
 msgstr ". Trazando..."
 
-#: app.py:940
+#: app.py:1060
 msgid "0 keeps every corner sharp; higher rounds them off"
 msgstr "0 deja todas las esquinas en punta; más alto las redondea"
 
-#: colors_panel.py:255
+#: colors_panel.py:262
 msgid "1 color edit matches no color now (it applies again if the color comes back; Reset colors clears it)."
 msgstr "1 edición de color ya no corresponde a ningún color (vuelve a aplicarse si el color reaparece; Restablecer colores la borra)."
 
@@ -117,19 +125,19 @@ msgstr "1 edición de color ya no corresponde a ningún color (vuelve a aplicars
 msgid "1 picture"
 msgstr "1 imagen"
 
-#: app.py:973
+#: app.py:1093
 msgid "2 times"
 msgstr "2 veces"
 
-#: app.py:974
+#: app.py:1094
 msgid "4 times"
 msgstr "4 veces"
 
-#: app.py:1906
+#: app.py:2378
 msgid "; %d colors edited"
 msgstr "; %d colores editados"
 
-#: app.py:1688
+#: app.py:1973
 msgid "; %d colors selected"
 msgstr "; %d colores seleccionados"
 
@@ -137,11 +145,11 @@ msgstr "; %d colores seleccionados"
 msgid "; %d not (see the list)"
 msgstr "; %d no (vea la lista)"
 
-#: app.py:1906
+#: app.py:2378
 msgid "; 1 color edited"
 msgstr "; 1 color editado"
 
-#: app.py:1903
+#: app.py:2375
 msgid "; cropped to %d x %d pixels"
 msgstr "; recortado a %d x %d píxeles"
 
@@ -149,15 +157,43 @@ msgstr "; recortado a %d x %d píxeles"
 msgid "; stopped"
 msgstr "; detenido"
 
-#: app.py:2137
+#: app.py:2081
+msgid "<b>%d colors</b> selected, marked on the SVG. Merge them into one, change them, or leave them out; Esc selects none."
+msgstr "<b>%d colores</b> seleccionados, marcados en el SVG. Combínelos en uno, cámbielos u omítalos; Esc no selecciona ninguno."
+
+#: app.py:2078
+msgid "<b>%s</b> selected (%.1f%% of the picture), marked on the SVG. Ctrl+click another color to merge them; Esc selects none."
+msgstr "<b>%s</b> seleccionado (%.1f%% de la imagen), marcado en el SVG. Ctrl+clic en otro color para combinarlos; Esc no selecciona ninguno."
+
+#: app.py:2061
+msgid "<b>Crop picture</b>: drag across the part of the picture to trace (on the left). Esc cancels."
+msgstr "<b>Recortar imagen</b>: arrastre sobre la parte de la imagen que quiere trazar (a la izquierda). Esc cancela."
+
+#: app.py:2063
+msgid "<b>Erase on the picture</b>: drag on the picture (on the left) to wipe out what shouldn't be traced. The circle shows the eraser. Undo takes a stroke back; the file never changes."
+msgstr "<b>Borrar en la imagen</b>: arrastre sobre la imagen (a la izquierda) para borrar lo que no debe trazarse. El círculo muestra el borrador. Deshacer revierte un trazo; el archivo nunca cambia."
+
+#: app.py:2616
 msgid "<b>KanzonasSVG %s is available</b> (you have %s)."
 msgstr "<b>KanzonasSVG %s está disponible</b> (usted tiene la %s)."
 
-#: app.py:1446 app.py:2085
+#: app.py:2073
+msgid "<b>Select colors</b>: click a color on the picture or the SVG to select it (Ctrl+click selects more), then change it, merge it or leave it out. Right-click for the same."
+msgstr "<b>Seleccionar colores</b>: haga clic en un color de la imagen o del SVG para seleccionarlo (Ctrl+clic selecciona más) y luego cámbielo, combínelo u omítalo. El clic derecho ofrece lo mismo."
+
+#: app.py:2068
+msgid "<b>Select colors</b>: this mode traces one color, so there are no colors to select. Drag to move the picture; Ctrl+wheel zooms."
+msgstr "<b>Seleccionar colores</b>: este modo traza un solo color, así que no hay colores que seleccionar. Arrastre para mover la imagen; Ctrl+rueda hace zoom."
+
+#: app.py:1662
+msgid "About"
+msgstr "Acerca de"
+
+#: app.py:1622
 msgid "About KanzonasSVG"
 msgstr "Acerca de KanzonasSVG"
 
-#: app.py:1406
+#: app.py:1557
 msgid "Actual size"
 msgstr "Tamaño real"
 
@@ -177,19 +213,23 @@ msgstr "Añadir imágenes..."
 msgid "Add the pictures in a folder"
 msgstr "Añadir las imágenes de una carpeta"
 
-#: app.py:47
+#: app.py:46
 msgid "All files"
 msgstr "Todos los archivos"
 
-#: colors_panel.py:390
+#: colors_panel.py:421
 msgid "Another color..."
 msgstr "Otro color..."
 
-#: app.py:971
+#: app.py:1091
 msgid "Auto"
 msgstr "Automático"
 
-#: app.py:886 app.py:1426
+#: app.py:1655
+msgid "Auto for new pictures"
+msgstr "Automático para nuevas"
+
+#: app.py:1006
 msgid "Auto settings"
 msgstr "Ajustes automáticos"
 
@@ -197,47 +237,51 @@ msgstr "Ajustes automáticos"
 msgid "Auto settings for each picture"
 msgstr "Ajustes automáticos para cada imagen"
 
-#: app.py:1427
+#: app.py:1580
 msgid "Auto settings for new pictures"
 msgstr "Ajustes automáticos para imágenes nuevas"
 
-#: app.py:870
+#: app.py:990
 msgid "Auto: %s"
 msgstr "Automático: %s"
 
-#: app.py:1413
+#: app.py:1566
 msgid "Automatic (the system's)"
 msgstr "Automático (el del sistema)"
 
-#: app.py:956
+#: app.py:1076
 msgid "Autotrace"
 msgstr "Autotrace"
 
-#. (a mode's name, from MODES in app.py)
 msgid "Autotrace: centerline"
 msgstr "Autotrace: línea central"
 
-#. (a mode's name, from MODES in app.py)
 msgid "Autotrace: colors"
 msgstr "Autotrace: colores"
 
-#: app.py:916
+#: app.py:2046
+msgid "Back to selecting colors (Esc)"
+msgstr "Volver a seleccionar colores (Esc)"
+
+#: app.py:1036
 msgid "Background"
 msgstr "Fondo"
 
-#: app.py:1436
+#: app.py:1657
+msgid "Bigger"
+msgstr "Más grande"
+
+#: app.py:1596
 msgid "Bigger eraser"
 msgstr "Borrador más grande"
 
-#. (a mode's name, from MODES in app.py)
 msgid "Black and white"
 msgstr "Blanco y negro"
 
-#: app.py:927
+#: app.py:1047
 msgid "Black and white: everything darker than this is traced.\nEdges: higher finds fewer edges."
 msgstr "Blanco y negro: se traza todo lo que es más oscuro que esto.\nBordes: más alto encuentra menos bordes."
 
-#. (a mode's name, from MODES in app.py)
 msgid "Brightness steps"
 msgstr "Escalones de brillo"
 
@@ -245,7 +289,7 @@ msgstr "Escalones de brillo"
 msgid "Browse..."
 msgstr "Examinar..."
 
-#: image.py:30 image.py:49
+#: image.py:30
 msgid "Can't read %s: %s"
 msgstr "No se puede leer %s: %s"
 
@@ -257,31 +301,35 @@ msgstr "No se puede guardar el instalador nuevo (%s)."
 msgid "Can't use that folder: %s"
 msgstr "No se puede usar esa carpeta: %s"
 
-#: updates.py:695 updates.py:751
+#: updates.py:695
 msgid "Can't write next to %s (%s)."
 msgstr "No se puede escribir junto a %s (%s)."
 
-#: app.py:2243
+#: app.py:2722
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: colors_panel.py:107
+#: app.py:1658
+msgid "Change color"
+msgstr "Cambiar color"
+
+#: app.py:1603
 msgid "Change color..."
 msgstr "Cambiar color..."
 
-#: app.py:2185 app.py:2101
+#: app.py:1662
 msgid "Check for updates"
 msgstr "Buscar actualizaciones"
 
-#: app.py:1443
+#: app.py:1619
 msgid "Check for updates automatically"
 msgstr "Buscar actualizaciones automáticamente"
 
-#: app.py:1442
+#: app.py:1618
 msgid "Check for updates..."
 msgstr "Buscar actualizaciones..."
 
-#: app.py:2119
+#: app.py:2598
 msgid "Checking for updates..."
 msgstr "Buscando actualizaciones..."
 
@@ -293,23 +341,35 @@ msgstr "Elija la carpeta donde guardarlas (Examinar...)."
 msgid "Clear"
 msgstr "Vaciar"
 
-#: app.py:1541
+#: app.py:1826
 msgid "Clear the list"
 msgstr "Vaciar la lista"
 
-#: colors_panel.py:87
-msgid "Click a color to select it, Ctrl+click to select more (here, on the picture or on the SVG), then change, merge or leave them out."
-msgstr "Haga clic en un color para seleccionarlo, Ctrl+clic para seleccionar más (aquí, en la imagen o en el SVG); luego cámbielos, combínelos u omítalos."
+#: app.py:1586
+msgid "Click a color on the picture or the SVG to select it (Ctrl+click: more), then change, merge or leave it out"
+msgstr "Haga clic en un color de la imagen o del SVG para seleccionarlo (Ctrl+clic: más) y luego cámbielo, combínelo u omítalo"
+
+#: colors_panel.py:90
+msgid "Click a color to select it, Ctrl+click to select more (here, on the picture or on the SVG): they're marked on the SVG. Then change, merge or leave them out, or right-click for the same."
+msgstr "Haga clic en un color para seleccionarlo, Ctrl+clic para seleccionar más (aquí, en la imagen o en el SVG): se marcan en el SVG. Luego cámbielos, combínelos u omítalos, o use el clic derecho."
+
+#: app.py:2141
+msgid "Click: select %s (%s). Ctrl+click: add it. Right-click: the color commands."
+msgstr "Clic: seleccionar %s (%s). Ctrl+clic: añadirlo. Clic derecho: los comandos de color."
 
 #: batch.py:164
 msgid "Close"
 msgstr "Cerrar"
 
-#: app.py:901 app.py:1071 colors_panel.py:80
+#: app.py:1559
+msgid "Collapse the ribbon"
+msgstr "Contraer la cinta"
+
+#: app.py:1021
 msgid "Colors"
 msgstr "Colores"
 
-#: app.py:1958
+#: app.py:1660
 msgid "Colors to trace"
 msgstr "Colores a trazar"
 
@@ -317,11 +377,15 @@ msgstr "Colores a trazar"
 msgid "Convert"
 msgstr "Convertir"
 
+#: app.py:1652
+msgid "Convert many"
+msgstr "Convertir varias"
+
 #: batch.py:99
 msgid "Convert many pictures"
 msgstr "Convertir varias imágenes"
 
-#: app.py:1383
+#: app.py:1527
 msgid "Convert many pictures..."
 msgstr "Convertir varias imágenes..."
 
@@ -329,11 +393,11 @@ msgstr "Convertir varias imágenes..."
 msgid "Converting %d of %d: %s"
 msgstr "Convirtiendo %d de %d: %s"
 
-#: app.py:1388
+#: app.py:1539
 msgid "Copy SVG"
 msgstr "Copiar SVG"
 
-#: engine.py:392 engine.py:409
+#: engine.py:392
 msgid "Couldn't draw the SVG."
 msgstr "No se pudo dibujar el SVG."
 
@@ -345,11 +409,11 @@ msgstr "No se pudo conectar con GitHub para buscar actualizaciones (%s)."
 msgid "Couldn't read the SVG to show it."
 msgstr "No se pudo leer el SVG para mostrarlo."
 
-#: app.py:2038 app.py:2021
+#: app.py:2517
 msgid "Couldn't save %s:\n%s"
 msgstr "No se pudo guardar %s:\n%s"
 
-#: app.py:1917
+#: app.py:2392
 msgid "Couldn't trace the picture:\n%s"
 msgstr "No se pudo trazar la imagen:\n%s"
 
@@ -361,11 +425,15 @@ msgstr "No se pudieron calcular los ajustes para esta imagen."
 msgid "Couldn't work out the colors."
 msgstr "No se pudieron calcular los colores."
 
-#: app.py:1431
+#: app.py:1656
+msgid "Crop"
+msgstr "Recortar"
+
+#: app.py:1588
 msgid "Crop picture"
 msgstr "Recortar imagen"
 
-#: app.py:935
+#: app.py:1055
 msgid "Curves"
 msgstr "Curvas"
 
@@ -373,31 +441,39 @@ msgstr "Curvas"
 msgid "DXF for CAD, laser and cutting programs"
 msgstr "DXF para programas de CAD, láser y corte"
 
-#: app.py:2204 app.py:2141
+#: app.py:2045
+msgid "Done"
+msgstr "Listo"
+
+#: app.py:2683
 msgid "Download"
 msgstr "Descargar"
 
-#: app.py:2199
+#: app.py:2678
 msgid "Download opens the release page in your browser."
 msgstr "Descargar abre la página de la versión en su navegador."
 
-#: app.py:2243
+#: app.py:2722
 msgid "Downloading the new KanzonasSVG..."
 msgstr "Descargando el nuevo KanzonasSVG..."
 
-#: app.py:1697
+#: app.py:1590
+msgid "Drag across the part of the picture to trace"
+msgstr "Arrastre sobre la parte de la imagen que quiere trazar"
+
+#: app.py:2172
 msgid "Drag across the picture on the left to crop it (Esc: cancel)."
 msgstr "Arrastre sobre la imagen de la izquierda para recortarla (Esc: cancelar)."
 
-#: app.py:1763
-msgid "Drag across the picture on the left to erase (the eraser: [ smaller, ] bigger, %d pixels across on the screen). Esc or Ctrl+E: stop erasing."
-msgstr "Arrastre sobre la imagen de la izquierda para borrar (el borrador: [ más pequeño, ] más grande, %d píxeles de ancho en la pantalla). Esc o Ctrl+E: dejar de borrar."
+#: app.py:1594
+msgid "Drag on the picture to wipe out what shouldn't be traced"
+msgstr "Arrastre sobre la imagen para borrar lo que no debe trazarse"
 
-#: app.py:938
+#: app.py:1058
 msgid "Drop spots of up to this many pixels"
 msgstr "Elimina manchas de hasta este número de píxeles"
 
-#: app.py:906
+#: app.py:1026
 msgid "Each layer also covers the layers above it, so no gaps show"
 msgstr "Cada capa cubre también las capas de encima, para que no se vean huecos"
 
@@ -405,35 +481,58 @@ msgstr "Cada capa cubre también las capas de encima, para que no se vean huecos
 msgid "Each picture's own size in pixels (96 to the inch): set Saved width under Size to save them at a width"
 msgstr "El tamaño propio de cada imagen en píxeles (96 por pulgada): fije Ancho al guardar, en Tamaño, para guardarlas con un ancho"
 
-#. (a mode's name, from MODES in app.py)
 msgid "Edges"
 msgstr "Bordes"
 
-#: app.py:976
+#: app.py:1690
+msgid "Edit"
+msgstr "Edición"
+
+#: app.py:1096
 msgid "Enlarge first"
 msgstr "Ampliar antes"
 
-#: app.py:1434
+#: app.py:1657
+msgid "Erase"
+msgstr "Borrar"
+
+#: app.py:1592
 msgid "Erase on the picture"
 msgstr "Borrar en la imagen"
 
-#: app.py:963
+#: app.py:1700
+msgid "Eraser"
+msgstr "Borrador"
+
+#: app.py:1083
 msgid "Error threshold"
 msgstr "Umbral de error"
 
-#: app.py:904
+#: app.py:1024
 msgid "Even out noise and JPEG blotches first; edges stay sharp"
 msgstr "Iguala antes el ruido y las manchas de JPEG; los bordes siguen nítidos"
 
-#: image.py:27 image.py:40
+#: app.py:1688
+msgid "File"
+msgstr "Archivo"
+
+#: image.py:27
 msgid "File not found: %s"
 msgstr "No se encontró el archivo: %s"
 
-#: app.py:964
+#: app.py:1084
 msgid "Filter passes"
 msgstr "Pasadas de filtro"
 
-#: app.py:2091
+#: app.py:1661
+msgid "Fit"
+msgstr "Ajustar"
+
+#: app.py:1537
+msgid "For CAD, laser and cutting programs: a layer for each color"
+msgstr "Para programas de CAD, láser y corte: una capa por color"
+
+#: app.py:2570
 msgid "Free software under the GNU General Public License, version 2 or later. Source code:"
 msgstr "Software libre bajo la Licencia Pública General de GNU, versión 2 o posterior. Código fuente:"
 
@@ -441,23 +540,31 @@ msgstr "Software libre bajo la Licencia Pública General de GNU, versión 2 o po
 msgid "GitHub sent an unexpected answer. Try again later."
 msgstr "GitHub envió una respuesta inesperada. Inténtelo más tarde."
 
-#: app.py:1071
+#: app.py:1202
 msgid "Grays"
 msgstr "Grises"
 
-#: app.py:959
+#: app.py:1661
+msgid "Help"
+msgstr "Ayuda"
+
+#: app.py:1687
+msgid "Home"
+msgstr "Inicio"
+
+#: app.py:1079
 msgid "How far a curve may be from the outline, in pixels"
 msgstr "Cuánto puede alejarse una curva del contorno, en píxeles"
 
-#: app.py:944
+#: app.py:1064
 msgid "How far joining segments may move the curve"
 msgstr "Cuánto puede mover la curva unir segmentos"
 
-#: app.py:900
+#: app.py:1020
 msgid "How many colors (count the background too)"
 msgstr "Cuántos colores (cuente también el fondo)"
 
-#: app.py:1440 app.py:2070
+#: app.py:1616
 msgid "How to use KanzonasSVG"
 msgstr "Cómo usar KanzonasSVG"
 
@@ -465,11 +572,11 @@ msgstr "Cómo usar KanzonasSVG"
 msgid "In this folder:"
 msgstr "En esta carpeta:"
 
-#: app.py:980
+#: app.py:1100
 msgid "Inches"
 msgstr "Pulgadas"
 
-#: app.py:929
+#: app.py:1049
 msgid "Invert"
 msgstr "Invertir"
 
@@ -477,73 +584,81 @@ msgstr "Invertir"
 msgid "It belongs to another user."
 msgstr "Pertenece a otro usuario."
 
-#: app.py:942
+#: app.py:1062
 msgid "Join curve segments: smaller files"
 msgstr "Une segmentos de curva: archivos más pequeños"
 
-#: app.py:2187
+#: app.py:2666
 msgid "KanzonasSVG %s is available (you have %s)."
 msgstr "KanzonasSVG %s está disponible (usted tiene la %s)."
 
-#: app.py:2234
+#: app.py:2713
 msgid "KanzonasSVG can't replace %s: %s\n\nThe release page opens so you can download the new %s yourself."
 msgstr "KanzonasSVG no puede reemplazar %s: %s\n\nSe abre la página de la versión para que descargue usted el nuevo %s."
 
-#: app.py:910
+#: app.py:1030
 msgid "Keep"
 msgstr "Conservar"
 
-#: app.py:962
+#: app.py:1082
 msgid "Keep line widths"
 msgstr "Conservar el grosor de las líneas"
 
-#: app.py:1408
+#: app.py:1561
 msgid "Language"
 msgstr "Idioma"
 
-#: app.py:2205 app.py:2144
+#: app.py:2684
 msgid "Later"
 msgstr "Más tarde"
 
-#: app.py:897
+#: app.py:1017
 msgid "Layers"
 msgstr "Capas"
 
-#: colors_panel.py:111 colors_panel.py:291
+#: app.py:1607
 msgid "Leave out"
 msgstr "Omitir"
 
-#: app.py:913
+#: app.py:1033
 msgid "Leave out the picture's background (the color around its edge):\nRemove: around the picture only (that color inside shapes stays)\nRemove, also inside: that color everywhere"
 msgstr "Omite el fondo de la imagen (el color alrededor de su borde):\nQuitar: solo alrededor de la imagen (ese color dentro de las formas se queda)\nQuitar, también dentro: ese color en todas partes"
 
-#: colors_panel.py:112
+#: colors_panel.py:116
 msgid "Leave the selected colors out: the SVG is see-through there (again: put them back)"
 msgstr "Omite los colores seleccionados: el SVG es transparente ahí (otra vez: los recupera)"
 
-#: app.py:950
+#: app.py:1070
 msgid "Make (all but) straight edges straight, level and upright ones exactly level and upright, and round shapes perfect circles and ellipses: for cutting, CAD and clean logos (it can move an edge up to half a pixel)"
 msgstr "Hace rectos los bordes casi rectos, exactamente horizontales y verticales los casi horizontales y verticales, y círculos y elipses perfectos las formas redondas: para corte, CAD y logotipos limpios (puede mover un borde hasta medio píxel)"
 
-#: colors_panel.py:109
+#: app.py:1658
 msgid "Merge"
 msgstr "Combinar"
 
-#: colors_panel.py:384
+#: app.py:1605
+msgid "Merge colors..."
+msgstr "Combinar colores..."
+
+#: colors_panel.py:415
 msgid "Merge into"
 msgstr "Combinar en"
 
-#: colors_panel.py:396
+#: colors_panel.py:429
 msgid "Merge the selected colors into"
 msgstr "Combinar los colores seleccionados en"
 
-#: app.py:981
+#: app.py:1101
 msgid "Millimeters"
 msgstr "Milímetros"
 
-#: app.py:894
+#: app.py:1014
 msgid "Mode"
 msgstr "Modo"
+
+#: ribbon.py:170
+msgid "More in {group}: {commands}"
+msgstr "Más en {group}: {commands}"
 
 #: help_window.py:42
 msgid "Next"
@@ -557,7 +672,7 @@ msgstr "Junto a cada imagen"
 msgid "No matches"
 msgstr "Sin coincidencias"
 
-#: app.py:1543
+#: app.py:1828
 msgid "No pictures yet"
 msgstr "Todavía no hay imágenes"
 
@@ -565,23 +680,31 @@ msgstr "Todavía no hay imágenes"
 msgid "No pictures yet."
 msgstr "Todavía no hay imágenes."
 
-#: app.py:972
+#: app.py:1092
 msgid "Off"
 msgstr "No"
 
-#: app.py:1326
+#: app.py:1652
+msgid "Open"
+msgstr "Abrir"
+
+#: app.py:1461
 msgid "Open a picture (Ctrl+O), drag one here, or paste one (Ctrl+V)."
 msgstr "Abra una imagen (Ctrl+O), arrastre una aquí o pegue una (Ctrl+V)."
 
-#: app.py:1468
+#: app.py:1684
+msgid "Open a picture (the arrow: the pictures opened last)"
+msgstr "Abrir una imagen (la flecha: las últimas imágenes abiertas)"
+
+#: app.py:1753
 msgid "Open picture"
 msgstr "Abrir imagen"
 
-#: app.py:1379
+#: app.py:1523
 msgid "Open picture..."
 msgstr "Abrir imagen..."
 
-#: app.py:1380
+#: app.py:1524
 msgid "Open recent"
 msgstr "Abrir reciente"
 
@@ -589,35 +712,43 @@ msgstr "Abrir reciente"
 msgid "Open the folder"
 msgstr "Abrir la carpeta"
 
-#: app.py:1503
+#: app.py:1788
 msgid "Opening %s..."
 msgstr "Abriendo %s..."
 
-#: app.py:941
+#: app.py:1061
 msgid "Optimize"
 msgstr "Optimizar"
 
-#: app.py:1384
+#: app.py:1660
+msgid "Outlines"
+msgstr "Contornos"
+
+#: app.py:1652
+msgid "Paste"
+msgstr "Pegar"
+
+#: app.py:1528
 msgid "Paste picture"
 msgstr "Pegar imagen"
 
-#: app.py:887
+#: app.py:1007
 msgid "Pick the settings that suit this picture (you can change them after)"
 msgstr "Elige los ajustes que convienen a esta imagen (puede cambiarlos después)"
 
-#: app.py:1854
+#: app.py:2326
 msgid "Picking settings..."
 msgstr "Eligiendo los ajustes..."
 
-#: app.py:1320 app.py:1958
+#: app.py:1451
 msgid "Picture"
 msgstr "Imagen"
 
-#: app.py:979
+#: app.py:1099
 msgid "Picture's pixels"
 msgstr "Píxeles de la imagen"
 
-#: app.py:47
+#: app.py:46
 msgid "Pictures"
 msgstr "Imágenes"
 
@@ -629,31 +760,31 @@ msgstr "Imágenes (arrastre más aquí, o añádalas):"
 msgid "Previous"
 msgstr "Anterior"
 
-#: colors_panel.py:291
+#: app.py:2095
 msgid "Put back"
 msgstr "Recuperar"
 
-#: app.py:1865
+#: app.py:2337
 msgid "Quick preview shown; tracing the whole picture..."
 msgstr "Vista previa rápida; trazando la imagen entera..."
 
-#: app.py:1390
+#: app.py:1541
 msgid "Quit"
 msgstr "Salir"
 
-#: app.py:1394
+#: app.py:1545
 msgid "Redo"
 msgstr "Rehacer"
 
-#: app.py:911 batch.py:111
+#: app.py:1031
 msgid "Remove"
 msgstr "Quitar"
 
-#: app.py:1432
+#: app.py:1591
 msgid "Remove crop"
 msgstr "Quitar recorte"
 
-#: app.py:912
+#: app.py:1032
 msgid "Remove, also inside"
 msgstr "Quitar, también dentro"
 
@@ -661,41 +792,81 @@ msgstr "Quitar, también dentro"
 msgid "Replace files that are already there"
 msgstr "Reemplazar los archivos que ya existen"
 
-#: colors_panel.py:113
+#: app.py:1609
 msgid "Reset colors"
 msgstr "Restablecer colores"
 
-#: app.py:996 app.py:1429
+#: app.py:1116
 msgid "Reset settings"
 msgstr "Restablecer ajustes"
 
-#: app.py:1437
+#: app.py:1597
 msgid "Restore the picture"
 msgstr "Restaurar la imagen"
 
-#: app.py:1611 app.py:1324
+#: app.py:1708
+msgid "Ribbon"
+msgstr "Cinta"
+
+#: app.py:1896
 msgid "SVG"
 msgstr "SVG"
 
-#: app.py:1864
+#: app.py:2336
 msgid "SVG (quick preview)"
 msgstr "SVG (vista previa rápida)"
 
-#: app.py:2062
+#: app.py:2541
 msgid "SVG copied: paste it into Inkscape, Illustrator or another program."
 msgstr "SVG copiado: péguelo en Inkscape, Illustrator u otro programa."
 
-#: app.py:1893
+#: app.py:2365
 msgid "SVG: %s, %d shapes, %s nodes"
 msgstr "SVG: %s, %d formas, %s nodos"
 
-#: app.py:1995 batch.py:135
+#: app.py:1652
+msgid "Save"
+msgstr "Guardar"
+
+#: batch.py:135
 msgid "Save as"
 msgstr "Guardar como"
 
-#: app.py:1387
-msgid "Save as..."
-msgstr "Guardar como..."
+#: app.py:2481
+msgid "Save as %s"
+msgstr "Guardar como %s"
+
+#: app.py:1654
+msgid "Save as DXF"
+msgstr "Guardar como DXF"
+
+#: app.py:1536
+msgid "Save as DXF..."
+msgstr "Guardar como DXF..."
+
+#: app.py:1653
+msgid "Save as EPS"
+msgstr "Guardar como EPS"
+
+#: app.py:1535
+msgid "Save as EPS..."
+msgstr "Guardar como EPS..."
+
+#: app.py:1653
+msgid "Save as PDF"
+msgstr "Guardar como PDF"
+
+#: app.py:1534
+msgid "Save as PDF..."
+msgstr "Guardar como PDF..."
+
+#: app.py:1653
+msgid "Save as SVG"
+msgstr "Guardar como SVG"
+
+#: app.py:1533
+msgid "Save as SVG..."
+msgstr "Guardar como SVG..."
 
 #: batch.py:228
 msgid "Save the files in"
@@ -705,7 +876,7 @@ msgstr "Guardar los archivos en"
 msgid "Save to"
 msgstr "Guardar en"
 
-#: app.py:1386
+#: app.py:1530
 msgid "Save..."
 msgstr "Guardar..."
 
@@ -713,23 +884,23 @@ msgstr "Guardar..."
 msgid "Saved %d of %d"
 msgstr "Guardadas %d de %d"
 
-#: app.py:2023 app.py:2040
+#: app.py:2502
 msgid "Saved %s"
 msgstr "Guardado %s"
 
-#: app.py:1975
+#: app.py:2449
 msgid "Saved at %s"
 msgstr "Se guarda a %s"
 
-#: app.py:991
+#: app.py:1111
 msgid "Saved width"
 msgstr "Ancho al guardar"
 
-#: app.py:2028
+#: app.py:2507
 msgid "Saving %s..."
 msgstr "Guardando %s..."
 
-#: app.py:924
+#: app.py:1044
 msgid "Scan"
 msgstr "Escaneo"
 
@@ -737,11 +908,23 @@ msgstr "Escaneo"
 msgid "Search the help (Ctrl+F)"
 msgstr "Buscar en la ayuda (Ctrl+F)"
 
-#: app.py:1685
+#: app.py:1585
+msgid "Select colors"
+msgstr "Seleccionar colores"
+
+#: app.py:1612
+msgid "Select no color"
+msgstr "No seleccionar ningún color"
+
+#: app.py:1659
+msgid "Select none"
+msgstr "Ninguno"
+
+#: app.py:1970
 msgid "Selected %s in Colors (%s)"
 msgstr "Seleccionado %s en Colores (%s)"
 
-#: app.py:1683
+#: app.py:1968
 msgid "Selected the background, %s in Colors (%s)"
 msgstr "Seleccionado el fondo, %s en Colores (%s)"
 
@@ -749,51 +932,59 @@ msgstr "Seleccionado el fondo, %s en Colores (%s)"
 msgid "Settings"
 msgstr "Ajustes"
 
-#: app.py:1397
+#: app.py:1704
+msgid "Show"
+msgstr "Mostrar"
+
+#: app.py:1548
 msgid "Show colors to trace"
 msgstr "Mostrar los colores a trazar"
 
-#: app.py:1398
+#: app.py:1549
 msgid "Show outlines"
 msgstr "Mostrar contornos"
 
-#: app.py:968
+#: app.py:1088
 msgid "Size"
 msgstr "Tamaño"
 
-#: app.py:2142
+#: app.py:2621
 msgid "Skip this version"
 msgstr "Omitir esta versión"
 
-#: app.py:1435
+#: app.py:1657
+msgid "Smaller"
+msgstr "Más pequeño"
+
+#: app.py:1595
 msgid "Smaller eraser"
 msgstr "Borrador más pequeño"
 
-#: app.py:903
+#: app.py:1023
 msgid "Smooth"
 msgstr "Suavizar"
 
-#: app.py:946
+#: app.py:1066
 msgid "Smooth corners"
 msgstr "Suavizar esquinas"
 
-#: app.py:961
+#: app.py:1081
 msgid "Smoothing passes on outlines before fitting curves"
 msgstr "Pasadas de suavizado sobre los contornos antes de ajustar las curvas"
 
-#: app.py:949
+#: app.py:1069
 msgid "Snap shapes"
 msgstr "Ajustar formas"
 
-#: app.py:945
+#: app.py:1065
 msgid "Speckles"
 msgstr "Motas"
 
-#: app.py:905
+#: app.py:1025
 msgid "Stack"
 msgstr "Apilar"
 
-#: app.py:1071
+#: app.py:1202
 msgid "Steps"
 msgstr "Escalones"
 
@@ -805,7 +996,7 @@ msgstr "Detener"
 msgid "Stopping..."
 msgstr "Deteniendo..."
 
-#: colors_panel.py:237
+#: colors_panel.py:241
 msgid "The background: %s. The same color inside the picture is a swatch of its own."
 msgstr "El fondo: %s. El mismo color dentro de la imagen es una muestra aparte."
 
@@ -821,6 +1012,10 @@ msgstr "La descarga no se aplicó: su sha256 no coincide con el de la versión."
 msgid "The download was stopped: it is far bigger than KanzonasSVG."
 msgstr "La descarga se detuvo: es mucho más grande que KanzonasSVG."
 
+#: app.py:2036
+msgid "The eraser's size, in pixels on the screen ([ smaller, ] bigger)"
+msgstr "El tamaño del borrador, en píxeles de la pantalla ([ más pequeño, ] más grande)"
+
 #: engine.py:276
 msgid "The image data is too short for its size."
 msgstr "Los datos de la imagen son demasiado cortos para su tamaño."
@@ -829,15 +1024,15 @@ msgstr "Los datos de la imagen son demasiado cortos para su tamaño."
 msgid "The image is empty."
 msgstr "La imagen está vacía."
 
-#: app.py:2278
+#: app.py:2757
 msgid "The new version couldn't be put in place of %s (%s). The release page opens so you can download it yourself."
 msgstr "No se pudo poner la versión nueva en lugar de %s (%s). Se abre la página de la versión para que la descargue usted."
 
-#: app.py:2221
+#: app.py:2700
 msgid "The new version is already downloading."
 msgstr "La versión nueva ya se está descargando."
 
-#: image.py:33 image.py:45 image.py:55
+#: image.py:33
 msgid "The picture is too big (%d x %d pixels; the limit is %d megapixels)."
 msgstr "La imagen es demasiado grande (%d x %d píxeles; el límite es %d megapíxeles)."
 
@@ -845,7 +1040,7 @@ msgstr "La imagen es demasiado grande (%d x %d píxeles; el límite es %d megap�
 msgid "The preview failed."
 msgstr "La vista previa falló."
 
-#: app.py:985
+#: app.py:1105
 msgid "The saved width, in the unit beside it (the height follows the picture)"
 msgstr "El ancho al guardar, en la unidad de al lado (el alto sigue a la imagen)"
 
@@ -857,103 +1052,115 @@ msgstr "Los ajustes que se ven ahora (los mismos para todas; no las ediciones de
 msgid "The update was not applied: the release has no sha256 digest."
 msgstr "La actualización no se aplicó: la versión no tiene resumen sha256."
 
-#: app.py:982
+#: app.py:1102
 msgid "The width it's saved at; the height follows. Picture's pixels: the picture's own size, 96 pixels to the inch (as browsers, Inkscape and Illustrator count them)"
 msgstr "El ancho con que se guarda; el alto lo sigue. Píxeles de la imagen: el tamaño propio de la imagen, 96 píxeles por pulgada (como los cuentan los navegadores, Inkscape e Illustrator)"
 
-#: app.py:1576
+#: app.py:1861
 msgid "There's no picture on the clipboard. Copy a picture first."
 msgstr "No hay ninguna imagen en el portapapeles. Copie primero una imagen."
 
-#: app.py:931
+#: app.py:1051
 msgid "Threshold"
 msgstr "Umbral"
 
-#: app.py:948
+#: app.py:1068
 msgid "Tolerance"
 msgstr "Tolerancia"
 
-#: app.py:1722
+#: app.py:2198
 msgid "Too small to crop to: drag across the part to trace."
 msgstr "Demasiado pequeño para recortar: arrastre sobre la parte que quiere trazar."
 
-#: app.py:975
+#: app.py:1693
+msgid "Tools"
+msgstr "Herramientas"
+
+#: app.py:1691
+msgid "Trace"
+msgstr "Trazar"
+
+#: app.py:1095
 msgid "Trace small pictures bigger, for smoother curves (the SVG keeps the picture's size)"
 msgstr "Traza las imágenes pequeñas más grandes, para curvas más suaves (el SVG conserva el tamaño de la imagen)"
 
-#: app.py:930
+#: app.py:1050
 msgid "Trace the light parts instead"
 msgstr "Traza las partes claras en su lugar"
 
-#: colors_panel.py:356
+#: colors_panel.py:387
 msgid "Trace the selected colors as"
 msgstr "Trazar los colores seleccionados como"
 
-#: colors_panel.py:108
+#: colors_panel.py:112
 msgid "Trace the selected colors as another color"
 msgstr "Traza los colores seleccionados con otro color"
 
-#: colors_panel.py:110
+#: colors_panel.py:114
 msgid "Trace the selected colors as one color, picked from them (or another)"
 msgstr "Traza los colores seleccionados como un solo color, elegido entre ellos (u otro)"
 
-#: app.py:2088
+#: app.py:2567
 msgid "Tracing engine %s: Inkscape's Trace Bitmap, with Potrace 1.16 (Peter Selinger) and Autotrace 0.40 (Martin Weber and others), with quality and speed fixes. Window: Qt for Python (PySide6)."
 msgstr "Motor de trazado %s: el Trace Bitmap de Inkscape, con Potrace 1.16 (Peter Selinger) y Autotrace 0.40 (Martin Weber y otros), con mejoras de calidad y velocidad. Ventana: Qt for Python (PySide6)."
 
-#: app.py:1854
+#: app.py:2326
 msgid "Tracing..."
 msgstr "Trazando..."
 
-#: app.py:2087
+#: app.py:2566
 msgid "Turns pictures into SVG files."
 msgstr "Convierte imágenes en archivos SVG."
 
-#: app.py:1393
+#: app.py:1544
 msgid "Undo"
 msgstr "Deshacer"
 
-#: colors_panel.py:114
+#: colors_panel.py:118
 msgid "Undo the edits of the selected colors (none selected: of all)"
 msgstr "Deshace las ediciones de los colores seleccionados (sin selección: de todos)"
 
-#: app.py:1685
+#: app.py:1970
 msgid "Unselected %s in Colors (%s)"
 msgstr "Deseleccionado %s en Colores (%s)"
 
-#: app.py:1682
+#: app.py:1967
 msgid "Unselected the background, %s in Colors (%s)"
 msgstr "Deseleccionado el fondo, %s en Colores (%s)"
 
-#: app.py:2244 app.py:2221 app.py:2255
+#: app.py:2723
 msgid "Update"
 msgstr "Actualizar"
 
-#: app.py:1422
+#: app.py:1575
 msgid "Update automatically"
 msgstr "Actualizar automáticamente"
 
-#: app.py:1424 app.py:2203 app.py:2140
+#: app.py:1577
 msgid "Update now"
 msgstr "Actualizar ahora"
 
-#: app.py:2177
+#: app.py:2656
 msgid "Update now downloads the new AppImage, checks it, puts it in place of %s, closes KanzonasSVG and starts it again."
 msgstr "Actualizar ahora descarga la AppImage nueva, la comprueba, la pone en lugar de %s, cierra KanzonasSVG y lo abre de nuevo."
 
-#: app.py:2171
+#: app.py:2650
 msgid "Update now downloads the new setup, checks it, closes KanzonasSVG and installs the new version over this one; KanzonasSVG starts again when it's done."
 msgstr "Actualizar ahora descarga el instalador nuevo, lo comprueba, cierra KanzonasSVG e instala la versión nueva sobre esta; KanzonasSVG se abre de nuevo al terminar."
 
-#: app.py:2174
+#: app.py:2653
 msgid "Update now downloads the new version, checks it, closes KanzonasSVG, puts the new program files in this folder and starts it again."
 msgstr "Actualizar ahora descarga la versión nueva, la comprueba, cierra KanzonasSVG, pone los archivos nuevos del programa en esta carpeta y lo abre de nuevo."
 
-#: app.py:2138
+#: app.py:1702
+msgid "View"
+msgstr "Ver"
+
+#: app.py:2617
 msgid "What's new"
 msgstr "Novedades"
 
-#: app.py:2188
+#: app.py:2667
 msgid "What's new since your version"
 msgstr "Novedades desde su versión"
 
@@ -969,27 +1176,31 @@ msgstr "No tiene permiso para cambiar la carpeta en la que está (%s)."
 msgid "You have the latest version (%s)."
 msgstr "Tiene la última versión (%s)."
 
-#: app.py:1403
+#: app.py:1703
+msgid "Zoom"
+msgstr "Zoom"
+
+#: app.py:1554
 msgid "Zoom in"
 msgstr "Acercar"
 
-#: app.py:1404
+#: app.py:1555
 msgid "Zoom out"
 msgstr "Alejar"
 
-#: app.py:1405
+#: app.py:1556
 msgid "Zoom to fit"
 msgstr "Ajustar a la ventana"
 
-#: app.py:2194
+#: app.py:2673
 msgid "[What's new in %s](%s)"
 msgstr "[Novedades de la %s](%s)"
 
-#: colors_panel.py:387
+#: colors_panel.py:418
 msgid "background"
 msgstr "fondo"
 
-#: app.py:859
+#: app.py:979
 msgid "black and white"
 msgstr "blanco y negro"
 
@@ -1001,11 +1212,11 @@ msgstr "falló: %s"
 msgid "in"
 msgstr "pulg."
 
-#: app.py:1686
+#: app.py:2139
 msgid "left out"
 msgstr "omitido"
 
-#: app.py:2080
+#: app.py:2559
 msgid "not found"
 msgstr "no encontrado"
 
@@ -1017,7 +1228,7 @@ msgstr "guardado %s: %d formas, %s nodos"
 msgid "skipped: %s is already there"
 msgstr "saltado: %s ya existe"
 
-#: app.py:865
+#: app.py:985
 msgid "smoothed"
 msgstr "suavizado"
 
@@ -1025,10 +1236,14 @@ msgstr "suavizado"
 msgid "stopped"
 msgstr "detenido"
 
-#: app.py:869
+#: app.py:2140
+msgid "the background, #%02x%02x%02x"
+msgstr "el fondo, #%02x%02x%02x"
+
+#: app.py:989
 msgid "thin lines: enlarged %d times first"
 msgstr "líneas finas: ampliado %d veces antes"
 
-#: app.py:867
+#: app.py:987
 msgid "transparent background kept"
 msgstr "fondo transparente conservado"

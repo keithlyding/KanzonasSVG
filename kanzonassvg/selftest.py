@@ -216,6 +216,33 @@ def run(argv):
         assert erased.pixelColor(55, 80).alpha() == 0 and img.pixelColor(55, 80).alpha() == 255
         return "%d outline pixels (of 9600 looked at)" % dark
 
+    def ribbon_and_tools():
+        # the ribbon's icons drawn from the icon font in the program (kanzonassvg/fonts: a glyph,
+        # not an empty icon), every ribbon button with one, and the tools and the selected colors'
+        # mark working in the program
+        from PySide6.QtCore import QSize
+        from PySide6.QtWidgets import QToolButton
+        from kanzonassvg import app as window, icons
+        pm = icons.icon("eraser").pixmap(QSize(32, 32)).toImage()
+        inked = sum(1 for y in range(32) for x in range(32) if pm.pixelColor(x, y).alpha() > 128)
+        assert inked > 30, "the icon font isn't in the program (%d pixels drawn)" % inked
+        w = window.MainWindow()
+        try:
+            buttons = [b for b in w.ribbon.findChildren(QToolButton) if b.defaultAction() is not None]
+            bare = [b.defaultAction().text() for b in buttons if b.defaultAction().icon().isNull()]
+            assert len(buttons) > 25 and not bare, (len(buttons), bare)
+            w.set_image(img, None)
+            for tool in ("erase", "crop", "select"):
+                w.set_tool(tool)
+                assert w.tool == tool and w.left.erase_mode == (tool == "erase"), tool
+            marked = tracing.marked(tracing.trace_image(img, engine.Options(smooth=False, scans=3), 1).svg,
+                                    [(178, 0, 45)])
+            assert "#b2002d" in marked and "#1d3f8f" not in marked
+        finally:
+            w.close()
+            w.deleteLater()
+        return "%d ribbon buttons, icons from the font (%d pixels in one)" % (len(buttons), inked)
+
     def spanish():
         # View > Language: Español: the catalog and the help in the program, every text
         # translated, and Qt's own Spanish (its buttons and dialogs) found
@@ -271,7 +298,7 @@ def run(argv):
                      ("big picture speed", big_picture), ("window opens and traces", window_opens),
                      ("command line", command_line), ("color edits", color_edits), ("saving", saving),
                      ("converting many", converting_many), ("outlines and erasing", outlines_and_erasing),
-                     ("Spanish", spanish),
+                     ("ribbon and tools", ribbon_and_tools), ("Spanish", spanish),
                      ("update check", update_check)]:
         check(name, fn)
 

@@ -5,7 +5,7 @@
 Turn pictures (logos, drawings, scans) into SVG files, on Windows and Linux. Or into PDF, EPS
 and DXF, for printers, cutting machines and lasers. In English or Spanish (*View > Language*).
 
-![The KanzonasSVG window: on the left, a picture of a yellow sunflower with a brown center on a dark green cactus; on the right, its SVG traced in 6 flat colors with Auto settings, petals, center and cactus matching the picture, its size above it (161 KB, 6 shapes, 4,079 nodes); the settings panel on the right shows Colors mode, 6 colors, Background: Remove, the Colors box with the six colors traced and a dashed swatch for the see-through background, and Saved width: Picture's pixels, 239 x 292 pixels (2.49 x 3.04 in)](docs/screenshot.png)
+![The KanzonasSVG window: the ribbon at the top (Home tab: Open, Paste, Convert many, Save, Save as SVG, Copy SVG, Undo, Redo, Auto settings, Update now, the tools Select colors, Crop and Erase), the bar under it saying what the Select colors tool does; on the left, a picture of a yellow sunflower with a brown center on a dark green cactus; on the right, its SVG traced in 6 flat colors with Auto settings, petals, center and cactus matching the picture, its size above it (161 KB, 6 shapes, 4,079 nodes); the settings panel on the right shows Colors mode, 6 colors, Background: Remove, the Colors box with the six colors traced and a dashed swatch for the see-through background, and Saved width: Picture's pixels, 239 x 292 pixels (2.49 x 3.04 in)](docs/screenshot.png)
 
 KanzonasSVG does one thing: it traces a picture into an SVG. Open a picture and it picks the
 settings that suit it (how many colors, smoothing, background) and shows the SVG beside it;
@@ -62,6 +62,10 @@ installed until you click it. (1.0.x doesn't have this: install 1.1 by hand once
 
 ## Using it
 
+The commands are on the ribbon at the top of the window (Home, Picture and View tabs) and in the
+menus, by the same names. The bar above the picture says what the tool that's on does, and has
+its controls.
+
 1. Open a picture: *File > Open picture* (Ctrl+O), drag it into the window, or copy a picture
    and *File > Paste picture* (Ctrl+V).
 2. KanzonasSVG picks the settings for the picture (**Auto settings**: exactly a logo's or a flat illustration's colors, up to 64,
@@ -69,20 +73,27 @@ installed until you click it. (1.0.x doesn't have this: install 1.1 by hand once
    for a scan of dark lines, and for a drawing or plan of thin lines, its lines' colors and
    enlarging 4 times; every setting, the curve settings too) and the status bar says what it picked. Change any setting on the
    right and the SVG updates.
-3. To change the colors it's traced with, use the **Colors** box: select colors (Ctrl+click
-   for several, on the swatches, the picture or the SVG), then **Change color...**, **Merge**
-   (several shades into the one you pick, for a simpler SVG) or **Leave out** (see-through). The
-   background has a swatch of its own, apart from the same color inside the picture.
+3. To change the colors it's traced with, click a color on the picture or the SVG (or its
+   swatch in the **Colors** box; Ctrl+click for several): the status bar says which color a
+   click selects before you click, and the selected colors are marked on the SVG, everything
+   else faded. Then **Change color**, **Merge** (several shades into the one you pick, for a
+   simpler SVG) or **Leave out** (see-through), on the bar above the picture, the ribbon, the
+   Colors menu, or a right-click. The background has a swatch of its own, apart from the same
+   color inside the picture.
    The picture itself stays as it is, and *Edit > Undo* (Ctrl+Z) goes back a step. The SVG's
    size shows above it.
 4. To trace only part of the picture (a drawing in a screenshot, without the toolbars around
-   it), *Trace > Crop picture* (Ctrl+R) and drag across that part.
-5. *File > Save...* (Ctrl+S) as SVG, PDF, EPS or DXF (pick the type when saving), or
-   *File > Copy SVG* (Ctrl+Shift+C) to paste it into Inkscape or another program.
+   it), **Crop** (*Trace > Crop picture*, Ctrl+R) and drag across that part.
+5. *File > Save as SVG...* (Ctrl+Shift+S), *Save as PDF...*, *Save as EPS...* or
+   *Save as DXF...* (on the ribbon, **Save as** and its arrow), or *File > Copy SVG*
+   (Ctrl+Shift+C) to paste it into Inkscape or another program.
+
+The mouse wheel moves the picture, Ctrl+wheel zooms; the settings panel's numbers change with
+the wheel only once clicked into, so scrolling the panel never changes them.
 
 **Seeing and fixing**: *View > Show outlines* (Ctrl+L) shows the SVG as its outlines and
-nodes; *Trace > Erase on the picture* (Ctrl+E) wipes out parts of the picture before tracing
-(a watermark, a smudge, text beside a logo), with Undo; *File > Open recent* lists the last 10
+nodes; **Erase** (*Trace > Erase on the picture*, Ctrl+E) wipes out parts of the picture before
+tracing (a watermark, a smudge, text beside a logo), a circle showing the eraser's size, with Undo; *File > Open recent* lists the last 10
 pictures. The help (F1) is in chapters, with a search.
 
 **Many pictures at once**: *File > Convert many pictures...* (Ctrl+Shift+O), or pick or drag
@@ -105,7 +116,7 @@ within 0.025 mm, in millimeters (in inches when the width is in inches).
 dark) see-through and keeps that color inside shapes; *Remove, also inside* removes that color
 everywhere.
 
-![The Colors box: the flat illustration's SVG with its sky traced blue instead of orange, its roof slate gray instead of red, and its two darker greens merged into one; the swatches of the colors traced on the right, the sun's yellow selected, and the status bar saying 4 colors edited](docs/screenshot-colors.png)
+![Editing colors: the flat illustration's SVG with its sky traced blue instead of orange, its roof slate gray instead of red, and its two darker greens merged into one; the sun's yellow selected, so the SVG shows the yellow parts (the sun, the windows, some flowers) in their color and everything else faded; the bar above the picture says the yellow is selected (2.2% of the picture) and has Change color, Merge and Leave out; the swatches of the colors traced on the right, and the status bar saying 4 colors edited](docs/screenshot-colors.png)
 
 ![A flat illustration traced with Auto settings: an orange sky with a pale yellow sun, purple mountains, a green hill, a blue lake, dark green pines, a cream house with a red roof and blue door, and pink, orange, yellow and lilac flowers in the grass; the SVG on the right matches it in 14 flat colors](docs/screenshot-landscape.png)
 
@@ -215,4 +226,4 @@ window). Short runs of the first and last are in every build.
 
 Free software under the GNU General Public License, version 2 or later (LICENSE). It's built
 on code from Inkscape, Potrace (Peter Selinger) and Autotrace (Martin Weber and others), and
-Qt for Python: see NOTICE.md.
+Qt for Python; its ribbon's icons are from Material Design Icons (Apache-2.0): see NOTICE.md.

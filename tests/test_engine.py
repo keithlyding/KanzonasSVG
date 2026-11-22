@@ -65,6 +65,18 @@ class TestColors(unittest.TestCase):
         self.assertEqual(n, 1)
         self.assertEqual(fills(svg), ["#b2002d"])
 
+    def test_colors_with_no_inside_pixels(self):
+        # (found by the engine battery, 1.5) a picture one pixel wide of two colors close enough to
+        # be merged: no pixel has all eight neighbors of its color, and the color traced was the
+        # mean of both, a color of neither; now the one most of its pixels have
+        img = canvas(1, 473)
+        for y in range(473):
+            img.setPixelColor(0, y, QColor(0xD6, 0xE0, 0x60) if y < 276 else QColor(0xCE, 0xDB, 0x64))
+        for scans in (2, 4, 16):
+            svg, _ = trace(image.to_rgba(img), scans=scans, smooth=False)
+            for c in fills(svg):
+                self.assertIn(c, ("#d6e060", "#cedb64"), "scans %d" % scans)
+
     def test_transparent_counts_as_white(self):
         from PySide6.QtCore import Qt
         img = canvas(60, 40, Qt.GlobalColor.transparent)

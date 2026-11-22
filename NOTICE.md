@@ -14,7 +14,9 @@ It is built on:
 | Autotrace 0.40 (as bundled with Inkscape, without its input/output modules and GLib) | `core/third_party/autotrace` | Martin Weber and other Autotrace authors | GPL-2.0-or-later (some files LGPL-2.1-or-later) |
 | Qt for Python (PySide6) and Qt | the window, reading pictures, drawing SVGs | The Qt Company and contributors | LGPL-3.0 |
 | Python | | Python Software Foundation | PSF License |
+| Material Design Icons 6.9.96 (the font, unchanged, as in qtawesome 1.4.0) | `kanzonassvg/fonts`: the ribbon's icons | Pictogrammers (Austin Andrews and contributors) | Apache-2.0 (`kanzonassvg/fonts/LICENSE-Apache-2.0.txt`) |
 
 Complete source code: https://github.com/keithlyding/KanzonasSVG
 Inkscape: https://gitlab.com/inkscape/inkscape. Potrace: https://potrace.sourceforge.net.
-Autotrace: https://github.com/autotrace/autotrace.
+Autotrace: https://github.com/autotrace/autotrace. Material Design Icons:
+https://github.com/Templarian/MaterialDesign.

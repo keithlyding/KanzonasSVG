@@ -31,8 +31,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ["KANZONASSVG_LANG"] = "en"   # (in English, whatever this computer's language)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from PySide6.QtCore import QPointF, QRectF, QSettings, Qt  # noqa: E402
-from PySide6.QtGui import QColor, QGuiApplication, QImage, QPainter, QPen  # noqa: E402
+from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, QSettings, Qt  # noqa: E402
+from PySide6.QtGui import QColor, QGuiApplication, QImage, QKeyEvent, QPainter, QPen, QWheelEvent  # noqa: E402
 from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QMessageBox  # noqa: E402
 
 APP = QApplication.instance() or QApplication(["kanzonassvg-battery"])
@@ -100,6 +100,12 @@ def _dialog_exec(self):
 
 
 QDialog.exec = _dialog_exec
+
+# Change color... and Merge's Another color...: a color at random, or Cancel
+from PySide6.QtWidgets import QColorDialog  # noqa: E402
+
+QColorDialog.getColor = staticmethod(
+    lambda *a, **k: QColor() if DIALOG_RNG.random() < 0.2 else QColor(*[DIALOG_RNG.randrange(256) for _ in range(3)]))
 
 
 def random_release_text(rng):
@@ -333,12 +339,25 @@ def check_window(steps, seed, fails):
         w.qs = QSettings(os.path.join(folder, "s.ini"), QSettings.Format.IniFormat)
         w.show()
         w.resize(1100, 700)
+
+        def answer_menus(w):
+            # (every window: Reopen makes a new one) a right-click menu: one of its commands at
+            # random, or none (closed); Merge's list: one of its colors, Another color..., or closed
+            def answer_menu(menu, where):
+                acts = [a for a in menu.actions() if not a.isSeparator() and a.isEnabled()]
+                if acts and rng.random() < 0.8:
+                    rng.choice(acts).trigger()
+            w.open_menu = answer_menu
+            w.settings.colors.open_menu = lambda menu, where: rng.choice(
+                [None] + [a for a in menu.actions() if a.data() is not None])
+        answer_menus(w)
         for step in range(steps):
             before = len(ERRORS)
             action = rng.choice(["open", "open", "paste", "setting", "setting", "setting", "setting", "auto",
                                  "update", "colors", "zoom", "move", "fit", "save", "copy", "reopen", "auto_new",
                                  "events", "new_version", "crop", "uncrop", "colors", "colors", "pick", "undo", "undo", "redo",
-                                 "save", "saved_width", "many", "erase", "erase", "outlines", "recent"])
+                                 "save", "saved_width", "many", "erase", "erase", "outlines", "recent",
+                                 "tool", "tool", "hover", "menu", "menu", "save_as", "wheel", "ribbon"])
             try:
                 if action == "open":
                     w.open_path(rng.choice(pics))
@@ -436,6 +455,7 @@ def check_window(steps, seed, fails):
                     w = app.MainWindow()
                     w.qs = QSettings(os.path.join(folder, "s.ini"), QSettings.Format.IniFormat)
                     w.show()
+                    answer_menus(w)
                 elif action == "crop":
                     if w.img is not None:
                         # a rectangle anywhere (partly or wholly off the picture, tiny or all of it)
@@ -482,6 +502,65 @@ def check_window(steps, seed, fails):
                     w.remove_crop()
                     if w.crop is not None:
                         fails.append("window seed %d step %d: Remove crop left a crop" % (seed, step))
+                elif action == "tool":
+                    # the tools: picked, by their commands, Esc, the eraser's size
+                    how = rng.random()
+                    if how < 0.4:
+                        w.set_tool(rng.choice(["select", "crop", "erase"]))
+                    elif how < 0.7:
+                        rng.choice([w.a_select, w.a_crop, w.a_erase]).trigger()
+                    elif how < 0.85:
+                        w.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier))
+                    else:
+                        w.eraser_slider.setValue(rng.randint(1, 500))
+                    on = [w.a_select.isChecked(), w.a_crop.isChecked(), w.a_erase.isChecked()]
+                    if on.count(True) != 1 or w.left.crop_mode != (w.tool == "crop") \
+                            or w.left.erase_mode != (w.tool == "erase") or not 2 <= w.left.eraser <= 200:
+                        fails.append("window seed %d step %d: the tools disagree: %s %s crop %s erase %s eraser %s"
+                                     % (seed, step, w.tool, on, w.left.crop_mode, w.left.erase_mode, w.left.eraser))
+                elif action == "hover":
+                    w.on_hover(None if w.img is None or rng.random() < 0.2 else
+                               QPointF(rng.uniform(-5, w.img.width() + 5), rng.uniform(-5, w.img.height() + 5)))
+                elif action == "menu":
+                    # a right-click on the picture, the SVG or a swatch, then one of its commands
+                    c = w.settings.colors
+                    if c.buttons and rng.random() < 0.3:
+                        rng.choice(c.buttons).customContextMenuRequested.emit(QPoint(1, 1))
+                    elif w.img is not None:
+                        w.on_picture_menu(QPointF(rng.uniform(-5, w.img.width() + 5),
+                                                  rng.uniform(-5, w.img.height() + 5)), QPoint(0, 0))
+                elif action == "save_as":
+                    # File > Save as SVG/PDF/EPS/DXF: the file written is the SVG shown, as that kind
+                    fmt = rng.choice(export.FORMATS)
+                    name = os.path.join(folder, "as%d" % step)
+                    w.ask_save_path = lambda start, f: "" if rng.random() < 0.2 else name
+                    svg, size = (w.result.svg, w.settings.saved_size()) if w.result is not None else (None, None)
+                    if w.save_as(fmt):
+                        w.wait_saved()
+                        with open(name + "." + fmt, "rb") as f:
+                            if f.read() != export.render(svg, fmt, size):
+                                fails.append("window seed %d step %d: Save as %s didn't write the SVG shown"
+                                             % (seed, step, fmt))
+                elif action == "wheel":
+                    # the wheel over the picture, the SVG or the settings panel, with or without Ctrl
+                    # and Shift: never a setting it passes over
+                    target = rng.choice([w.left, w.right, w.settings.speckles, w.settings.mode, w.settings.scans])
+                    mods = rng.choice([Qt.KeyboardModifier.NoModifier, Qt.KeyboardModifier.ControlModifier,
+                                       Qt.KeyboardModifier.ShiftModifier])
+                    options = w.settings.options()
+                    pos = QPointF(rng.uniform(0, max(1, target.width())), rng.uniform(0, max(1, target.height())))
+                    QApplication.sendEvent(target, QWheelEvent(pos, QPointF(target.mapToGlobal(pos.toPoint())),
+                                                               QPoint(0, 0), QPoint(0, rng.choice([-360, -120, 120, 240])),
+                                                               Qt.MouseButton.NoButton, mods,
+                                                               Qt.ScrollPhase.NoScrollPhase, False))
+                    if not target.hasFocus() and w.settings.options() != options:
+                        fails.append("window seed %d step %d: the wheel changed a setting it passed over" % (seed, step))
+                elif action == "ribbon":
+                    r = w.ribbon
+                    if rng.random() < 0.3:
+                        w.a_collapse.trigger()
+                    else:
+                        r.setCurrentIndex(rng.randrange(r.count()))
                 elif action == "new_version":
                     update_step(rng, w, fails, seed, step)
                 elif action == "auto_new":
@@ -522,6 +601,12 @@ def check_window(steps, seed, fails):
                 expect = tracing.trace_image(w.img, w.settings.options(), w.settings.enlarge_setting()).svg
                 if expect != w.result.svg:
                     fails.append("window seed %d step %d: the SVG shown differs from tracing again" % (seed, step))
+                # the selected colors marked on the SVG shown (none selected: no mark)
+                c = w.settings.colors
+                chosen = c.selected_colors() if c.isVisible() and c.selected else []
+                want = tuple(tuple(x) for x in chosen) if chosen else None
+                if w.right.mark != want:
+                    fails.append("window seed %d step %d: the mark isn't the selected colors (%s)" % (seed, step, chosen))
             if step % 500 == 499:
                 print("  window: %d steps, %d failures" % (step + 1, len(fails)), flush=True)
         w.close()
@@ -537,7 +622,12 @@ def main():
     t = time.time()
     check_files(random.Random(args.seed), fails)
     print("files: %d failures (%.0f s)" % (len(fails), time.time() - t), flush=True)
-    check_window(args.steps, args.seed, fails)
+    try:
+        check_window(args.steps, args.seed, fails)
+    except BaseException:
+        # (the hook above keeps exceptions quiet: one out of the steps' own checks ended the
+        # run with nothing said, and Qt then aborted on the threads left running)
+        fails.append("window seed %d: the battery itself stopped:\n%s" % (args.seed, traceback.format_exc()))
     for f in fails:
         print("FAIL", f)
     print("%s: %d failures in %.0f s" % ("FAILED" if fails else "PASSED", len(fails), time.time() - t))

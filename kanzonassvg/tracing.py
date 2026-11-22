@@ -63,6 +63,43 @@ def set_size(svg, width, height):
     return _SIZE.sub(lambda m: '<svg %swidth="%d" height="%d"' % (m.group(1), width, height), svg, count=1)
 
 
+FADE = 0.75  # how far the other colors go toward white
+
+
+def marked(svg, colors):
+    """The SVG with every color but these ((r, g, b) each) faded toward white, everything in its
+    place: the window marks the selected colors with it. (Drawing only the selected colors over
+    a faded SVG was wrong with Stack: a color's shape also covers the colors stacked on it.) The
+    engine writes each run of a color as a group of its own, <g id="color-rrggbb">, its shapes in
+    that color: its groups found and replaced in with plain string steps (a regular expression
+    took 0.19 s for a photo's 23 MB SVG)."""
+    wanted = {"%02x%02x%02x" % tuple(c) for c in colors}
+    out = []
+    at = 0
+    head = '<g id="color-'
+    while True:
+        start = svg.find(head, at)
+        if start < 0:
+            break
+        end = svg.find("</g>", start)
+        if end < 0:
+            break
+        end += 4
+        hexa = svg[start + len(head):start + len(head) + 6]
+        if hexa not in wanted and re.fullmatch("[0-9a-f]{6}", hexa):
+            v = int(hexa, 16)
+            faded = "%02x%02x%02x" % tuple(round(c + (255 - c) * FADE)
+                                           for c in ((v >> 16) & 255, (v >> 8) & 255, v & 255))
+            out.append(svg[at:start])
+            out.append(svg[start:end].replace("#" + hexa, "#" + faded))
+            at = end
+        else:
+            out.append(svg[at:end])
+            at = end
+    out.append(svg[at:])
+    return "".join(out)
+
+
 def _stamp(svg):
     """The program's version in the SVG's "Created with" note (the engine writes its own)."""
     from kanzonassvg import __version__

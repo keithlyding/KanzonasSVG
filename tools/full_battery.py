@@ -118,7 +118,11 @@ def main():
                "- [ ] The AppImage on a Linux desktop: the same.",
                "- [ ] A PDF, an EPS and a DXF saved at a width in mm, opened in the programs people use "
                "them in (Inkscape, Illustrator or a PDF reader; LightBurn, LibreCAD or another CAD or laser "
-               "program for the DXF): the right size, colors and layers.", "", "## Details", ""]
+               "program for the DXF): the right size, colors and layers.",
+               "- [ ] The ribbon on Windows at its own font and at 125% and 150% display scaling: every tab "
+               "fits, nothing cut off; the bar above the picture readable; right-click menus; the wheel on a "
+               "mouse and on a touchpad (moves; Ctrl zooms) and over the settings panel (scrolls it).",
+               "", "## Details", ""]
     for r in results:
         report += ["### %s" % r["name"], "", "`%s`" % r["cmd"], "", "```", r["tail"], "```", ""]
     path = os.path.join(ROOT, "docs", "test-reports", "%s%s.md" % (version, "-quick" if quick else ""))
