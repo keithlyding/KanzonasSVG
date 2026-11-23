@@ -147,7 +147,7 @@ jobs:
         if: always()
         with:
           name: windows-setup-window
-          path: setup-window.png
+          path: setup-window*.png
           if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v6
