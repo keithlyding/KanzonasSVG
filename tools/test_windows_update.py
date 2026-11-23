@@ -173,37 +173,50 @@ def capture(hwnd):
     return img, origin.x - box.left, origin.y - box.top, inside.right - inside.left
 
 
-def blue_and_orange(img, x0, y0, x1, y1):
-    """Clearly blue and clearly orange pixels in img between (x0, y0) and (x1, y1)."""
-    blue = orange = 0
+def colored(img, x0, y0, x1, y1):
+    """The clearly blue and the clearly orange pixels in img between (x0, y0) and (x1, y1), as
+    two lists of (x, y)."""
+    blue, orange = [], []
     for y in range(max(0, y0), min(img.height(), y1)):
         for x in range(max(0, x0), min(img.width(), x1)):
             c = img.pixelColor(x, y)
             r, g, b = c.red(), c.green(), c.blue()
             if b > 150 and b > r + 60:
-                blue += 1
+                blue.append((x, y))
             elif r > 180 and r > b + 80 and g > 60:
-                orange += 1
+                orange.append((x, y))
     return blue, orange
+
+
+def spread(points):
+    xs, ys = [x for x, _ in points], [y for _, y in points]
+    return "x %d-%d, y %d-%d" % (min(xs), max(xs), min(ys), max(ys))
 
 
 def icons_shown(shot):
     """What's wrong with the setup window's icons in a capture, or "" when they're right:
     the blue setup icon at the top left (in the title bar), the orange program icon at the
-    top right (the wizard's small picture, in the band across the top of the inside)."""
+    top right (the wizard's small picture, in the band across the top of the inside).
+    Blue at the top right counts only beside the icon, from the top of the inside down to the
+    icon's bottom edge: below it, on the progress page, Windows draws its progress bar in blue
+    (1.5.2's first build on main found one 75 pixels into that area)."""
     img, cx, cy, cw = shot
     s = max(1.0, img.devicePixelRatio())
-    left_blue, _ = blue_and_orange(img, 0, 0, cx + int(48 * s), cy)
-    mid_blue, _ = blue_and_orange(img, img.width() // 3, 0, 2 * img.width() // 3, cy)
-    right_blue, right_orange = blue_and_orange(img, cx + cw - int(140 * s), cy, cx + cw, cy + int(100 * s))
+    left_blue, _ = colored(img, 0, 0, cx + int(48 * s), cy)
+    mid_blue, _ = colored(img, img.width() // 3, 0, 2 * img.width() // 3, cy)
+    x0, x1 = cx + cw - int(140 * s), cx + cw
+    _, orange = colored(img, x0, cy, x1, cy + int(100 * s))
     if mid_blue:
         return "the title bar is blue itself: the setup icon can't be told apart"
-    if left_blue < 15:
-        return "no blue setup icon at the top left (%d blue pixels)" % left_blue
-    if right_blue > 5:
-        return "the top right shows blue (%d pixels): the blue setup icon, not the orange one" % right_blue
-    if right_orange < 200:
-        return "no orange program icon at the top right (%d orange pixels)" % right_orange
+    if len(left_blue) < 15:
+        return "no blue setup icon at the top left (%d blue pixels)" % len(left_blue)
+    if len(orange) < 200:
+        return "no orange program icon at the top right (%d orange pixels)" % len(orange)
+    bottom = max(y for _, y in orange) + int(3 * s)
+    blue, _ = colored(img, x0, cy, x1, bottom + 1)
+    if len(blue) > 5:
+        return ("the top right shows blue (%d pixels, %s; the orange icon %s): the blue setup icon, "
+                "not the orange one" % (len(blue), spread(blue), spread(orange)))
     return ""
 
 
@@ -234,6 +247,11 @@ def installer(setup, folder, picture=None):
     if picture:
         best[0].save(picture)
         print("the setup's window: %s" % picture)
+        for i, f in enumerate(found):
+            if f:                                    # (each capture that wasn't right, to look at)
+                name = "%s-wrong-%d.png" % (os.path.splitext(picture)[0], i + 1)
+                shots[i][0].save(name)
+                print("capture %d: %s (%s)" % (i + 1, f, name))
     wrong = [f for f in found if f.startswith("the top right shows blue")]
     if wrong or "" not in found:
         sys.exit("FAILED: the setup's window icons (%d captures): %s" % (len(shots), (wrong or found)[0]))
