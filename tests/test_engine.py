@@ -133,6 +133,32 @@ class TestModes(unittest.TestCase):
         self.assertIn("stroke:#", svg)
         self.assertIn("fill:none", svg)
 
+    def test_centerline_on_very_wide_and_tall_pictures(self):
+        # (1.5.2) Autotrace's find_centerline_pixels counted rows and columns in a signed short:
+        # past 32,767 it went negative and read far outside the picture (a crash). Upstream
+        # fixed it in 0.31.11 (169cdf3); Inkscape's copy, ours, hadn't.
+        from PySide6.QtGui import QPainter, QPen
+        for w, h in ((40000, 6), (6, 40000), (65535, 4)):
+            img = canvas(w, h)
+            p = QPainter(img)
+            p.setPen(QPen(BLUE, 2))
+            p.drawLine(w // 4, h // 4, w * 3 // 4, h * 3 // 4)
+            p.end()
+            svg, n = trace(image.to_rgba(img), mode=engine.CENTERLINE)
+            self.assertIn("stroke:#", svg, (w, h))
+
+    def test_autotrace_refuses_pictures_too_big_for_it(self):
+        # (1.5.2) Autotrace keeps the size in 16 bits: a picture over 65,535 pixels across was
+        # traced as a part of itself, wrapped round (an empty SVG); now refused, with why
+        img = canvas(65536, 4)
+        for mode in (engine.AUTOTRACE, engine.CENTERLINE):
+            with self.assertRaisesRegex(engine.TraceError, "65,535"):
+                trace(image.to_rgba(img), mode=mode)
+            with self.assertRaisesRegex(engine.TraceError, "65536 x 4"):
+                tracing.trace_image(image.to_rgba(img), engine.Options(mode=mode), 1)
+        svg, n = trace(image.to_rgba(img), mode=engine.COLORS)  # (Potrace has no such limit)
+        self.assertIn("<svg", svg)
+
 
 class TestNumbers(unittest.TestCase):
     def test_decimal_point_whatever_the_locale(self):
@@ -218,6 +244,10 @@ class TestEnlarge(unittest.TestCase):
         self.assertEqual(tracing.enlarge_factor(4, 6000, 4000), 1)
         self.assertEqual(tracing.enlarge_factor(4, 3000, 2000), 2)  # 6 MP: 4x is 24 MP, 3x would be 54
         self.assertEqual(tracing.enlarge_factor(4, 1000, 1000), 4)
+        # nor past 65,535 pixels across (what Autotrace can trace): 1.5.2
+        self.assertEqual(tracing.enlarge_factor(4, 20000, 10), 3)
+        self.assertEqual(tracing.enlarge_factor(4, 10, 40000), 1)
+        self.assertEqual(tracing.enlarge_factor(tracing.AUTO, 999, 66), 2)
 
 
 if __name__ == "__main__":

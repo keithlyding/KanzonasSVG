@@ -20,7 +20,8 @@ import urllib.request
 
 WATCH_PYPI = ("PySide6_Essentials",)
 POTRACE_COPIED = "1.16"             # core/third_party/potrace
-AUTOTRACE_NEWEST_KNOWN = "0.31.11"  # the newest autotrace/autotrace tag on 2026-11-15
+AUTOTRACE_NEWEST_KNOWN = "0.31.12"  # the newest autotrace/autotrace tag on 2026-11-23, its fixes
+# for the tracing code we carry brought over (core/third_party/autotrace/README.md)
 
 
 def pinned(path="constraints.txt"):

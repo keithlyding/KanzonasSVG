@@ -253,6 +253,10 @@ msgstr "Automático (el del sistema)"
 msgid "Autotrace"
 msgstr "Autotrace"
 
+#: tracing.py:120
+msgid "Autotrace traces pictures up to 65,535 pixels wide and high; this one is %d x %d pixels. Pick Colors or another mode that isn't Autotrace."
+msgstr "Autotrace calca imágenes de hasta 65.535 píxeles de ancho y de alto; esta mide %d x %d píxeles. Elija Colores u otro modo que no sea Autotrace."
+
 msgid "Autotrace: centerline"
 msgstr "Autotrace: línea central"
 

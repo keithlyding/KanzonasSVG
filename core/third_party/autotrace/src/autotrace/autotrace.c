@@ -153,7 +153,7 @@ at_bitmap *at_bitmap_copy(const at_bitmap * src)
   planes = at_bitmap_get_planes(src);
 
   dist = at_bitmap_new(width, height, planes);
-  memcpy(dist->bitmap, src->bitmap, width * height * planes * sizeof(unsigned char));
+  memcpy(dist->bitmap, src->bitmap, (size_t)width * height * planes); /* (KanzonasSVG, as upstream ba1f172) */
   return dist;
 }
 
@@ -167,7 +167,7 @@ at_bitmap at_bitmap_init(unsigned char *area, unsigned short width, unsigned sho
     if (0 == (width * height))
       bitmap.bitmap = NULL;
     else
-      XCALLOC(bitmap.bitmap, width * height * planes * sizeof(unsigned char));
+      XCALLOC(bitmap.bitmap, (size_t)width * height * planes); /* (KanzonasSVG, as upstream c23e19d) */
   }
 
   bitmap.width = width;

@@ -28,6 +28,7 @@
 #include <exception>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -1258,8 +1259,15 @@ struct OptsDeleter
     void operator()(at_fitting_opts_type *p) { at_fitting_opts_free(p); }
 };
 
+// Autotrace keeps a picture's width and height in 16 bits (at_bitmap, as upstream's readers
+// check since 0.31.12): a wider or taller one was traced as a part of it, wrapped round.
+constexpr int AUTOTRACE_MAX_SIDE = 65535;
+
 Shapes trace_autotrace(RgbMap const &map, kz_options const &o, Progress &progress)
 {
+    if (map.width > AUTOTRACE_MAX_SIDE || map.height > AUTOTRACE_MAX_SIDE) {
+        throw std::runtime_error("Autotrace and Centerline trace pictures up to 65,535 pixels wide and high");
+    }
     autotrace_init();
 
     RgbMap input(1, 1);
