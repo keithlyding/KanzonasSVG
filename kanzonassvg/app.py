@@ -122,6 +122,8 @@ looser curves.</li>
 <li><b>Autotrace: centerline</b>: lines along the middle of strokes (handwriting, line art)
 instead of outlines.</li>
 </ul>
+<p>The two Autotrace modes trace pictures up to 65,535 pixels wide and high (the Potrace modes
+have no such limit), and <b>Enlarge first</b> never goes past that.</p>
 <h3>Settings</h3>
 <ul>
 <li><b>Smooth</b>: evens out noise, JPEG blotches and texture before the colors are picked,

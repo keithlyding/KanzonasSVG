@@ -2,6 +2,15 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.5.2
+
+Fixed:
+- **Security:** *Autotrace: centerline* crashed on a picture more than 32,767 pixels wide or high
+  (it read memory outside the picture). Fixed with the change Autotrace's own project made.
+- A picture more than 65,535 pixels wide or high traced with one of the Autotrace modes came out
+  empty. KanzonasSVG now says the picture is too big for Autotrace (the other modes trace it),
+  and *Enlarge first* never makes a picture bigger than that.
+
 ## 1.5.1
 
 Fixed:

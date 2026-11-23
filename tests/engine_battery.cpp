@@ -70,6 +70,14 @@ Pic make_picture(Rng &r)
         case 3: p.w = rnd(r, 2, 8); p.h = rnd(r, 2, 8); break;
         default: p.w = rnd(r, 8, 360); p.h = rnd(r, 8, 260); break;
     }
+    // now and then very long and thin (1.5.2): past 32,767 Autotrace's centerline read outside
+    // the picture, and past 65,535 its 16-bit size wrapped round
+    if (rnd(r, 0, 59) == 0) {
+        bool past_16_bits = rnd(r, 0, 1);  // (no more pixels than the biggest usual picture: a checkerboard
+        int len = past_16_bits ? rnd(r, 65400, 70000) : rnd(r, 32700, 33000);  // is a shape for each)
+        int thin = past_16_bits ? 1 : rnd(r, 1, 2);
+        if (rnd(r, 0, 1)) { p.w = len; p.h = thin; } else { p.w = thin; p.h = len; }
+    }
     p.stride = p.w * 4 + (rnd(r, 0, 3) == 0 ? rnd(r, 1, 64) : 0);
     p.px.assign((size_t)p.stride * p.h, 0xA5); // padding with junk: must never be read as pixels
     int ncol = rnd(r, 1, 12);
@@ -473,7 +481,11 @@ int main(int argc, char **argv)
             // (a size that reaches into the mode field, even partly, hands over a mode that may be none)
             bool nonsense_mode = o.size > (int)offsetof(kz_options, mode) &&
                                  (o.size < (int)(offsetof(kz_options, mode) + sizeof(int)) || o.mode < 0 || o.mode > 6);
-            if (!nonsense_mode || !err) errs.push_back(std::string("error: ") + (err ? err : "(no message)"));
+            // (Autotrace refuses a picture over 65,535 pixels wide or high, saying so)
+            bool too_big_for_autotrace = (o.mode == KZ_AUTOTRACE || o.mode == KZ_CENTERLINE) && (p.w > 65535 || p.h > 65535) &&
+                                         err && std::strstr(err, "65,535");
+            if ((!nonsense_mode && !too_big_for_autotrace) || !err)
+                errs.push_back(std::string("error: ") + (err ? err : "(no message)"));
         } else {
             errs.push_back("unknown status " + std::to_string(st));
         }
@@ -520,9 +532,11 @@ int main(int argc, char **argv)
                 e.nedits = 3;
                 char *svg3 = nullptr, *err3 = nullptr;
                 int n3 = 0;
-                if (kz_trace(p.px.data(), p.w, p.h, p.stride, &e, nullptr, nullptr, &svg3, &n3, &err3) != KZ_OK)
+                bool refused = (e.mode == KZ_AUTOTRACE || e.mode == KZ_CENTERLINE) && (p.w > 65535 || p.h > 65535);
+                if (kz_trace(p.px.data(), p.w, p.h, p.stride, &e, nullptr, nullptr, &svg3, &n3, &err3) !=
+                    (refused ? KZ_ERROR : KZ_OK))
                     errs.push_back(std::string("trace with edits failed: ") + (err3 ? err3 : ""));
-                else {
+                else if (!refused) {
                     kz_options eff = e;
                     eff.scans = std::max(2, std::min(256, eff.scans));
                     check_svg(svg3, p, n3, eff, errs);
@@ -545,6 +559,9 @@ int main(int argc, char **argv)
         double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         slowest = std::max(slowest, secs);
         if (secs > limit) errs.push_back("took " + std::to_string(secs) + " s");
+        else if (secs > limit / 4)  // (named, to see what's slow before it's too slow)
+            std::printf("  slow: step %ld (%s %dx%d, mode %d, scans %d) %.1f s\n", step, p.kind.c_str(), p.w, p.h,
+                        o.mode, o.scans, secs);
 
         if (!errs.empty() && std::getenv("KZ_DUMP")) {
             // the picture as a PAM file (RGBA), to look at the failure

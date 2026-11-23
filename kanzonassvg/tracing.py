@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 
 from kanzonassvg import engine, export, image
+from kanzonassvg.i18n import tr
 
 # "Enlarge first": Auto traces small pictures at twice their size. Potrace and
 # Autotrace follow pixel edges, so on a small picture curves come out lumpy; at 2x
@@ -19,6 +20,9 @@ AUTO_BELOW = 1000  # longest side, in pixels
 # "4 times" on a 24-megapixel photo used to make a 384-megapixel picture (3 GB of memory)
 # before refusing it as too big.
 MAX_ENLARGED = 40_000_000  # pixels
+# Autotrace (Autotrace and Centerline) traces pictures up to this wide and high (the engine
+# refuses bigger ones); enlarging never goes past it either.
+AUTOTRACE_MAX_SIDE = 65535  # pixels
 
 
 def enlarge_factor(setting, width, height):
@@ -26,7 +30,8 @@ def enlarge_factor(setting, width, height):
         factor = 2 if max(width, height) < AUTO_BELOW else 1
     else:
         factor = max(1, min(4, int(setting)))
-    while factor > 1 and width * height * factor * factor > MAX_ENLARGED:
+    while factor > 1 and (width * height * factor * factor > MAX_ENLARGED
+                          or max(width, height) * factor > AUTOTRACE_MAX_SIDE):
         factor -= 1
     return factor
 
@@ -111,6 +116,10 @@ def trace_image(img, options, enlarge=AUTO, progress=None):
     """Trace a QImage (RGBA8888). The SVG has the picture's own size."""
     t = time.perf_counter()
     factor = enlarge_factor(enlarge, img.width(), img.height())
+    if options.mode in (engine.AUTOTRACE, engine.CENTERLINE) and max(img.width(), img.height()) > AUTOTRACE_MAX_SIDE:
+        raise engine.TraceError(tr("Autotrace traces pictures up to 65,535 pixels wide and high; this one "
+                                   "is %d x %d pixels. Pick Colors or another mode that isn't Autotrace.")
+                                % (img.width(), img.height()))
     work = image.scaled(img, factor)
     data, w, h, stride = image.pixels(work)
     svg, n = engine.trace(data, w, h, stride, options, progress)

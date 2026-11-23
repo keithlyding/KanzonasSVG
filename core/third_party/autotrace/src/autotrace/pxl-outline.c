@@ -169,7 +169,7 @@ cleanup:
 
 static pixel_outline_type find_one_outline(at_bitmap * bitmap, edge_type original_edge, unsigned short original_row, unsigned short original_col, at_bitmap * marked, gboolean clockwise, gboolean ignore, at_exception_type * exp)
 {
-  pixel_outline_type outline;
+  pixel_outline_type outline = { 0 }; /* (KanzonasSVG, as upstream 356e4e8) */
   unsigned short row = original_row, col = original_col;
   edge_type edge = original_edge;
   at_coord pos;
@@ -219,7 +219,7 @@ gboolean is_valid_dir(unsigned short row, unsigned short col, direction_type dir
 pixel_outline_list_type find_centerline_pixels(at_bitmap * bitmap, at_color bg_color, at_progress_func notify_progress, gpointer progress_data, at_testcancel_func test_cancel, gpointer testcancel_data, at_exception_type * exp)
 {
   pixel_outline_list_type outline_list;
-  signed short row, col;
+  unsigned int row, col; /* (KanzonasSVG, as upstream 169cdf3: signed short wrapped past 32767) */
   at_bitmap *marked = at_bitmap_new(AT_BITMAP_WIDTH(bitmap), AT_BITMAP_HEIGHT(bitmap), 1);
   unsigned int max_progress = AT_BITMAP_HEIGHT(bitmap) * AT_BITMAP_WIDTH(bitmap);
 

@@ -86,6 +86,8 @@ numerosas y más sueltas.</li>
 <li><b>Autotrace: línea central</b>: líneas por el centro de los trazos (escritura a mano,
 dibujos de líneas) en lugar de contornos.</li>
 </ul>
+<p>Los dos modos de Autotrace trazan imágenes de hasta 65.535 píxeles de ancho y de alto (los
+modos de Potrace no tienen ese límite), y <b>Ampliar antes</b> nunca pasa de ahí.</p>
 <h3>Ajustes</h3>
 <ul>
 <li><b>Suavizar</b>: iguala el ruido, las manchas de JPEG y la textura antes de elegir los
