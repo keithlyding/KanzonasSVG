@@ -271,7 +271,7 @@ rueda solo después de hacer clic en ellos.</p>
 <tr><td>Ctrl+S</td><td>Guardar</td></tr>
 <tr><td>Ctrl+Mayús+S</td><td>Guardar como SVG</td></tr>
 <tr><td>Ctrl+Mayús+C</td><td>Copiar SVG</td></tr>
-<tr><td>F5</td><td>Actualizar ahora</td></tr>
+<tr><td>F5</td><td>Actualizar ahora (menú <i>Trazar</i>: volver a trazar)</td></tr>
 <tr><td>Ctrl+Mayús+A</td><td>Ajustes automáticos</td></tr>
 <tr><td>Ctrl+Z / Ctrl+Y</td><td>Deshacer / Rehacer</td></tr>
 <tr><td>Ctrl+clic</td><td>Seleccionar más colores (una muestra, la imagen o el SVG)</td></tr>
@@ -306,18 +306,26 @@ botones y cuadros de diálogo propios de Qt). La línea de comandos siempre est�
 <p>Una vez al día, unos segundos después de abrirse, KanzonasSVG pregunta a GitHub si hay una
 versión más nueva (<i>Ayuda &gt; Buscar actualizaciones automáticamente</i>, activado al
 principio; no envía nada sobre usted ni sobre sus imágenes, y cuando no hay conexión simplemente
-lo intenta de nuevo al día siguiente). Cuando la hay, un aviso en la barra de estado lo dice:
-<b>Novedades</b> muestra lo que cambió desde su versión (las notas están en inglés),
-<b>Actualizar ahora</b> la actualiza, <b>Descargar</b> abre la página de la versión, <b>Omitir
-esta versión</b> deja de avisar de esa versión, y <b>Más tarde</b> oculta el aviso.
-<i>Ayuda &gt; Buscar actualizaciones...</i> pregunta en el acto.</p>
-<p><b>Actualizar ahora</b> descarga la versión nueva, la comprueba con la suma de verificación que
-GitHub publica con la versión (no se instala nada si no coinciden), cierra KanzonasSVG, pone la
-versión nueva en su lugar y lo abre de nuevo. Instalado con el instalador, ejecuta el instalador
-nuevo sobre este; descomprimido de KanzonasSVG-windows.zip, reemplaza los archivos del programa en
-esa carpeta; la AppImage de Linux reemplaza su archivo. Sus ajustes se conservan. (Ejecutado desde
-su código fuente, KanzonasSVG solo lo avisa.) Nunca se descarga ni se instala nada hasta que hace
-clic en <b>Actualizar ahora</b>.</p>
+lo intenta de nuevo al día siguiente). Cuando la hay, no se abre ninguna ventana: un aviso en la
+barra de estado, abajo, lo dice, con botones: <b>Novedades</b> muestra lo que cambió desde su
+versión (las notas están en inglés), <b>Actualizar ahora</b> la actualiza, <b>Descargar</b> abre la
+página de la versión, <b>Omitir esta versión</b> deja de avisar de esa versión, y <b>Más tarde</b>
+oculta el aviso. Cuando no hay nada más nuevo, la barra de estado lo dice unos segundos.
+<i>Ayuda &gt; Buscar actualizaciones...</i> pregunta en el acto y contesta en un cuadro: las
+novedades desde su versión (las notas de cada versión más nueva), con <b>Actualizar ahora</b>,
+<b>Descargar</b> y <b>Más tarde</b>, o que tiene la última versión.</p>
+<p><b>Actualizar ahora</b> (este, no <i>Trazar &gt; Actualizar ahora</i>, F5, que vuelve a trazar la
+imagen) descarga la versión nueva, la comprueba con la suma de verificación que GitHub publica con
+la versión (no se instala nada si no coinciden), cierra KanzonasSVG, pone la versión nueva en su
+lugar y lo abre de nuevo. KanzonasSVG no pregunta si quiere guardar al cerrarse, así que guarde
+antes su SVG. Instalado con el instalador, ejecuta el instalador nuevo sobre este (instalado para
+todos los usuarios, Windows pide antes permisos de administrador); descomprimido de
+KanzonasSVG-windows.zip, reemplaza los archivos del programa en esa carpeta; la AppImage de Linux
+reemplaza su archivo. Sus ajustes se conservan. (Ejecutado desde su código fuente, KanzonasSVG no
+tiene <b>Actualizar ahora</b>: <b>Descargar</b> abre la página de la versión.) Nunca se descarga ni
+se instala nada hasta que hace clic en <b>Actualizar ahora</b>. Si el instalador nuevo no pudo
+terminar (Windows mantuvo en uso uno de sus archivos), KanzonasSVG lo dice la próxima vez que se
+abre y ofrece ejecutar de nuevo el instalador, con sus ventanas, que muestran lo que lo impide.</p>
 <h3>Acerca de</h3>
 <p><i>Ayuda &gt; Acerca de KanzonasSVG</i> muestra la versión, de dónde viene el trazado y la
 licencia.</p>

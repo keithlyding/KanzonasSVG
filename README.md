@@ -54,11 +54,13 @@ about the installer, which isn't code-signed.
 
 **Updates** (from 1.1 on): once a day KanzonasSVG asks GitHub whether a newer version is out
 (*Help > Check for updates automatically*; nothing about you or your pictures is sent) and says so
-in the status bar, with what's new since your version. **Update now** downloads it, checks it
-against the checksum GitHub publishes with the release, and puts it in place: the setup runs
-over an installed copy, an unzipped copy gets the new files in its folder, and the AppImage
-replaces itself; then KanzonasSVG starts again, settings kept. Nothing is downloaded or
-installed until you click it. (1.0.x doesn't have this: install 1.1 by hand once.)
+in a notice in the status bar (no window pops up), with What's new, Update now, Download, Skip
+this version and Later, as KanzonasPDF does. **Update now** downloads it, checks it against the
+checksum GitHub publishes with the release, and puts it in place: the setup runs over an
+installed copy, an unzipped copy gets the new files in its folder, and the AppImage replaces
+itself; then KanzonasSVG starts again, settings kept (save your SVG first: it closes without
+asking). Nothing is downloaded or installed until you click it. (1.0.x doesn't have this:
+install 1.1 by hand once.)
 
 ## Using it
 

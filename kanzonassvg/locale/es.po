@@ -5,10 +5,6 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: es\n"
 
-#: app.py:2734
-msgid "\n\nYou can still download %s from the release page."
-msgstr "\n\nAún puede descargar %s desde la página de la versión."
-
 #: app.py:983
 msgid " (a photo or painting: it has more)"
 msgstr " (una foto o una pintura: tiene más)"
@@ -16,14 +12,6 @@ msgstr " (una foto o una pintura: tiene más)"
 #: app.py:2373
 msgid " (at %d times the size)"
 msgstr " (a %d veces el tamaño)"
-
-#: app.py:2677
-msgid " Your settings are kept.\n\n"
-msgstr " Sus ajustes se conservan.\n\n"
-
-#: app.py:2672
-msgid "### Version "
-msgstr "### Versión "
 
 #: app.py:2139
 msgid "%.1f%% of the picture"
@@ -333,6 +321,10 @@ msgstr "Buscar actualizaciones automáticamente"
 msgid "Check for updates..."
 msgstr "Buscar actualizaciones..."
 
+#: app.py:2587
+msgid "Checked for updates: %s"
+msgstr "Actualizaciones buscadas: %s"
+
 #: app.py:2598
 msgid "Checking for updates..."
 msgstr "Buscando actualizaciones..."
@@ -456,6 +448,10 @@ msgstr "Descargar"
 #: app.py:2678
 msgid "Download opens the release page in your browser."
 msgstr "Descargar abre la página de la versión en su navegador."
+
+#: app.py:2750
+msgid "Download the setup from the release page and run it."
+msgstr "Descargue el instalador desde la página de la versión y ejecútelo."
 
 #: app.py:2722
 msgid "Downloading the new KanzonasSVG..."
@@ -600,6 +596,10 @@ msgstr "KanzonasSVG %s está disponible (usted tiene la %s)."
 msgid "KanzonasSVG can't replace %s: %s\n\nThe release page opens so you can download the new %s yourself."
 msgstr "KanzonasSVG no puede reemplazar %s: %s\n\nSe abre la página de la versión para que descargue usted el nuevo %s."
 
+#: app.py:2675
+msgid "KanzonasSVG is installed for all users, so Windows asks for administrator rights first."
+msgstr "KanzonasSVG está instalado para todos los usuarios, así que Windows pide antes permisos de administrador."
+
 #: app.py:1030
 msgid "Keep"
 msgstr "Conservar"
@@ -716,6 +716,14 @@ msgstr "Abrir reciente"
 msgid "Open the folder"
 msgstr "Abrir la carpeta"
 
+#: app.py:2634
+msgid "Open the release page to download the installer or portable zip"
+msgstr "Abrir la página de la versión para descargar el instalador o el zip portátil"
+
+#: app.py:2635
+msgid "Open the release page to download the new version"
+msgstr "Abrir la página de la versión para descargar la versión nueva"
+
 #: app.py:1788
 msgid "Opening %s..."
 msgstr "Abriendo %s..."
@@ -811,6 +819,14 @@ msgstr "Restaurar la imagen"
 #: app.py:1708
 msgid "Ribbon"
 msgstr "Cinta"
+
+#: app.py:2748
+msgid "Run the setup"
+msgstr "Ejecutar el instalador"
+
+#: app.py:2746
+msgid "Run the setup now to finish it: it shows what's in the way and can close it."
+msgstr "Ejecute ahora el instalador para terminarla: muestra lo que lo impide y puede cerrarlo."
 
 #: app.py:1896
 msgid "SVG"
@@ -1052,6 +1068,10 @@ msgstr "El ancho al guardar, en la unidad de al lado (el alto sigue a la imagen)
 msgid "The settings shown now (the same for all; not the color edits)"
 msgstr "Los ajustes que se ven ahora (los mismos para todas; no las ediciones de color)"
 
+#: app.py:2742
+msgid "The update to KanzonasSVG %s didn't finish: this is still %s. Windows may have kept one of its files in use."
+msgstr "La actualización a KanzonasSVG %s no terminó: esta sigue siendo la %s. Puede que Windows mantuviera en uso uno de sus archivos."
+
 #: updates.py:606
 msgid "The update was not applied: the release has no sha256 digest."
 msgstr "La actualización no se aplicó: la versión no tiene resumen sha256."
@@ -1144,25 +1164,37 @@ msgstr "Actualizar automáticamente"
 msgid "Update now"
 msgstr "Actualizar ahora"
 
-#: app.py:2656
-msgid "Update now downloads the new AppImage, checks it, puts it in place of %s, closes KanzonasSVG and starts it again."
-msgstr "Actualizar ahora descarga la AppImage nueva, la comprueba, la pone en lugar de %s, cierra KanzonasSVG y lo abre de nuevo."
+#: app.py:2679
+msgid "Update now downloads it, closes KanzonasSVG (save your SVG first: it closes without asking), replaces the program files in this folder and starts it again. Your settings are kept."
+msgstr "Actualizar ahora la descarga, cierra KanzonasSVG (guarde antes su SVG: se cierra sin preguntar), reemplaza los archivos del programa en esta carpeta y lo abre de nuevo. Sus ajustes se conservan."
 
-#: app.py:2650
-msgid "Update now downloads the new setup, checks it, closes KanzonasSVG and installs the new version over this one; KanzonasSVG starts again when it's done."
-msgstr "Actualizar ahora descarga el instalador nuevo, lo comprueba, cierra KanzonasSVG e instala la versión nueva sobre esta; KanzonasSVG se abre de nuevo al terminar."
+#: app.py:2683
+msgid "Update now downloads the new AppImage, checks it, closes KanzonasSVG (save your SVG first: it closes without asking), puts it in place of %s and starts it again. Your settings are kept."
+msgstr "Actualizar ahora descarga la AppImage nueva, la comprueba, cierra KanzonasSVG (guarde antes su SVG: se cierra sin preguntar), la pone en lugar de %s y lo abre de nuevo. Sus ajustes se conservan."
 
-#: app.py:2653
-msgid "Update now downloads the new version, checks it, closes KanzonasSVG, puts the new program files in this folder and starts it again."
-msgstr "Actualizar ahora descarga la versión nueva, la comprueba, cierra KanzonasSVG, pone los archivos nuevos del programa en esta carpeta y lo abre de nuevo."
+#: app.py:2671
+msgid "Update now downloads the new setup, checks it, closes KanzonasSVG (save your SVG first: it closes without asking) and installs the new version over this one; KanzonasSVG starts again when it's done. Your settings are kept."
+msgstr "Actualizar ahora descarga el instalador nuevo, lo comprueba, cierra KanzonasSVG (guarde antes su SVG: se cierra sin preguntar) e instala la versión nueva sobre esta; KanzonasSVG se abre de nuevo al terminar. Sus ajustes se conservan."
+
+#: app.py:2702
+msgid "Version %s"
+msgstr "Versión %s"
 
 #: app.py:1702
 msgid "View"
 msgstr "Ver"
 
+#: app.py:2629
+msgid "What changed since your version"
+msgstr "Lo que cambió desde su versión"
+
 #: app.py:2617
 msgid "What's new"
 msgstr "Novedades"
+
+#: app.py:2703
+msgid "What's new in %s"
+msgstr "Novedades de la %s"
 
 #: app.py:2667
 msgid "What's new since your version"
@@ -1171,6 +1203,18 @@ msgstr "Novedades desde su versión"
 #: batch.py:137
 msgid "Width"
 msgstr "Ancho"
+
+#: app.py:2808
+msgid "You can still download %s from the release page and put it in place of this one."
+msgstr "Aún puede descargar %s desde la página de la versión y ponerla en lugar de esta."
+
+#: app.py:2810
+msgid "You can still download %s from the release page, unzip it and copy what's in its KanzonasSVG folder over this folder."
+msgstr "Aún puede descargar %s desde la página de la versión, descomprimirlo y copiar el contenido de su carpeta KanzonasSVG sobre esta carpeta."
+
+#: app.py:2806
+msgid "You can still download the setup from the release page and run it."
+msgstr "Aún puede descargar el instalador desde la página de la versión y ejecutarlo."
 
 #: updates.py:388
 msgid "You don't have permission to change the folder it is in (%s)."
@@ -1195,10 +1239,6 @@ msgstr "Alejar"
 #: app.py:1556
 msgid "Zoom to fit"
 msgstr "Ajustar a la ventana"
-
-#: app.py:2673
-msgid "[What's new in %s](%s)"
-msgstr "[Novedades de la %s](%s)"
 
 #: colors_panel.py:418
 msgid "background"
