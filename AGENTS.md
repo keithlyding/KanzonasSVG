@@ -50,6 +50,13 @@ Every change, minor (1.0.1, 1.0.2) or major, before pushing:
 - Every build (GitHub) also runs 400 steps of the engine battery with the sanitizers and a new
   seed, the self test inside the finished programs, and installs, updates and uninstalls the
   Windows installer.
+- Every night (`.github/workflows/nightly.yml`, 05:23 UTC, and by hand from Actions): the engine
+  battery with ASan/UBSan (4 seeds x 3,000) and ThreadSanitizer (2 x 1,000), the fuzzer (20
+  minutes), the window battery (2 seeds x 4,000) and the unit tests on Windows and Linux; the
+  seeds are the date and a digit (`20261124` + 1-6), new each night and rerun the same way. A
+  failure opens (or adds to) one issue labeled `nightly`: treat it as a battery failure: rerun
+  the seed, fix the cause with its own regression test, close the issue. A pull request that
+  changes nightly.yml runs it too.
 
 A major revision (a new middle number: 1.1, 1.2; or 2.0), before merging, adds the full checks:
 `python tools/full_battery.py` (about two hours; writes `docs/test-reports/<version>.md`,
