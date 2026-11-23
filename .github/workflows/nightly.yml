@@ -1,0 +1,188 @@
+name: Nightly tests
+
+# Every night, more of the random checks than a build has time for (a build runs 400 steps of
+# the engine battery with one seed): the engine battery with AddressSanitizer/UBSan on 4 seeds
+# and ThreadSanitizer on 2, the fuzzer, the window battery on 2 seeds, and the unit tests on
+# Windows and Linux. The seeds come from the date (YYYYMMDD and a digit), new every night and
+# easy to rerun: tests/engine_battery.sh STEPS SEED, tests/battery_app.py --seed SEED.
+# A failure goes into one open issue labeled "nightly" (AGENTS.md says what to do with it).
+# (GitHub starts scheduled runs late when it's busy, and turns them off after 60 days without a
+# push to the repository; Actions > Nightly tests > Enable workflow turns them back on.)
+on:
+  schedule:
+    - cron: "23 5 * * *"          # 05:23 UTC: after midnight in the US (EST; 1 a.m. EDT)
+  workflow_dispatch:
+  pull_request:                   # a change to this file is tried in its pull request (no issue opened)
+    paths: [".github/workflows/nightly.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    outputs:
+      base: ${{ steps.date.outputs.base }}
+    steps:
+      - id: date
+        run: echo "base=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+
+  # the engine with the sanitizers: random pictures and settings (tests/engine_battery.cpp)
+  engine:
+    needs: seed
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {part: 1, kind: asan, steps: 3000, limit: 120}
+          - {part: 2, kind: asan, steps: 3000, limit: 120}
+          - {part: 3, kind: asan, steps: 3000, limit: 120}
+          - {part: 4, kind: asan, steps: 3000, limit: 120}
+          - {part: 5, kind: tsan, steps: 1000, limit: 300}
+          - {part: 6, kind: tsan, steps: 1000, limit: 300}
+    name: engine battery (${{ matrix.kind }}, seed ${{ needs.seed.outputs.base }}${{ matrix.part }})
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Engine battery
+        env:
+          CC: clang
+          CXX: clang++
+          SEED: ${{ needs.seed.outputs.base }}${{ matrix.part }}
+          KIND: ${{ matrix.kind }}
+        run: |
+          if [ "$KIND" = tsan ]; then
+            export SAN="-fsanitize=thread -fno-omit-frame-pointer -g -O1" TSAN_OPTIONS=halt_on_error=1
+          fi
+          tests/engine_battery.sh ${{ matrix.steps }} "$SEED" ${{ matrix.limit }}
+
+  fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fuzzer, 20 minutes (libFuzzer with AddressSanitizer and UBSan)
+        run: tests/fuzz_engine.sh 1200 2
+
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: fuzzer-findings
+          path: |
+            build/fuzz/crash-*
+            build/fuzz/leak-*
+            build/fuzz/timeout-*
+            build/fuzz/oom-*
+            build/fuzz/fuzz-*.log
+          if-no-files-found: ignore
+
+  # the window: odd and broken files, then random window actions (tests/battery_app.py)
+  window:
+    needs: seed
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2]
+    name: window battery (seed ${{ needs.seed.outputs.base }}${{ matrix.part }})
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Qt's system libraries
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends \
+            libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 \
+            libegl1 libgl1 libopengl0 libdbus-1-3 libfontconfig1 cmake
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt -c constraints.txt numpy
+
+      - name: Build the tracing engine
+        run: python tools/build_engine.py
+
+      - name: Window battery
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python tests/battery_app.py --steps 4000 --seed ${{ needs.seed.outputs.base }}${{ matrix.part }}
+
+  unit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    name: unit tests (${{ matrix.os }})
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Qt's system libraries and Ghostscript (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends \
+            libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 \
+            libegl1 libgl1 libopengl0 libdbus-1-3 libfontconfig1 cmake ghostscript
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt -c constraints.txt numpy pyflakes pymupdf ezdxf
+
+      - name: Build the tracing engine
+        run: python tools/build_engine.py
+
+      - name: Unit tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m unittest discover -s tests -p "test_*.py" -t .
+
+  report:
+    needs: [seed, engine, fuzz, window, unit]
+    if: failure() && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Report in an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BASE: ${{ needs.seed.outputs.base }}
+          RESULTS: "engine battery: ${{ needs.engine.result }}, fuzzer: ${{ needs.fuzz.result }}, window battery: ${{ needs.window.result }}, unit tests: ${{ needs.unit.result }}"
+        run: |
+          {
+            echo "The nightly tests of $(date -u +%F) failed: $RUN"
+            echo
+            echo "$RESULTS"
+            echo
+            echo "Seeds: ${BASE}1 to ${BASE}4 (engine battery, AddressSanitizer/UBSan, 3,000 steps), ${BASE}5 and ${BASE}6"
+            echo "(ThreadSanitizer, 1,000 steps), ${BASE}1 and ${BASE}2 (window battery, 4,000 steps). The failed job's log"
+            echo "names the seed and step; the fuzzer's findings are the run's fuzzer-findings files."
+            echo
+            echo "Rerun the failure (tests/engine_battery.sh STEPS SEED, KZ_STEP=N for one step; tests/battery_app.py"
+            echo "--steps N --seed SEED), fix the cause with its own unit test, and close this issue."
+          } > body.md
+          gh label create nightly --color FBCA04 --description "Nightly tests failed" 2>/dev/null || true
+          n=$(gh issue list --label nightly --state open --json number --jq '.[0].number')
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --body-file body.md
+          else
+            gh issue create --title "Nightly tests failed" --label nightly --body-file body.md
+          fi
