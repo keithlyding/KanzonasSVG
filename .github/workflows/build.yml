@@ -116,7 +116,8 @@ jobs:
           if (-not (Test-Path "$dir\KanzonasSVG.exe")) { throw "KanzonasSVG.exe isn't installed" }
           # Update now: the setup run exactly as the app runs it (no /DIR: it finds the installation
           # itself), closing the running program and starting it again (/RELAUNCH)
-          python tools/test_windows_update.py installer $setup $dir
+          # (and its window must show the blue setup icon top left, the orange program icon top right)
+          python tools/test_windows_update.py installer $setup $dir setup-window.png
           if ($LASTEXITCODE -ne 0) { throw "Updating the installed program the way Update now does failed" }
           $un = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{5F2EE57A-F848-4461-9769-94D17A448495}_is1"
           if ((Get-ItemProperty $un).InstallLocation.TrimEnd('\') -ne $dir) { throw "The update installed to another folder" }
@@ -141,6 +142,13 @@ jobs:
           path: KanzonasSVG-windows.zip
           compression-level: 0
           if-no-files-found: error
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: windows-setup-window
+          path: setup-window.png
+          if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v6
         if: failure()
