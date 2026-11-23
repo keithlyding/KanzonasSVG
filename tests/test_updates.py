@@ -366,7 +366,14 @@ class TestDownloads(unittest.TestCase):
         c.api = self.base + "/none"
         c.check()
         self.assertTrue(wait(lambda: said))
-        self.assertIn("latest version", said[-1])
+        self.assertEqual(said[-1], "You have the latest version (%s)." % __version__)
+        # found nothing newer on its own: says so for the status bar, not in a box (as KanzonasPDF)
+        checked = []
+        c.checked.connect(checked.append)
+        c.check(manual=False)
+        self.assertTrue(wait(lambda: checked))
+        self.assertEqual(checked, ["You have the latest version (%s)." % __version__])
+        self.assertEqual(len(said), 1)
         c.api = self.base + "/junk"
         c.check()
         self.assertTrue(wait(lambda: len(said) == 2))
@@ -383,32 +390,228 @@ class TestDownloads(unittest.TestCase):
 
 
 class TestWindow(unittest.TestCase):
-    def test_notice_and_menu(self):
-        w = app.MainWindow()
-        try:
-            texts = [a.text() for m in w.menuBar().actions() for a in m.menu().actions()]
-            self.assertIn("Check for updates...", texts)
-            self.assertIn("Check for updates automatically", texts)
-            w.a_auto_updates.setChecked(False)
-            self.assertFalse(w.updater().enabled())
-            w.a_auto_updates.setChecked(True)
-            u = w.updater()
-            u.manual = False
-            u.release = {"tag_name": "v99.1"}
-            u.releases = [u.release]
-            w._update_found("99.1")
-            bar = w._update_bar
-            self.assertIsNotNone(bar)
-            buttons = [b.text() for b in bar.findChildren(app.QPushButton)]
-            # run from source: no Update now
-            self.assertEqual(buttons, ["What's new", "Download", "Skip this version", "Later"])
-            skip = [b for b in bar.findChildren(app.QPushButton) if b.text() == "Skip this version"][0]
-            skip.click()
-            self.assertIsNone(w._update_bar)
-            self.assertEqual(w.qs.value(updates.KEY_SKIP), "99.1")
-            w.qs.remove(updates.KEY_SKIP)
-        finally:
-            w.close()
+    """The notice, the update box and their texts: the same as KanzonasPDF's (its
+    kanzonas/main_window.py: _update_found, _update_box, _update_now_text, _update_outcome), for
+    each way KanzonasSVG can be installed."""
+
+    INSTALLER = ("Update now downloads the new setup, checks it, closes KanzonasSVG (save your SVG first: "
+                 "it closes without asking) and installs the new version over this one; KanzonasSVG starts "
+                 "again when it's done. Your settings are kept.")
+    PORTABLE = ("Update now downloads it, closes KanzonasSVG (save your SVG first: it closes without "
+                "asking), replaces the program files in this folder and starts it again. Your settings "
+                "are kept.")
+    APPIMAGE = ("Update now downloads the new AppImage, checks it, closes KanzonasSVG (save your SVG "
+                "first: it closes without asking), puts it in place of KanzonasSVG-x86_64.AppImage and "
+                "starts it again. Your settings are kept.")
+
+    def setUp(self):
+        from unittest import mock
+        self.mock = mock
+        self.w = app.MainWindow()
+        self.opened = []
+        self.patches = [mock.patch.object(app.QDesktopServices, "openUrl",
+                                          side_effect=lambda u: self.opened.append(u.toString()))]
+        for p in self.patches:
+            p.start()
+        u = self.w.updater()
+        u.manual = False
+        u.release = {"tag_name": "v99.2", "html_url": "https://github.com/keithlyding/KanzonasSVG/releases/tag/v99.2",
+                     "assets": [asset(updates.setup_name("99.2")), asset(updates.PORTABLE_ZIP), asset(updates.APPIMAGE)],
+                     "body": "<!-- kanzonas-notes -->\nFixed: the newest\n<!-- /kanzonas-notes -->"}
+        older = {"tag_name": "v99.1", "html_url": "https://github.com/keithlyding/KanzonasSVG/releases/tag/v99.1",
+                 "assets": [], "body": "no notes in this one"}
+        u.releases = [u.release, older]
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        self.w.close()
+
+    def kind(self, kind, all_users=False):
+        """Act as a copy installed that way (None: run from source)."""
+        m = self.mock
+        for p in (m.patch.object(updates, "update_kind", return_value=kind),
+                  m.patch.object(updates, "running_appimage", return_value="/home/me/Apps/KanzonasSVG-x86_64.AppImage"),
+                  m.patch.object(updates, "for_all_users", return_value=all_users)):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def notice(self):
+        self.w.statusBar().showMessage("something else")
+        self.w._update_found("99.2")
+        bar = self.w._update_bar
+        self.assertIsNotNone(bar)
+        self.assertEqual(self.w.statusBar().currentMessage(), "", "a status message would hide the notice")
+        return bar, {b.text(): b for b in bar.findChildren(app.QPushButton)}
+
+    def test_menu(self):
+        texts = [a.text() for m in self.w.menuBar().actions() for a in m.menu().actions()]
+        self.assertIn("Check for updates...", texts)
+        self.assertIn("Check for updates automatically", texts)
+        self.w.a_auto_updates.setChecked(False)
+        self.assertFalse(self.w.updater().enabled())
+        self.w.a_auto_updates.setChecked(True)
+
+    def test_notice(self):
+        for kind, text in (("installer", self.INSTALLER), ("portable", self.PORTABLE),
+                           ("appimage", self.APPIMAGE), (None, None)):
+            with self.subTest(kind=kind):
+                self.kind(kind)
+                bar, buttons = self.notice()
+                label = bar.findChildren(app.QLabel)[0].text()
+                self.assertEqual(label, "<b>KanzonasSVG 99.2 is available</b> (you have %s)." % __version__)
+                order = [b.text() for b in bar.findChildren(app.QPushButton)]
+                if kind is None:    # run from source: it can't update itself
+                    self.assertEqual(order, ["What's new", "Download", "Skip this version", "Later"])
+                else:
+                    self.assertEqual(order, ["What's new", "Update now", "Download", "Skip this version", "Later"])
+                    self.assertEqual(buttons["Update now"].toolTip(), text)
+                self.assertEqual(buttons["What's new"].toolTip(), "What changed since your version")
+                self.assertEqual(buttons["Download"].toolTip(),
+                                 "Open the release page to download the installer or portable zip"
+                                 if sys.platform == "win32" else "Open the release page to download the new version")
+                buttons["Later"].click()
+                self.assertIsNone(self.w._update_bar)
+                self.doCleanups()
+
+    def test_notice_buttons(self):
+        self.kind("portable")
+        _, b = self.notice()
+        b["Skip this version"].click()
+        self.assertIsNone(self.w._update_bar)
+        self.assertEqual(self.w.qs.value(updates.KEY_SKIP), "99.2")
+        self.w.qs.remove(updates.KEY_SKIP)
+        _, b = self.notice()
+        b["Download"].click()
+        self.assertIsNone(self.w._update_bar)
+        self.assertEqual(self.opened, ["https://github.com/keithlyding/KanzonasSVG/releases/tag/v99.2"])
+        _, b = self.notice()
+        with self.mock.patch.object(self.w, "update_now") as now:
+            b["Update now"].click()
+        now.assert_called_once()
+        self.assertIsNone(self.w._update_bar)
+        # What's new: the box; Update now or Download there closes the notice too, Later doesn't
+        for answer, closes in (("Later", False), ("Download", True)):
+            _, b = self.notice()
+            with self.mock.patch.object(self.w, "run_dialog", side_effect=self.answer(answer)):
+                b["What's new"].click()
+            self.assertEqual(self.w._update_bar is None, closes, answer)
+        self.w._close_update_bar()
+
+    def answer(self, text):
+        def run(d):
+            box = d.findChild(app.QDialogButtonBox)
+            self.seen = d
+            [b for b in box.buttons() if b.text() == text][0].click()
+        return run
+
+    def test_box(self):
+        for kind, text in (("installer", self.INSTALLER), ("portable", self.PORTABLE),
+                           ("appimage", self.APPIMAGE), (None, None)):
+            with self.subTest(kind=kind):
+                self.kind(kind)
+                shown = {}
+
+                def look(d):
+                    shown["title"] = d.windowTitle()
+                    shown["size"] = (d.width(), d.height())
+                    shown["labels"] = [x.text() for x in d.findChildren(app.QLabel)]
+                    shown["notes"] = d.findChild(app.QTextBrowser).toMarkdown()
+                    shown["buttons"] = [b.text() for b in d.findChild(app.QDialogButtonBox).buttons()]
+                with self.mock.patch.object(self.w, "run_dialog", side_effect=look):
+                    self.w.update_box("99.2")
+                self.assertEqual(shown["title"], "Check for updates")
+                self.assertEqual(shown["size"], (600, 520))
+                hint = "Download opens the release page in your browser."
+                self.assertEqual(shown["labels"], [
+                    "KanzonasSVG 99.2 is available (you have %s)." % __version__,
+                    "<b>What's new since your version</b>",
+                    (text + "\n\n" + hint) if text else hint])
+                notes = shown["notes"]
+                self.assertIn("Version 99.2", notes)
+                self.assertIn("Fixed: the newest", notes)
+                self.assertIn("Version 99.1", notes)
+                self.assertIn("[What's new in 99.1](https://github.com/keithlyding/KanzonasSVG/releases/tag/v99.1)", notes)
+                self.assertLess(notes.index("99.2"), notes.index("99.1"))
+                self.assertEqual(sorted(shown["buttons"]),
+                                 sorted((["Update now"] if text else []) + ["Download", "Later"]))
+                self.doCleanups()
+
+    def test_box_buttons(self):
+        self.kind("installer")
+        done = []
+        with self.mock.patch.object(self.w, "update_now") as now, \
+                self.mock.patch.object(self.w, "run_dialog", side_effect=self.answer("Update now")):
+            self.w.update_box("99.2", lambda: done.append(1))
+        now.assert_called_once()
+        self.assertEqual(done, [1])
+        with self.mock.patch.object(self.w, "run_dialog", side_effect=self.answer("Later")):
+            self.w.update_box("99.2", lambda: done.append(2))
+        self.assertEqual((done, self.opened), ([1], []))
+        with self.mock.patch.object(self.w, "run_dialog", side_effect=self.answer("Download")):
+            self.w.update_box("99.2", lambda: done.append(3))
+        self.assertEqual((done, len(self.opened)), ([1, 3], 1))
+        # asked for (Help > Check for updates...): the box at once, no notice
+        self.w.updater().manual = True
+        with self.mock.patch.object(self.w, "update_box") as box:
+            self.w._update_found("99.2")
+        box.assert_called_once_with("99.2")
+        self.assertIsNone(getattr(self.w, "_update_bar", None))
+
+    def test_update_now_texts(self):
+        self.kind("installer", all_users=True)
+        self.assertEqual(self.w._update_now_text(), self.INSTALLER + " KanzonasSVG is installed for all users, "
+                         "so Windows asks for administrator rights first.")
+        self.doCleanups()
+        self.kind(None)
+        self.assertEqual(self.w._update_now_text(), "")
+        self.assertIsNone(self.w._update_url())
+
+    def test_failed_download_hints(self):
+        self.assertEqual(self.w._update_failed_hint("installer"),
+                         "You can still download the setup from the release page and run it.")
+        self.assertEqual(self.w._update_failed_hint("appimage"), "You can still download KanzonasSVG-x86_64.AppImage "
+                         "from the release page and put it in place of this one.")
+        self.assertEqual(self.w._update_failed_hint("portable"), "You can still download KanzonasSVG-windows.zip from "
+                         "the release page, unzip it and copy what's in its KanzonasSVG folder over this folder.")
+
+    def test_update_that_didnt_finish(self):
+        qs = self.w.qs
+        folder = tempfile.mkdtemp(prefix="kzsvgsetup")
+        setup = os.path.join(folder, updates.setup_name("99.2"))
+        open(setup, "wb").close()
+        updates.remember_update(qs, "99.2", setup)
+        shown = []
+
+        def look(box):
+            shown.append((box.windowTitle(), box.icon(), box.text(), box.informativeText(),
+                          [b.text() for b in box.buttons()]))
+        with self.mock.patch.object(self.w, "run_dialog", side_effect=look):
+            self.w._update_outcome()
+            self.w._update_outcome()            # (told once)
+        self.assertEqual(len(shown), 1)
+        title, icon, text, more, buttons = shown[0]
+        self.assertEqual((title, icon), ("Update", app.QMessageBox.Icon.Warning))
+        self.assertEqual(text, "The update to KanzonasSVG 99.2 didn't finish: this is still %s. Windows may have "
+                         "kept one of its files in use." % __version__)
+        self.assertEqual(more, "Run the setup now to finish it: it shows what's in the way and can close it.")
+        self.assertIn("Run the setup", buttons)
+        self.assertTrue(os.path.exists(setup), "kept, to run it again")
+        # it took (the version running is the one installed): nothing said, the setup removed
+        updates.remember_update(qs, __version__, setup)
+        with self.mock.patch.object(self.w, "run_dialog", side_effect=look):
+            self.w._update_outcome()
+        self.assertEqual(len(shown), 1)
+        self.assertFalse(os.path.exists(folder))
+        # the setup gone: download it again
+        updates.remember_update(qs, "99.2", setup)
+        with self.mock.patch.object(self.w, "run_dialog", side_effect=look):
+            self.w._update_outcome()
+        self.assertEqual(shown[1][3], "Download the setup from the release page and run it.")
+        self.assertNotIn("Run the setup", shown[1][4])
+        qs.setValue(updates.KEY_PENDING, "{not json")
+        self.assertIsNone(updates.update_outcome(qs))
+        self.assertIsNone(qs.value(updates.KEY_PENDING))
 
 
 if __name__ == "__main__":

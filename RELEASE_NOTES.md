@@ -2,6 +2,20 @@
 
 Short, plain-language notes for each version; the release text on GitHub is made from them.
 
+## 1.5.3
+
+Changed:
+- The update notice and the update box now look and work the same as in KanzonasPDF: a notice in
+  the status bar when a new version is out (What's new, Update now, Download, Skip this version,
+  Later, each with a tip saying what it does), and the box with what's new since your version.
+  When the daily check finds nothing newer, the status bar says so.
+- The box says exactly what Update now will do for your copy (setup, unzipped copy or AppImage),
+  including that KanzonasSVG closes without asking to save, so save your SVG first.
+
+Fixed:
+- If an update with the setup couldn't finish (Windows kept a file in use), KanzonasSVG now says
+  so the next time it starts and offers to run the setup again.
+
 ## 1.5.2
 
 Fixed:

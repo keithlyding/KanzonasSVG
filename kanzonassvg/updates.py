@@ -60,6 +60,7 @@ USER_AGENT = (APP_NAME + "/" + __version__).encode()
 KEY_CHECK = "updates/check"
 KEY_LAST = "updates/last"
 KEY_SKIP = "updates/skip"
+KEY_PENDING = "updates/pending"   # the setup Update now ran, until the next start (update_outcome)
 
 
 # versions and releases
@@ -315,6 +316,35 @@ def installer_command(setup_path, folder):
             "/ALLUSERS" if for_all_users(folder) else "/CURRENTUSER", "/RELAUNCH"]
 
 
+def remember_update(settings, version, setup_path):
+    """Update now is about to run the setup for version: kept until the next start, which tells
+    whether it took (update_outcome; as KanzonasPDF's)."""
+    settings.setValue(KEY_PENDING, json.dumps({"version": str(version), "setup": setup_path,
+                                               "at": time.time()}))
+
+
+def update_outcome(settings, running=None):
+    """At start-up, after Update now ran a setup: None when there was none (or the record is
+    unreadable), else {"ok": bool, "version", "setup"}. ok: the version running is the one
+    installed, or newer; the setup's folder is then removed. Either way the record goes: the
+    outcome is told once."""
+    raw = settings.value(KEY_PENDING)
+    if not raw:
+        return None
+    settings.remove(KEY_PENDING)
+    try:
+        rec = json.loads(str(raw))
+        want = str(rec["version"])
+    except (ValueError, KeyError, TypeError):
+        return None                     # (a record this version can't read: nothing to tell)
+    ok = version_tuple(running or __version__) >= version_tuple(want)
+    out = {"ok": ok, "version": want, "setup": str(rec.get("setup") or "")}
+    folder = os.path.dirname(out["setup"])
+    if ok and os.path.basename(folder).startswith("kzsvgsetup"):
+        shutil.rmtree(folder, ignore_errors=True)    # (the setup: done with)
+    return out
+
+
 # Windows: the zip
 
 def file_sha256(path):
@@ -457,9 +487,11 @@ def restart_env(env=None):
 
 class UpdateChecker(QObject):
     """found(version) when a newer release exists (self.release is its entry, self.releases every
-    release listed); result(text) answers a check the user asked for."""
+    release listed); result(text) answers a check the user asked for; checked(text) says an
+    automatic check found nothing newer (as KanzonasPDF's: the window shows it in the status bar)."""
     found = Signal(str)
     result = Signal(str)
+    checked = Signal(str)
 
     def __init__(self, settings, parent=None, api=API):
         super().__init__(parent)
@@ -532,8 +564,8 @@ class UpdateChecker(QObject):
         self.releases = data
         self.release = newest_release(data)
         if self.release is None:
-            if manual:
-                self.result.emit(tr("You have the latest version (%s).") % __version__)
+            text = tr("You have the latest version (%s).") % __version__
+            (self.result if manual else self.checked).emit(text)
             return
         version = release_version(self.release)
         if not manual and str(self.settings.value(KEY_SKIP, "")) == version:
